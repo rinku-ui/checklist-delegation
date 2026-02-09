@@ -81,7 +81,7 @@ export default function TaskNavigationTabs({
         const completionDate = task.submission_date ? parseTaskStartDate(task.submission_date) : null
 
         let status = "pending"
-        if (completionDate || task.status === 'Yes') {
+        if (completionDate || task.status === 'yes') {
           status = "completed"
         } else if (taskStartDate && isDateInPast(taskStartDate)) {
           status = "overdue"
@@ -237,198 +237,223 @@ export default function TaskNavigationTabs({
 
   return (
     <div className="w-full overflow-hidden rounded-lg border border-gray-200 bg-white">
-      <div className="grid grid-cols-3">
+      <div className="hidden md:grid grid-cols-3">
         <button
           className={`py-3 text-center font-medium transition-colors ${taskView === "recent" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           onClick={() => setTaskView("recent")}
         >
-          {dashboardType === "delegation" ? "Today Tasks" : "Recent Tasks"}
+          {dashboardType === "delegation" ? "Today Task" : "Recent"}
         </button>
         <button
           className={`py-3 text-center font-medium transition-colors ${taskView === "upcoming" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           onClick={() => setTaskView("upcoming")}
         >
-          {dashboardType === "delegation" ? "Future Tasks" : "Upcoming Tasks"}
+          {dashboardType === "delegation" ? "Future Task" : "Upcoming"}
         </button>
         <button
           className={`py-3 text-center font-medium transition-colors ${taskView === "overdue" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           onClick={() => setTaskView("overdue")}
         >
-          Overdue Tasks
+          Overdue
         </button>
       </div>
 
       <div className="p-4">
         {/* Accordion Filter Section */}
-        <div className="mb-4 border border-gray-200 rounded-lg">
-          <button
-            onClick={() => setIsFilterExpanded(!isFilterExpanded)}
-            className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
-          >
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-purple-600" />
-              <span className="font-medium text-purple-700">Filters</span>
-              {(searchQuery || dashboardStaffFilter !== "all" || departmentFilter !== "all") && (
-                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
-                  Active
-                </span>
+        {dashboardType !== 'checklist' && dashboardType !== 'delegation' && (
+          <div className="mb-4 border border-gray-200 rounded-lg">
+            <button
+              onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
+            >
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-purple-600" />
+                <span className="font-medium text-purple-700">Filters</span>
+                {(searchQuery || dashboardStaffFilter !== "all" || departmentFilter !== "all") && (
+                  <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
+                    Active
+                  </span>
+                )}
+              </div>
+              {isFilterExpanded ? (
+                <ChevronUp className="h-4 w-4 text-gray-600" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-gray-600" />
               )}
-            </div>
-            {isFilterExpanded ? (
-              <ChevronUp className="h-4 w-4 text-gray-600" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-gray-600" />
-            )}
-          </button>
+            </button>
 
-          {isFilterExpanded && (
-            <div className="p-4 border-t border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label htmlFor="search" className="block text-sm font-medium text-gray-700">
-                    Search Tasks
-                  </label>
-                  <input
-                    id="search"
-                    placeholder="Search by task title or ID"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  />
-                </div>
+            {isFilterExpanded && (
+              <div className="p-4 border-t border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label htmlFor="search" className="block text-sm font-medium text-gray-700">
+                      Search Tasks
+                    </label>
+                    <input
+                      id="search"
+                      placeholder="Search by task title or ID"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full rounded-md border border-gray-300 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    />
+                  </div>
 
-                {/* Active Filters Display */}
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Active Filters
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {dashboardStaffFilter !== "all" && (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
-                        Staff: {dashboardStaffFilter}
-                      </span>
-                    )}
-                    {departmentFilter !== "all" && (
-                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
-                        Department: {departmentFilter}
-                      </span>
-                    )}
-                    {searchQuery && (
-                      <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
-                        Search: {searchQuery}
-                      </span>
-                    )}
-                    {!dashboardStaffFilter || dashboardStaffFilter === "all" &&
-                      !departmentFilter || departmentFilter === "all" &&
-                      !searchQuery && (
-                        <span className="text-xs text-gray-500">No active filters</span>
+                  {/* Active Filters Display */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Active Filters
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {dashboardStaffFilter !== "all" && (
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
+                          Staff: {dashboardStaffFilter}
+                        </span>
                       )}
+                      {departmentFilter !== "all" && (
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
+                          Department: {departmentFilter}
+                        </span>
+                      )}
+                      {searchQuery && (
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
+                          Search: {searchQuery}
+                        </span>
+                      )}
+                      {!dashboardStaffFilter || dashboardStaffFilter === "all" &&
+                        !departmentFilter || departmentFilter === "all" &&
+                        !searchQuery && (
+                          <span className="text-xs text-gray-500">No active filters</span>
+                        )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Show total count */}
-        {totalCount > 0 && (
-          <div className="mb-4 text-sm text-gray-600">
-            Total {taskView} tasks: {totalCount} | Showing: {displayedTasks.length}
-            {(dashboardStaffFilter !== "all" || departmentFilter !== "all") && (
-              <div className="mt-1 text-xs">
-                {dashboardStaffFilter !== "all" && (
-                  <span className="mr-3">Filtered by Staff: {dashboardStaffFilter}</span>
-                )}
-                {departmentFilter !== "all" && (
-                  <span>Filtered by Department: {departmentFilter}</span>
-                )}
               </div>
             )}
           </div>
         )}
 
+        {/* Mobile-Friendly Tabs Header */}
+        <div className="md:hidden flex bg-white rounded-lg border border-purple-200 p-1 mb-4 shadow-sm overflow-x-auto no-scrollbar">
+          {["recent", "upcoming", "overdue"].map((view) => (
+            <button
+              key={view}
+              onClick={() => setTaskView(view)}
+              className={`flex-1 min-w-[100px] py-3 rounded-lg text-sm font-bold transition-all duration-300 uppercase tracking-wider ${taskView === view
+                ? "bg-purple-600 text-white shadow-lg"
+                : "text-purple-600 hover:bg-purple-50"
+                }`}
+            >
+              {view === "overdue" ? "Overdue" :
+                (dashboardType === "delegation"
+                  ? (view === "recent" ? "Today Task" : "Future Task")
+                  : (view === "recent" ? "Recent" : "Upcoming")
+                )
+              }
+            </button>
+          ))}
+        </div>
+
+        {/* Task List / Table Rendering */}
         {displayedTasks.length === 0 && !isLoadingMore ? (
-          <div className="text-center p-8 text-gray-500">
-            <p>No tasks found for {taskView} view.</p>
-            {(dashboardStaffFilter !== "all" || departmentFilter !== "all") && (
-              <p className="text-sm mt-2">Try adjusting your filters to see more results.</p>
-            )}
+          <div className="text-center p-12 bg-white rounded-xl border border-dashed border-gray-300">
+            <div className="flex justify-center mb-4">
+              <div className="p-3 bg-gray-50 rounded-full">
+                <Filter className="h-8 w-8 text-gray-300" />
+              </div>
+            </div>
+            <p className="text-gray-500 font-medium">No tasks found for {taskView} view.</p>
+            <p className="text-sm text-gray-400 mt-1">Try adjusting your filters or search query.</p>
           </div>
         ) : (
-          <div
-            className="task-table-container overflow-x-auto"
-            style={{ maxHeight: "400px", overflowY: "auto" }}
-          >
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0 z-10">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Seq No.
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Task ID
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Task Description
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Assigned To
-                  </th>
-                  {dashboardType === "checklist" && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Department
-                    </th>
-                  )}
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Task Start Date
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Frequency
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {displayedTasks.map((task, index) => {
-                  // Calculate sequence number - starts from 1 for the first item
-                  const sequenceNumber = index + 1;
-
-                  return (
-                    <tr key={`${task.id}-${task.taskStartDate}`} className="hover:bg-gray-50">
-                      {/* Add Sequence Number Cell */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
-                        {sequenceNumber}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.id}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{task.title}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.assignedTo}</td>
+          <div>
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div
+                className="task-table-container overflow-x-auto"
+                style={{ maxHeight: "500px", overflowY: "auto" }}
+              >
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50 sticky top-0 z-10 transition-all">
+                    <tr>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Seq</th>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">ID</th>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Description</th>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Staff</th>
                       {dashboardType === "checklist" && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.department}</td>
+                        <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Department</th>
                       )}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.taskStartDate}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getFrequencyColor(task.frequency)}`}>
-                          {task.frequency.charAt(0).toUpperCase() + task.frequency.slice(1)}
-                        </span>
-                      </td>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Date</th>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Freq</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {displayedTasks.map((task, index) => (
+                      <tr key={`${task.id}-${task.taskStartDate}`} className="hover:bg-purple-50/30 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-400">{index + 1}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-purple-700">{task.id}</td>
+                        <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate font-medium">{task.title}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">{task.assignedTo}</td>
+                        {dashboardType === "checklist" && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">{task.department}</td>
+                        )}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">{task.taskStartDate}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${getFrequencyColor(task.frequency)}`}>
+                            {task.frequency}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+              {displayedTasks.map((task, index) => (
+                <div key={`${task.id}-${task.taskStartDate}`} className="bg-white p-4 rounded-xl shadow-md border border-gray-100 relative overflow-hidden group active:scale-[0.98] transition-all">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded uppercase">#{task.id}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getFrequencyColor(task.frequency)}`}>
+                      {task.frequency}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-800 line-clamp-2 mb-3 pr-4 leading-relaxed">{task.title}</h3>
+                  <div className="grid grid-cols-2 gap-y-2 border-t border-gray-50 pt-3">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Assigned To</span>
+                      <span className="text-xs font-semibold text-gray-700">{task.assignedTo}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Start Date</span>
+                      <span className="text-xs font-semibold text-gray-700">{task.taskStartDate}</span>
+                    </div>
+                    {dashboardType === "checklist" && (
+                      <div className="flex flex-col col-span-2 mt-1">
+                        <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Department</span>
+                        <span className="text-xs font-semibold text-gray-700">{task.department}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                </div>
+              ))}
+            </div>
 
             {isLoadingMore && (
-              <div className="text-center py-4">
-                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                <p className="text-sm text-gray-500 mt-2">Loading more tasks...</p>
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="h-8 w-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+                <p className="text-xs font-bold text-purple-600 mt-3 uppercase tracking-widest">Loading Tasks...</p>
               </div>
             )}
 
             {!hasMoreData && displayedTasks.length > 0 && (
-              <div className="text-center py-4 text-sm text-gray-500">
-                No more tasks to load
+              <div className="text-center py-8 text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">
+                You've reached the end
               </div>
             )}
           </div>

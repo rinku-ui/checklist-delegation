@@ -88,13 +88,20 @@ export const fetchUniqueDoerNameDataApi = async (department) => {
   try {
     console.log("Department passed:", department);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("users")
       .select("user_name, role, user_access")
-      .or(`user_access.ilike.%${department}%,role.eq.admin`) // ✅ match department OR admin role
       .eq("status", "active")
-      .eq("role", "user") // only active users
+      .eq("role", "user")
       .order("user_name", { ascending: true });
+
+    if (department) {
+      query = query.or(`user_access.ilike.%${department}%,role.eq.admin`);
+    } else {
+      query = query.eq("role", "admin"); // Fallback if no department
+    }
+
+    const { data, error } = await query;
 
     const uniqueDoerName = [...new Set(data?.map((d) => d.user_name))];
 
@@ -112,8 +119,14 @@ export const fetchUniqueDoerNameDataApi = async (department) => {
 
 
 export const pushAssignTaskApi = async (generatedTasks) => {
-  const submitTable =
-    generatedTasks[0]?.frequency === "one-time" ? "delegation" : "checklist";
+  // Determine which table to use based on frequency
+  const firstTaskFrequency = generatedTasks[0]?.frequency?.toLowerCase() || "";
+  const isOneTime = firstTaskFrequency === "one-time" ||
+    firstTaskFrequency.includes("one time") ||
+    firstTaskFrequency.includes("no recurrence");
+
+  const submitTable = isOneTime ? "delegation" : "checklist";
+  console.log("Submitting to table:", submitTable, "Frequency:", generatedTasks[0]?.frequency);
 
 
   const tasksData = generatedTasks.map((task) => ({
@@ -133,16 +146,16 @@ export const pushAssignTaskApi = async (generatedTasks) => {
       .from(submitTable)
       .insert(tasksData);
 
-    if (!error) {
-      console.log("post succefully", data)
-
-    } else {
-      console.log("error when posting data", error)
+    if (error) {
+      console.error("Error when posting data:", error);
+      throw error;
     }
+
+    console.log("Posted successfully to", submitTable, ":", data);
     return data;
   } catch (error) {
-    console.log("error from supabase", error);
-
+    console.error("Error from supabase:", error);
+    throw error;
   }
 }
 

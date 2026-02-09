@@ -502,6 +502,43 @@ function DelegationDataPage() {
 
     setIsSubmitting(true);
 
+    // Helper to ensure valid ISO timestamp for DB
+    const ensureISO = (dateStr) => {
+      if (!dateStr) return null;
+
+      try {
+        // If already ISO-like (begins with 4 digits)
+        if (typeof dateStr === 'string' && /^\d{4}/.test(dateStr)) {
+          const d = new Date(dateStr);
+          return !isNaN(d.getTime()) ? d.toISOString() : null;
+        }
+
+        // If DD/MM/YYYY format
+        if (typeof dateStr === 'string' && /^\d{1,2}\/\d{1,2}\/\d{4}/.test(dateStr)) {
+          const [datePart, timePart] = dateStr.split(' ');
+          const [day, month, year] = datePart.split('/');
+
+          let hours = 0, minutes = 0, seconds = 0;
+          if (timePart) {
+            const parts = timePart.split(':');
+            hours = parseInt(parts[0] || 0, 10);
+            minutes = parseInt(parts[1] || 0, 10);
+            seconds = parseInt(parts[2] || 0, 10);
+          }
+
+          const date = new Date(year, month - 1, day, hours, minutes, seconds);
+          return !isNaN(date.getTime()) ? date.toISOString() : null;
+        }
+
+        // Try generic construction
+        const d = new Date(dateStr);
+        return !isNaN(d.getTime()) ? d.toISOString() : null;
+      } catch (e) {
+        console.warn('Date parsing error:', e);
+        return null;
+      }
+    };
+
     try {
       const selectedData = selectedItemsArray.map((id) => {
         const item = delegation.find((account) => account.task_id === id);
@@ -512,14 +549,14 @@ function DelegationDataPage() {
 
         return {
           task_id: item.task_id,
-          department: item.department,
-          given_by: item.given_by,
+          department: item.department || '',
+          given_by: item.given_by || '',
           name: item.name,
           task_description: item.task_description,
-          task_start_date: item.task_start_date,
-          planned_date: item.planned_date,
+          task_start_date: ensureISO(item.task_start_date),
+          planned_date: ensureISO(item.planned_date),
           status: dbStatus,
-          next_extend_date: statusData[id] === "Extend date" ? nextTargetDate[id] : null,
+          next_extend_date: statusData[id] === "Extend date" ? ensureISO(nextTargetDate[id]) : null,
           reason: remarksData[id] || "",
           image_url: uploadedImages[id] ? null : item.image,
           require_attachment: item.require_attachment,
@@ -529,35 +566,34 @@ function DelegationDataPage() {
 
       console.log("Selected Data for submission:", selectedData);
 
-      const submissionPromises = selectedData.map(async (taskData) => {
-        const taskImage = uploadedImages[taskData.task_id];
+      const action = await dispatch(
+        insertDelegationDoneAndUpdate({
+          selectedDataArray: selectedData,
+          uploadedImages: uploadedImages,
+        })
+      );
 
-        return dispatch(
-          insertDelegationDoneAndUpdate({
-            selectedDataArray: [taskData],
-            uploadedImages: taskImage ? { [taskData.task_id]: taskImage } : {},
-          })
-        );
-      });
+      if (insertDelegationDoneAndUpdate.fulfilled.match(action)) {
+        const results = action.payload;
+        const failedTasks = results.filter(r => r.status === 'error');
 
-      const results = await Promise.allSettled(submissionPromises);
-
-      const failedSubmissions = results.filter(result => result.status === 'rejected');
-
-      if (failedSubmissions.length > 0) {
-        console.error('Some submissions failed:', failedSubmissions);
-        alert(`${failedSubmissions.length} out of ${selectedItemsArray.length} submissions failed. Please check the console for details.`);
+        if (failedTasks.length > 0) {
+          console.error('Some tasks failed to submit:', failedTasks);
+          alert(`${failedTasks.length} task(s) failed to submit. Please check console for details.`);
+        } else {
+          setSuccessMessage(
+            `Successfully submitted ${selectedItemsArray.length} task records!`
+          );
+          setSelectedItems(new Set());
+          setAdditionalData({});
+          setRemarksData({});
+          setStatusData({});
+          setNextTargetDate({});
+          setUploadedImages({});
+        }
       } else {
-        setSuccessMessage(
-          `Successfully submitted ${selectedItemsArray.length} task records!`
-        );
+        throw new Error(action.payload || 'Submission failed');
       }
-
-      setSelectedItems(new Set());
-      setAdditionalData({});
-      setRemarksData({});
-      setStatusData({});
-      setNextTargetDate({});
 
       setTimeout(() => {
         dispatch(delegationData());
@@ -566,7 +602,7 @@ function DelegationDataPage() {
 
     } catch (error) {
       console.error('Submission error:', error);
-      alert('An error occurred during submission. Please try again.');
+      alert('An error occurred during submission: ' + (error.message || 'Please try again.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -621,20 +657,20 @@ function DelegationDataPage() {
             <div className="flex gap-2">
               <button
                 onClick={toggleHistory}
-                className="flex-1 sm:flex-none rounded-md gradient-bg py-2 px-3 sm:px-4 text-white hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm sm:text-base"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm sm:text-base font-medium text-purple-700 bg-white border border-purple-200 rounded-md hover:bg-purple-50 transition-colors shadow-sm"
               >
                 {showHistory ? (
-                  <div className="flex items-center justify-center">
+                  <>
                     <ArrowLeft className="h-4 w-4 mr-1" />
                     <span className="hidden sm:inline">Back to Tasks</span>
                     <span className="sm:hidden">Back</span>
-                  </div>
+                  </>
                 ) : (
-                  <div className="flex items-center justify-center">
+                  <>
                     <History className="h-4 w-4 mr-1" />
                     <span className="hidden sm:inline">View History</span>
                     <span className="sm:hidden">History</span>
-                  </div>
+                  </>
                 )}
               </button>
 
@@ -642,7 +678,7 @@ function DelegationDataPage() {
                 <button
                   onClick={handleSubmit}
                   disabled={selectedItemsCount === 0 || isSubmitting}
-                  className="flex-1 sm:flex-none rounded-md gradient-bg py-2 px-3 sm:px-4 text-white hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm sm:text-base font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
                 >
                   {isSubmitting
                     ? "Processing..."

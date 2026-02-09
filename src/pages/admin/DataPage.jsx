@@ -1,4 +1,4 @@
-"use client"
+
 
 import { useParams } from "react-router-dom"
 import AdminLayout from "../../components/layout/AdminLayout.jsx"
@@ -11,6 +11,8 @@ import PurchaseDataPage from "./purchase-data-page.jsx"
 import DirectorDataPage from "./director-data-page.jsx"
 import ManagingDirector from "./managingDirector-data-page.jsx"
 import AdminDataPage from "./admin-data-page.jsx"
+import MaintenanceDataPage from "./MaintenanceDataPage.jsx"
+import RepairDataPage from "./RepairDataPage.jsx"
 import Coo from "./coo-data-page.jsx"
 
 export default function DataPage() {
@@ -28,9 +30,13 @@ export default function DataPage() {
   // Render the appropriate component based on category
   switch (category) {
     case "main":
-      return <AdminDataPage/>
+      return <AdminDataPage />
     case "sales":
       return <SalesDataPage />
+    case "maintenance":
+      return <MaintenanceDataPage />
+    case "repair":
+      return <RepairDataPage />
     // case "service":
     //   return <ServiceDataPage />
     // case "jockey":
@@ -39,12 +45,12 @@ export default function DataPage() {
       return <AccountDataPage />
     case "warehouse":
       return <WarehouseDataPage />
-      case "purchase":
-        return <PurchaseDataPage/>
-        case "director":
-        return <DirectorDataPage/>
-        case "managing-director":
-          return <ManagingDirector/>
+    case "purchase":
+      return <PurchaseDataPage />
+    case "director":
+      return <DirectorDataPage />
+    case "managing-director":
+      return <ManagingDirector />
     //       case "coo":
     //       return <Coo/>
     default:

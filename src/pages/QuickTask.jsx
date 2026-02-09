@@ -5,7 +5,8 @@ import { Search, ChevronDown, Filter, Trash2, Edit, Save, X } from "lucide-react
 import AdminLayout from "../components/layout/AdminLayout";
 import DelegationPage from "./delegation-data";
 import { useDispatch, useSelector } from "react-redux";
-import { deleteChecklistTask, uniqueChecklistTaskData, uniqueDelegationTaskData, updateChecklistTask, fetchUsers, resetChecklistPagination, resetDelegationPagination  } from "../redux/slice/quickTaskSlice";
+import { deleteChecklistTask, uniqueChecklistTaskData, uniqueDelegationTaskData, updateChecklistTask, fetchUsers, resetChecklistPagination, resetDelegationPagination } from "../redux/slice/quickTaskSlice";
+import { maintenanceData } from "../redux/slice/maintenanceSlice";
 
 
 export default function QuickTask() {
@@ -15,11 +16,9 @@ export default function QuickTask() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [activeTab, setActiveTab] = useState('checklist');
-  const [nameFilter, setNameFilter] = useState('');
   const [freqFilter, setFreqFilter] = useState('');
-    const tableContainerRef = useRef(null);
+  const tableContainerRef = useRef(null);
   const [dropdownOpen, setDropdownOpen] = useState({
-    name: false,
     frequency: false
   });
   const [selectedTasks, setSelectedTasks] = useState([]);
@@ -29,59 +28,59 @@ export default function QuickTask() {
   const [isSaving, setIsSaving] = useState(false);
 
   // const { quickTask, loading, delegationTasks, users } = useSelector((state) => state.quickTask);
-  const { 
-    quickTask, 
-    loading, 
-    delegationTasks, 
+  const {
+    quickTask,
+    loading,
+    delegationTasks,
     users,                    // Add this
     checklistPage,            // Add this
     checklistHasMore,         // Add this
     delegationPage,           // Add this
     delegationHasMore         // Add this
   } = useSelector((state) => state.quickTask);
+
+  const { maintenance, loading: maintenanceLoading } = useSelector((state) => state.maintenance);
   const dispatch = useDispatch();
 
-useEffect(() => {
-  dispatch(fetchUsers());
-  dispatch(resetChecklistPagination());
-  dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter: '' }));
-}, [dispatch]);
+  useEffect(() => {
+    dispatch(fetchUsers());
+    dispatch(resetChecklistPagination());
+    dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50 }));
+  }, [dispatch]);
 
 
-// Add this new function
-const handleScroll = useCallback(() => {
-  if (!tableContainerRef.current || loading) return;
+  // Add this new function
+  const handleScroll = useCallback(() => {
+    if (!tableContainerRef.current || loading) return;
 
-  const { scrollTop, scrollHeight, clientHeight } = tableContainerRef.current;
-  
-  // Check if scrolled near bottom (within 100px)
-  if (scrollHeight - scrollTop - clientHeight < 100) {
-    if (activeTab === 'checklist' && checklistHasMore) {
-      dispatch(uniqueChecklistTaskData({ 
-        page: checklistPage, 
-        pageSize: 50, 
-        nameFilter,
-        append: true 
-      }));
-    } else if (activeTab === 'delegation' && delegationHasMore) {
-      dispatch(uniqueDelegationTaskData({ 
-        page: delegationPage, 
-        pageSize: 50, 
-        nameFilter,
-        append: true 
-      }));
+    const { scrollTop, scrollHeight, clientHeight } = tableContainerRef.current;
+
+    // Check if scrolled near bottom (within 100px)
+    if (scrollHeight - scrollTop - clientHeight < 100) {
+      if (activeTab === 'checklist' && checklistHasMore) {
+        dispatch(uniqueChecklistTaskData({
+          page: checklistPage,
+          pageSize: 50,
+          append: true
+        }));
+      } else if (activeTab === 'delegation' && delegationHasMore) {
+        dispatch(uniqueDelegationTaskData({
+          page: delegationPage,
+          pageSize: 50,
+          append: true
+        }));
+      }
     }
-  }
-}, [loading, activeTab, checklistHasMore, delegationHasMore, checklistPage, delegationPage, nameFilter, dispatch]);
+  }, [loading, activeTab, checklistHasMore, delegationHasMore, checklistPage, delegationPage, dispatch]);
 
-// Add scroll listener
-useEffect(() => {
-  const container = tableContainerRef.current;
-  if (container) {
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }
-}, [handleScroll]);
+  // Add scroll listener
+  useEffect(() => {
+    const container = tableContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
 
   // Edit functionality
   const handleEditClick = (task) => {
@@ -208,76 +207,15 @@ useEffect(() => {
     setSortConfig({ key, direction });
   };
 
-  const toggleDropdown = (dropdown) => {
-    setDropdownOpen(prev => ({
-      ...prev,
-      [dropdown]: !prev[dropdown]
-    }));
-  };
-
-const handleNameFilterSelect = (name) => {
-  setNameFilter(name);
-  
-  if (activeTab === 'checklist') {
-    dispatch(resetChecklistPagination());
-    dispatch(uniqueChecklistTaskData({ 
-      page: 0, 
-      pageSize: 50, 
-      nameFilter: name,
-      append: false 
-    }));
-  } else {
-    dispatch(resetDelegationPagination());
-    dispatch(uniqueDelegationTaskData({ 
-      page: 0, 
-      pageSize: 50, 
-      nameFilter: name,
-      append: false 
-    }));
-  }
-  
-  setDropdownOpen({ ...dropdownOpen, name: false });
-};
-
   const handleFrequencyFilterSelect = (freq) => {
     setFreqFilter(freq);
     setDropdownOpen({ ...dropdownOpen, frequency: false });
   };
 
-const clearNameFilter = () => {
-  setNameFilter('');
-  
-  if (activeTab === 'checklist') {
-    dispatch(resetChecklistPagination());
-    dispatch(uniqueChecklistTaskData({ 
-      page: 0, 
-      pageSize: 50, 
-      nameFilter: '',
-      append: false 
-    }));
-  } else {
-    dispatch(resetDelegationPagination());
-    dispatch(uniqueDelegationTaskData({ 
-      page: 0, 
-      pageSize: 50, 
-      nameFilter: '',
-      append: false 
-    }));
-  }
-  
-  setDropdownOpen({ ...dropdownOpen, name: false });
-};
-
   const clearFrequencyFilter = () => {
     setFreqFilter('');
     setDropdownOpen({ ...dropdownOpen, frequency: false });
   };
-
-  // FIXED: Added proper null/undefined checks and string validation
-const allNames = [
-  ...new Set(users.map(user => user.user_name))
-].filter(name => name && typeof name === 'string' && name.trim() !== '')
- .sort();
 
   // Keep allFrequencies as is (or modify if you want to fetch frequencies from elsewhere)
   const allFrequencies = [
@@ -288,22 +226,22 @@ const allNames = [
   ].filter(frequency => frequency && typeof frequency === 'string' && frequency.trim() !== '');
 
 
-const filteredChecklistTasks = quickTask.filter(task => {
-  const freqFilterPass = !freqFilter || task.frequency === freqFilter;
-  const searchTermPass = !searchTerm || task.task_description
-    ?.toLowerCase()
-    .includes(searchTerm.toLowerCase());
-  return freqFilterPass && searchTermPass;  // Only these two filters
-}).sort((a, b) => {
-  if (!sortConfig.key) return 0;
-  if (a[sortConfig.key] < b[sortConfig.key]) {
-    return sortConfig.direction === 'asc' ? -1 : 1;
-  }
-  if (a[sortConfig.key] > b[sortConfig.key]) {
-    return sortConfig.direction === 'asc' ? 1 : -1;
-  }
-  return 0;
-});
+  const filteredChecklistTasks = quickTask.filter(task => {
+    const freqFilterPass = !freqFilter || task.frequency === freqFilter;
+    const searchTermPass = !searchTerm || task.task_description
+      ?.toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    return freqFilterPass && searchTermPass;  // Only these two filters
+  }).sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    if (a[sortConfig.key] < b[sortConfig.key]) {
+      return sortConfig.direction === 'asc' ? -1 : 1;
+    }
+    if (a[sortConfig.key] > b[sortConfig.key]) {
+      return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
 
   function formatTimestampToDDMMYYYY(timestamp) {
     if (!timestamp || timestamp === "" || timestamp === null) {
@@ -333,31 +271,51 @@ const filteredChecklistTasks = quickTask.filter(task => {
             <p className="text-purple-600 text-sm">
               {activeTab === 'checklist'
                 ? `Showing ${quickTask.length} checklist tasks`
-                : `Showing delegation tasks`}
+                : activeTab === 'maintenance'
+                  ? `Showing ${maintenance.length} maintenance tasks`
+                  : `Showing delegation tasks`}
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <div className="flex border border-purple-200 rounded-md overflow-hidden self-start">
-             <button
-  className={`px-4 py-2 text-sm font-medium ${activeTab === 'checklist' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
-  onClick={() => {
-    setActiveTab('checklist');
-    dispatch(resetChecklistPagination());
-    dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter }));
-  }}
->
+            <div className="flex gap-2 self-start overflow-x-auto no-scrollbar pb-1 max-w-full">
+              <button
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border-2 transition-all ${activeTab === 'checklist'
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                  : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300'
+                  }`}
+                onClick={() => {
+                  setActiveTab('checklist');
+                  dispatch(resetChecklistPagination());
+                  dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50 }));
+                }}
+              >
                 Checklist
               </button>
               <button
-  className={`px-4 py-2 text-sm font-medium ${activeTab === 'delegation' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
-  onClick={() => {
-    setActiveTab('delegation');
-    dispatch(resetDelegationPagination());
-    dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter }));
-  }}
->
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border-2 transition-all ${activeTab === 'delegation'
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                  : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300'
+                  }`}
+                onClick={() => {
+                  setActiveTab('delegation');
+                  dispatch(resetDelegationPagination());
+                  dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50 }));
+                }}
+              >
                 Delegation
+              </button>
+              <button
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border-2 transition-all ${activeTab === 'maintenance'
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                  : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300'
+                  }`}
+                onClick={() => {
+                  setActiveTab('maintenance');
+                  dispatch(maintenanceData(1));
+                }}
+              >
+                Maintenance
               </button>
             </div>
 
@@ -375,107 +333,8 @@ const filteredChecklistTasks = quickTask.filter(task => {
 
             <div className="flex gap-2">
               <div className="relative">
-                <div className="flex items-center gap-2">
-                  {/* Input with datalist for autocomplete */}
-                 <div className="relative">
-  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-  <input
-    type="text"
-    list="nameOptions"
-    placeholder="Type or select name..."
-    value={nameFilter}
-    onChange={(e) => {
-      const typedName = e.target.value;
-      setNameFilter(typedName); // Always update the input value
-      
-      // Only trigger DB fetch if the value is empty or matches a name in the list
-      if (typedName === '') {
-        clearNameFilter();
-      } else if (allNames.includes(typedName)) {
-        handleNameFilterSelect(typedName);
-      }
-    }}
-    onBlur={(e) => {
-      // When input loses focus, if the typed value doesn't match any name, clear it
-      const typedName = e.target.value;
-      if (typedName && !allNames.includes(typedName)) {
-        // Optional: You can either clear it or keep it for manual filtering
-        // setNameFilter('');
-        // clearNameFilter();
-      }
-    }}
-    onKeyDown={(e) => {
-      // Allow pressing Enter to apply the filter even if not exact match
-      if (e.key === 'Enter') {
-        if (nameFilter === '') {
-          clearNameFilter();
-        } else {
-          // Apply the filter with whatever is typed
-          handleNameFilterSelect(nameFilter);
-        }
-      }
-    }}
-    className="w-48 pl-10 pr-4 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-  />
-  <datalist id="nameOptions">
-    {allNames.map(name => (
-      <option key={name} value={name} />
-    ))}
-  </datalist>
-
-  {/* Clear button for input */}
-  {nameFilter && (
-    <button
-      onClick={() => {
-        setNameFilter('');
-        clearNameFilter();
-      }}
-      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-    >
-      <X size={16} />
-    </button>
-  )}
-</div>
-
-                  {/* Dropdown button */}
-                  <button
-                    onClick={() => toggleDropdown('name')}
-                    className="flex items-center gap-1 px-3 py-2 border border-purple-200 rounded-md bg-white text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <ChevronDown size={16} className={`transition-transform ${dropdownOpen.name ? 'rotate-180' : ''}`} />
-                  </button>
-                </div>
-
-                {/* Dropdown menu */}
-                {dropdownOpen.name && (
-                  <div className="absolute z-50 mt-1 w-56 rounded-md bg-white shadow-lg border border-gray-200 max-h-60 overflow-auto top-full right-0">
-                    <div className="py-1">
-                      <button
-                        onClick={clearNameFilter}
-                        className={`block w-full text-left px-4 py-2 text-sm ${!nameFilter ? 'bg-purple-100 text-purple-900' : 'text-gray-700 hover:bg-gray-100'}`}
-                      >
-                        All Names
-                      </button>
-                      {allNames.map(name => (
-                        <button
-                          key={name}
-                          onClick={() => {
-                            handleNameFilterSelect(name);
-                            setDropdownOpen({ ...dropdownOpen, name: false });
-                          }}
-                          className={`block w-full text-left px-4 py-2 text-sm ${nameFilter === name ? 'bg-purple-100 text-purple-900' : 'text-gray-700 hover:bg-gray-100'}`}
-                        >
-                          {name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="relative">
                 <button
-                  onClick={() => toggleDropdown('frequency')}
+                  onClick={() => setDropdownOpen(prev => ({ ...prev, frequency: !prev.frequency }))}
                   className="flex items-center gap-2 px-3 py-2 border border-purple-200 rounded-md bg-white text-sm text-gray-700 hover:bg-gray-50"
                 >
                   <Filter className="h-4 w-4" />
@@ -557,12 +416,10 @@ const filteredChecklistTasks = quickTask.filter(task => {
                   </span>
                 )}
               </div>
-              {/* <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}> */}
-<div 
-  ref={tableContainerRef}
-  className="overflow-x-auto overflow-y-auto" 
-  style={{ maxHeight: 'calc(100vh - 220px)' }}
->
+              <div
+                ref={tableContainerRef}
+                className="overflow-x-auto"
+              >
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50 sticky top-0 z-20">
                     <tr>
@@ -790,7 +647,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
                     ) : (
                       <tr>
                         <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
-                          {searchTerm || nameFilter || freqFilter
+                          {searchTerm || freqFilter
                             ? "No tasks matching your filters"
                             : "No tasks available"}
                         </td>
@@ -799,19 +656,94 @@ const filteredChecklistTasks = quickTask.filter(task => {
                   </tbody>
                 </table>
                 {loading && checklistHasMore && (
-                <div className="text-center py-4">
-                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-500"></div>
-                  <p className="text-purple-600 text-sm mt-2">Loading more tasks...</p>
-                </div>
-              )}
+                  <div className="text-center py-4">
+                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-500"></div>
+                    <p className="text-purple-600 text-sm mt-2">Loading more tasks...</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : activeTab === 'maintenance' ? (
+            <div className="mt-4 rounded-lg border border-purple-200 shadow-md bg-white overflow-hidden">
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-4">
+                <h2 className="text-purple-700 font-medium">Maintenance Tasks</h2>
+                <p className="text-purple-600 text-sm">Showing all maintenance tasks from database</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50 sticky top-0 z-20">
+                    <tr>
+                      {[
+                        { label: 'Department' },
+                        { label: 'Given By' },
+                        { label: 'Name' },
+                        { label: 'Task Description', minWidth: 'min-w-[300px]' },
+                        { label: 'Start Date', bg: 'bg-yellow-50' },
+                        { label: 'End Date', bg: 'bg-yellow-50' },
+                        { label: 'Frequency' },
+                        { label: 'Status' },
+                        { label: 'Remarks' },
+                      ].map((column) => (
+                        <th
+                          key={column.label}
+                          className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${column.bg || ''} ${column.minWidth || ''}`}
+                        >
+                          {column.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {maintenance.length > 0 ? (
+                      maintenance.map((task, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{task.company_name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.given_by}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.name}</td>
+                          <td className="px-6 py-4 text-sm text-gray-500 min-w-[300px] max-w-[400px]">
+                            <div className="whitespace-normal break-words">{task.task_description}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
+                            {formatTimestampToDDMMYYYY(task.task_start_date)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
+                            {formatTimestampToDDMMYYYY(task.submission_date)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className={`px-2 py-1 rounded-full text-xs ${task.frequency === 'Daily' ? 'bg-blue-100 text-blue-800' :
+                              task.frequency === 'Weekly' ? 'bg-green-100 text-green-800' :
+                                task.frequency === 'Monthly' ? 'bg-purple-100 text-purple-800' :
+                                  'bg-gray-100 text-gray-800'
+                              }`}>
+                              {task.frequency}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className={`px-2 py-1 rounded-full text-xs ${task.status === 'Done' ? 'bg-green-100 text-green-800' :
+                              task.status === 'Issue' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
+                              {task.status || 'Pending'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {task.remarks || '—'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
+                          No maintenance tasks found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           ) : (
             <DelegationPage
               searchTerm={searchTerm}
-              nameFilter={nameFilter}
               freqFilter={freqFilter}
-              setNameFilter={setNameFilter}
               setFreqFilter={setFreqFilter}
             />
           )}

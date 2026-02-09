@@ -22,21 +22,29 @@ export const insertDelegationDoneAndUpdate = createAsyncThunk(
             task_description: taskData.task_description,
             given_by: taskData.given_by,
             image_url: taskData.image_url, // Will be updated after image upload
+            department: taskData.department,
+            task_start_date: taskData.task_start_date,
+            planned_date: taskData.planned_date,
           };
 
           console.log('Inserting into delegation_done:', delegationDoneData);
 
-          const { data: doneData, error: doneError } = await supabase
+          const { data: doneDataList, error: doneError } = await supabase
             .from('delegation_done')
             .insert([delegationDoneData])
-            .select()
-            .single();
+            .select();
 
           if (doneError) {
-            console.error('Error inserting delegation_done:', doneError);
+            console.error('Error inserting delegation_done:', {
+              message: doneError.message,
+              details: doneError.details,
+              hint: doneError.hint,
+              code: doneError.code
+            });
             throw doneError;
           }
 
+          const doneData = doneDataList && doneDataList.length > 0 ? doneDataList[0] : null;
           console.log('Successfully inserted delegation_done:', doneData);
 
           // Step 2: Handle image upload if exists
@@ -46,11 +54,11 @@ export const insertDelegationDoneAndUpdate = createAsyncThunk(
           if (taskImage) {
             try {
               console.log('Uploading image for task:', taskData.task_id);
-              
+
               // Create a unique filename
               const timestamp = Date.now();
               const fileName = `delegation_${taskData.task_id}_${timestamp}_${taskImage.name}`;
-              
+
               // Upload to Supabase storage
               const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('delegation') // Make sure this bucket exists
@@ -66,15 +74,17 @@ export const insertDelegationDoneAndUpdate = createAsyncThunk(
                   .getPublicUrl(fileName);
 
                 imageUrl = publicUrl;
-                
-                // Update delegation_done with image URL
-                const { error: updateImageError } = await supabase
-                  .from('delegation_done')
-                  .update({ image_url: imageUrl })
-                  .eq('id', doneData.id);
 
-                if (updateImageError) {
-                  console.error('Error updating image URL:', updateImageError);
+                if (doneData) {
+                  // Update delegation_done with image URL
+                  const { error: updateImageError } = await supabase
+                    .from('delegation_done')
+                    .update({ image_url: imageUrl })
+                    .eq('id', doneData.id);
+
+                  if (updateImageError) {
+                    console.error('Error updating image URL:', updateImageError);
+                  }
                 }
 
                 console.log('Image uploaded successfully:', imageUrl);
@@ -89,8 +99,8 @@ export const insertDelegationDoneAndUpdate = createAsyncThunk(
           let delegationUpdate = {
             updated_at: new Date().toISOString(),
             submission_date: new Date().toISOString(),
-            image:imageUrl,
-            remarks:taskData.reason
+            image: imageUrl,
+            remarks: taskData.reason
           };
 
           if (taskData.status === 'done') {
@@ -143,7 +153,7 @@ export const insertDelegationDoneAndUpdate = createAsyncThunk(
       // Check if any submissions failed
       const failedTasks = results.filter(r => r.status === 'error');
       if (failedTasks.length > 0) {
-        console.warn('Some tasks failed:', failedTasks);
+        console.warn('Some tasks failed:', JSON.stringify(failedTasks, null, 2));
       }
 
       return results;
@@ -223,7 +233,7 @@ export const fetchDelegationDataSortByDate = async () => {
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
   const userAccess = localStorage.getItem("user_access"); // Add this line
-  
+
   try {
     let query = supabase
       .from('delegation')
@@ -234,10 +244,12 @@ export const fetchDelegationDataSortByDate = async () => {
     // Apply role-based filter
     if (role === 'user' && username) {
       query = query.eq('name', username);
-    } else if (role === 'admin' && userAccess) {
+    } else if (role === 'admin' && userAccess && userAccess !== 'all') {
       // Filter by departments in user_access for admin
-      const allowedDepartments = userAccess.split(',').map(dept => dept.trim());
-      query = query.in('department', allowedDepartments);
+      const allowedDepartments = userAccess.split(',').map(dept => dept.trim()).filter(d => d && d !== 'all');
+      if (allowedDepartments.length > 0) {
+        query = query.in('department', allowedDepartments);
+      }
     }
 
     const { data, error } = await query;
@@ -260,7 +272,7 @@ export const fetchDelegation_DoneDataSortByDate = async () => {
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
   const userAccess = localStorage.getItem("user_access"); // Add this line
-  
+
   try {
     let query = supabase
       .from('delegation_done')
@@ -270,10 +282,12 @@ export const fetchDelegation_DoneDataSortByDate = async () => {
     // Filter by user if role is 'user'
     if (role === 'user' && username) {
       query = query.eq('name', username);
-    } else if (role === 'admin' && userAccess) {
+    } else if (role === 'admin' && userAccess && userAccess !== 'all') {
       // Filter by departments in user_access for admin
-      const allowedDepartments = userAccess.split(',').map(dept => dept.trim());
-      query = query.in('department', allowedDepartments);
+      const allowedDepartments = userAccess.split(',').map(dept => dept.trim()).filter(d => d && d !== 'all');
+      if (allowedDepartments.length > 0) {
+        query = query.in('department', allowedDepartments);
+      }
     }
 
     const { data, error } = await query;

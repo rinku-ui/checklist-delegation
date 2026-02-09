@@ -35,126 +35,61 @@ export default function StatisticsCards({
   return (
     <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
       {/* Left side - Statistics Cards */}
-      <div className="lg:w-1/2">
-        <div className="grid grid-cols-3 sm:grid-cols-2 gap-3 sm:gap-4 justify-center">
+      <div className="lg:w-1/2 w-full">
+        <div className="grid grid-cols-2 xs:grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
 
-          {/* Total Tasks - Updated description for date range */}
-          <div className="rounded-lg border border-l-4 border-l-blue-500 shadow-md hover:shadow-lg transition-all bg-white">
-            <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-tr-lg p-3 sm:p-4">
-              <h3 className="text-xs sm:text-sm font-medium text-blue-700">Total Tasks</h3>
-              <ListTodo className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
+          {/* Total Tasks - Standardized size for mobile */}
+          <div className="rounded-xl border border-l-4 border-l-blue-500 shadow-md hover:shadow-lg transition-all bg-white overflow-hidden">
+            <div className="flex flex-row items-center justify-between space-y-0 bg-gradient-to-r from-blue-50 to-blue-100 p-3">
+              <h3 className="text-[10px] xs:text-xs font-bold text-blue-700 uppercase tracking-wider line-clamp-1">Total</h3>
+              <ListTodo className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
             </div>
-            <div className="hidden sm:block p-3 sm:p-4">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-700">{totalTask}</div>
-              <p className="text-xs text-blue-600">
-                {dateRange ? (
-                  <>Tasks in selected period</>
-                ) : dashboardType === "delegation" ? (
-                  "All tasks"
-                ) : (
-                  "Current Month's tasks"
-                )}
-              </p>
-            </div>
-
-            <div className="sm:hidden p-3 sm:p-4 mt-4">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-700">{totalTask}</div>
-              <p className="text-xs text-blue-600">
-                {dateRange ? "Selected period" : "Total tasks"}
+            <div className="p-3 sm:p-4">
+              <div className="text-xl xs:text-2xl font-bold text-blue-700">{totalTask}</div>
+              <p className="text-[10px] text-blue-600 mt-0.5 line-clamp-1">
+                {dateRange ? "Filtered" : "Monthly"}
               </p>
             </div>
           </div>
 
           {/* Completed Tasks */}
-          <div className="rounded-lg border border-l-4 border-l-green-500 shadow-md hover:shadow-lg transition-all bg-white">
-            <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-green-50 to-green-100 rounded-tr-lg p-3 sm:p-4">
-              <h3 className="text-xs sm:text-sm font-medium text-green-700">
-                {dashboardType === "delegation" ? "Completed Once" : "Completed Tasks"}
-              </h3>
-              <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+          <div className="rounded-xl border border-l-4 border-l-green-500 shadow-md hover:shadow-lg transition-all bg-white overflow-hidden">
+            <div className="flex flex-row items-center justify-between space-y-0 bg-gradient-to-r from-green-50 to-green-100 p-3">
+              <h3 className="text-[10px] xs:text-xs font-bold text-green-700 uppercase tracking-wider line-clamp-1">Done</h3>
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
             </div>
             <div className="p-3 sm:p-4">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-700">{completeTask}</div>
-              <p className="text-xs text-green-600">
-                {dateRange ? (
-                  <>Completed in period</>
-                ) : dashboardType === "delegation" ? (
-                  "Tasks completed once"
-                ) : (
-                  "Current Month's completed"
-                )}
+              <div className="text-xl xs:text-2xl font-bold text-green-700">{completeTask}</div>
+              <p className="text-[10px] text-green-600 mt-0.5 line-clamp-1">
+                Completed
               </p>
             </div>
           </div>
 
-          {/* Pending Tasks / Completed Twice */}
-          <div className="rounded-lg border border-l-4 border-l-amber-500 shadow-md hover:shadow-lg transition-all bg-white">
-            <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-amber-50 to-amber-100 rounded-tr-lg p-3 sm:p-4">
-              <h3 className="text-xs sm:text-sm font-medium text-amber-700">
-                {dashboardType === "delegation" ? "Completed Twice" : "Pending Tasks"}
-              </h3>
-              {dashboardType === "delegation" ? (
-                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500" />
-              ) : (
-                <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500" />
-              )}
+          {/* Pending Tasks */}
+          <div className="rounded-xl border border-l-4 border-l-amber-500 shadow-md hover:shadow-lg transition-all bg-white overflow-hidden">
+            <div className="flex flex-row items-center justify-between space-y-0 bg-gradient-to-r from-amber-50 to-amber-100 p-3">
+              <h3 className="text-[10px] xs:text-xs font-bold text-amber-700 uppercase tracking-wider line-clamp-1">Pending</h3>
+              <Clock className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
             </div>
             <div className="p-3 sm:p-4">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-amber-700">{pendingTask}</div>
-              <p className="text-xs text-amber-600">
-                {dateRange ? (
-                  <>Pending in period</>
-                ) : dashboardType === "delegation" ? (
-                  "Tasks completed twice"
-                ) : (
-                  "Overdue + today"
-                )}
+              <div className="text-xl xs:text-2xl font-bold text-amber-700">{pendingTask}</div>
+              <p className="text-[10px] text-amber-600 mt-0.5 line-clamp-1">
+                To be done
               </p>
             </div>
           </div>
 
-          {/* Not Done Tasks */}
-          <div className="rounded-lg border border-l-4 border-l-gray-500 shadow-md hover:shadow-lg transition-all bg-white">
-            <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-tr-lg p-3 sm:p-4">
-              <h3 className="text-xs sm:text-sm font-medium text-gray-700">Not Done</h3>
-              <XCircle className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
+          {/* Overdue Tasks */}
+          <div className="rounded-xl border border-l-4 border-l-red-500 shadow-md hover:shadow-lg transition-all bg-white overflow-hidden">
+            <div className="flex flex-row items-center justify-between space-y-0 bg-gradient-to-r from-red-50 to-red-100 p-3">
+              <h3 className="text-[10px] xs:text-xs font-bold text-red-700 uppercase tracking-wider line-clamp-1">Overdue</h3>
+              <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
             </div>
             <div className="p-3 sm:p-4">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-700">{notDoneTask}</div>
-              <p className="text-xs text-gray-600">
-                {dateRange ? (
-                  <>Not done in period</>
-                ) : dashboardType === "delegation" ? (
-                  "Tasks not completed"
-                ) : (
-                  "Current month's not done"
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* Overdue Tasks / Completed 3+ Times */}
-          <div className="rounded-lg border border-l-4 border-l-red-500 shadow-md hover:shadow-lg transition-all bg-white sm:col-span-2 lg:col-span-1 col-span-2">
-            <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-red-50 to-red-100 rounded-tr-lg p-3 sm:p-4">
-              <h3 className="text-xs sm:text-sm font-medium text-red-700">
-                {dashboardType === "delegation" ? "Completed 3+ Times" : "Overdue Tasks"}
-              </h3>
-              {dashboardType === "delegation" ? (
-                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
-              ) : (
-                <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
-              )}
-            </div>
-            <div className="p-3 sm:p-4">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-700">{overdueTask}</div>
-              <p className="text-xs text-red-600">
-                {dateRange ? (
-                  <>Overdue in period</>
-                ) : dashboardType === "delegation" ? (
-                  "Tasks completed 3+ times"
-                ) : (
-                  "Current Month's due"
-                )}
+              <div className="text-xl xs:text-2xl font-bold text-red-700">{overdueTask}</div>
+              <p className="text-[10px] text-red-600 mt-0.5 line-clamp-1">
+                Past due date
               </p>
             </div>
           </div>

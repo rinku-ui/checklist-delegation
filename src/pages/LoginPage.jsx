@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux"
 import { useNavigate } from "react-router-dom"
 import { loginUser } from "../redux/slice/loginSlice"
 import { LoginCredentialsApi } from "../redux/api/loginApi"
+import supabase from "../SupabaseClient"
 
 const LoginPage = () => {
   const navigate = useNavigate()

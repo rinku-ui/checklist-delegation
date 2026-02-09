@@ -283,7 +283,7 @@ export const countPendingOrDelayTaskApi = async (dashboardType, staffFilter = nu
       query = supabase
         .from('checklist')
         .select('*', { count: 'exact', head: true })
-        .or('status.is.null,status.neq.Yes')
+        .or('status.is.null,status.neq.yes')
         .gte('task_start_date', `${today}T00:00:00`)
         .lte('task_start_date', `${today}T23:59:59`);
     }

@@ -31,3 +31,11 @@
     background: #c1c1c1;
     border-radius: 4px;
 }
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}

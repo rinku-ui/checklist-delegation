@@ -1,0 +1,137 @@
+import supabase from "../../SupabaseClient";
+
+// --- FETCH PENDING REPAIRS ---
+export const fetchRepairDataSortByDate = async (page = 1, limit = 50, searchTerm = '') => {
+    try {
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+
+        let query = supabase
+            .from('repair_tasks')
+            .select('*', { count: 'exact' })
+            .eq('status', 'Pending') // Fetch only pending items
+            .order('created_at', { ascending: false })
+            .range(from, to);
+
+        // Search logic updated for new columns
+        if (searchTerm && searchTerm.trim() !== '') {
+            const val = searchTerm.trim();
+            query = query.or(`task_id.ilike.%${val}%,machine_name.ilike.%${val}%,issue_description.ilike.%${val}%,filled_by.ilike.%${val}%`);
+        }
+
+        const { data, error, count } = await query;
+        if (error) throw error;
+
+        return { data, totalCount: count };
+    } catch (error) {
+        console.error("Error fetching repair data:", error);
+        return { data: [], totalCount: 0 };
+    }
+};
+
+
+// --- FETCH ALL REPAIR TASKS (For Dashboard) ---
+export const fetchAllRepairTasks = async (page = 1, limit = 1000) => {
+    try {
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+
+        const { data, error, count } = await supabase
+            .from('repair_tasks')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(from, to);
+
+        if (error) throw error;
+        return { data, totalCount: count };
+    } catch (error) {
+        console.error("Error fetching all repair tasks:", error);
+        return { data: [], totalCount: 0 };
+    }
+};
+
+// --- CREATE NEW REPAIR REQUEST ---
+export const postRepairTaskApi = async (formData) => {
+    try {
+        // Generate a simple ID like "REP-173822"
+        const uniqueId = `REP-${Date.now().toString().slice(-6)}`;
+
+        const { data, error } = await supabase
+            .from('repair_tasks')
+            .insert({
+                task_id: uniqueId,
+                filled_by: formData.filledBy,           // Matches "Form Filled By"
+                assigned_person: formData.assignedPerson, // Matches "To Assign Person"
+                machine_name: formData.machineName,     // Matches "Machine Name"
+                issue_description: formData.issueDetails, // Matches "Issue Details"
+                status: 'Pending'
+            })
+            .select();
+
+        if (error) throw error;
+        return data;
+    } catch (error) {
+        console.error("Error creating repair task:", error);
+        throw error;
+    }
+};
+
+// --- UPDATE REPAIR (Admin Action) ---
+export const updateRepairData = async (updates) => {
+    try {
+        // This handles the "Admin will complete remaining info" part
+        const results = await Promise.all(updates.map(async (item) => {
+            const { data, error } = await supabase
+                .from('repair_tasks')
+                .update({
+                    status: item.status,             // e.g., 'Done'
+                    part_replaced: item.partReplaced || null,
+                    bill_amount: item.billAmount || null,
+                    remarks: item.remarks || null,
+                    vendor_name: item.vendorName || null,
+                    work_done: item.workDone || null,
+                    work_photo_url: item.workPhotoUrl || null,
+                    bill_copy_url: item.billCopyUrl || null,
+                    submission_date: new Date().toISOString()
+                })
+                .eq('task_id', item.taskId)
+                .select();
+
+            if (error) throw error;
+            return data[0];
+        }));
+
+        return results;
+    } catch (error) {
+        console.error("Error updating repair:", error);
+        throw error;
+    }
+};
+
+// Fetch Repair History
+export const fetchRepairDataForHistory = async (page = 1, searchTerm = '') => {
+    const itemsPerPage = 50;
+    const from = (page - 1) * itemsPerPage;
+    const to = from + itemsPerPage - 1;
+
+    try {
+        let query = supabase
+            .from('repair_tasks')
+            .select('*', { count: 'exact' })
+            .neq('status', 'Pending')
+            .order('submission_date', { ascending: false })
+            .range(from, to);
+
+        if (searchTerm && searchTerm.trim() !== '') {
+            const val = searchTerm.trim();
+            query = query.or(`task_id.ilike.%${val}%,machine_name.ilike.%${val}%,issue_description.ilike.%${val}%,filled_by.ilike.%${val}%`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    } catch (e) {
+        console.error("Error fetching repair history:", e);
+        return [];
+    }
+};

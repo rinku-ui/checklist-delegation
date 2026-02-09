@@ -23,6 +23,12 @@ import {
   fetchChecklistDataByDateRangeApi,
   getChecklistDateRangeStatsApi
 } from "../../redux/api/dashboardApi.js"
+import { fetchMaintenanceDataSortByDate, fetchAllMaintenanceTasksForDashboard } from "../../redux/api/maintenanceApi.js"
+import { fetchRepairDataSortByDate, fetchAllRepairTasks } from "../../redux/api/repairApi.js"
+import DefaultView from "./dashboard/views/DefaultView.jsx"
+import MaintenanceView from "./dashboard/views/MaintenanceView.jsx"
+import RepairView from "./dashboard/views/RepairView.jsx"
+import TaskManagementTabs from "../../components/TaskManagementTabs.jsx"
 
 export default function AdminDashboard() {
   const [dashboardType, setDashboardType] = useState("checklist")
@@ -44,6 +50,7 @@ export default function AdminDashboard() {
   const [batchSize] = useState(1000)
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [availableDepartments, setAvailableDepartments] = useState([])
+  const [mainTab, setMainTab] = useState("default") // "default", "maintenance", "repair"
 
   // State for department data
   const [departmentData, setDepartmentData] = useState({
@@ -196,14 +203,14 @@ export default function AdminDashboard() {
 
           if (dashboardType === "checklist") {
             // For checklist: Use status field directly
-            if (task.status === 'Yes') {
+            if (task.status === 'yes') {
               completedTasks++;
             } else {
               pendingTasks++;
             }
 
-            // Overdue tasks for checklist: past tasks with status not 'Yes'
-            if (taskStartDate && taskStartDate < today && task.status !== 'Yes') {
+            // Overdue tasks for checklist: past tasks with status not 'yes'
+            if (taskStartDate && taskStartDate < today && task.status !== 'yes') {
               overdueTasks++;
             }
           } else {
@@ -319,9 +326,9 @@ export default function AdminDashboard() {
 
         if (dashboardType === "checklist") {
           // For checklist: Use status field
-          if (task.status === 'Yes') {
+          if (task.status === 'yes') {
             completedTasks++;
-          } else if (task.status === 'No') {
+          } else if (task.status === 'no') {
             notDoneTasks++;
             pendingTasks++; // Not done tasks are also pending
           } else {
@@ -329,8 +336,8 @@ export default function AdminDashboard() {
             pendingTasks++;
           }
 
-          // Overdue tasks for checklist: past tasks with status not 'Yes'
-          if (taskDate && taskDate < today && task.status !== 'Yes') {
+          // Overdue tasks for checklist: past tasks with status not 'yes'
+          if (taskDate && taskDate < today && task.status !== 'yes') {
             overdueTasks++;
           }
         } else {
@@ -475,7 +482,18 @@ export default function AdminDashboard() {
       }
 
       // Use the updated API function with department filter
-      const data = await fetchDashboardDataApi(dashboardType, dashboardStaffFilter, page, batchSize, 'all', departmentFilter)
+      let data = []
+
+      // Determine what data to fetch based on mainTab and dashboardType
+      if (mainTab === 'maintenance') {
+        const result = await fetchAllMaintenanceTasksForDashboard(page, batchSize);
+        data = result.data || [];
+      } else if (mainTab === 'repair') {
+        const result = await fetchAllRepairTasks(page, batchSize);
+        data = result.data || [];
+      } else {
+        data = await fetchDashboardDataApi(dashboardType, dashboardStaffFilter, page, batchSize, 'all', departmentFilter)
+      }
 
       if (!data || data.length === 0) {
         if (page === 1) {
@@ -568,7 +586,7 @@ export default function AdminDashboard() {
           }
 
           // FIXED: Use correct field name from your Supabase data
-          const taskStartDate = parseTaskStartDate(task.task_start_date);
+          const taskStartDate = parseTaskStartDate(task.task_start_date || task.created_at);
           const completionDate = task.submission_date ? parseTaskStartDate(task.submission_date) : null;
 
           let status = "pending";
@@ -606,16 +624,35 @@ export default function AdminDashboard() {
             }
           }
 
+          // Determine status based on task type or dates
+          if (mainTab === 'repair' || mainTab === 'maintenance') {
+            // For repair/maintenance, use the explicit status if available, fallback to calculated
+            if (task.status) {
+              status = task.status.toLowerCase();
+            }
+          }
+
           return {
             id: task.task_id,
-            title: task.task_description,
-            assignedTo: task.name || "Unassigned",
-            taskStartDate: formatDateToDDMMYYYY(taskStartDate),
-            originalTaskStartDate: task.task_start_date,
+            title: task.task_description || task.issue_description || "No Description",
+            assignedTo: task.name || task.assigned_person || "Unassigned",
+            taskStartDate: formatDateToDDMMYYYY(taskStartDate || (task.created_at ? new Date(task.created_at) : null)),
+            originalTaskStartDate: task.task_start_date || task.created_at,
             submission_date: task.submission_date,
             status,
-            frequency: task.frequency || "one-time",
+            frequency: task.frequency || task.freq || "one-time",
             rating: task.color_code_for || 0,
+            machine_name: task.machine_name || "-",
+            given_by: task.given_by || task.filled_by || "-",
+            enable_reminders: task.enable_reminders || task.enable_reminder || false,
+            require_attachment: task.require_attachment || false,
+            remarks: task.remarks || task.remark || "-",
+            uploaded_image_url: task.uploaded_image_url || null,
+            bill_amount: task.bill_amount,
+            vendor_name: task.vendor_name,
+            part_replaced: task.part_replaced,
+            work_done: task.work_done,
+            image_url: task.image_url || task.uploaded_image_url
           };
         })
         .filter(Boolean);
@@ -804,6 +841,19 @@ export default function AdminDashboard() {
     )
   }, [dashboardType, dashboardStaffFilter, departmentFilter, dispatch])
 
+  // Sync mainTab when departmentFilter changes from other sources (like DashboardHeader)
+  useEffect(() => {
+    if (departmentFilter === "Maintenance") {
+      setMainTab("maintenance")
+    } else if (departmentFilter === "Repair") {
+      setMainTab("repair")
+    } else if (departmentFilter === "all") {
+      setMainTab("default")
+    } else {
+      setMainTab("custom") // or just leave it
+    }
+  }, [departmentFilter])
+
   // Filter tasks based on criteria
   const filteredTasks = departmentData.allTasks.filter((task) => {
     if (filterStatus !== "all" && task.status !== filterStatus) return false
@@ -825,6 +875,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     setDashboardStaffFilter("all")
     setDepartmentFilter("all")
+    setMainTab("default")
     setCurrentPage(1)
     setHasMoreData(true)
     // Clear date range when dashboard type changes
@@ -967,7 +1018,28 @@ export default function AdminDashboard() {
   return (
     <AdminLayout>
       <div className="space-y-6">
+        {/* Main Dashboard Tabs */}
+        {/* Main Dashboard Tabs - Premium UI */}
+        <TaskManagementTabs
+          activeTab={mainTab === 'default' ? 'checklist' : mainTab}
+          setActiveTab={(tabId) => {
+            if (tabId === 'checklist') {
+              setMainTab("default")
+              setDepartmentFilter("all")
+              // Optional: Ensure we are actually viewing checklist if they click checklist
+              setDashboardType("checklist")
+            } else if (tabId === 'maintenance') {
+              setMainTab("maintenance")
+              setDepartmentFilter("Maintenance")
+            } else if (tabId === 'repair') {
+              setMainTab("repair")
+              setDepartmentFilter("Repair")
+            }
+          }}
+        />
+
         <DashboardHeader
+          mainTab={mainTab}
           dashboardType={dashboardType}
           setDashboardType={setDashboardType}
           dashboardStaffFilter={dashboardStaffFilter}
@@ -982,50 +1054,36 @@ export default function AdminDashboard() {
           onDateRangeChange={handleDateRangeChange} // Add this prop
         />
 
-        <StatisticsCards
-          totalTask={displayStats.totalTasks}
-          completeTask={displayStats.completedTasks}
-          pendingTask={displayStats.pendingTasks}
-          overdueTask={displayStats.overdueTasks}
-          notDoneTask={notDoneTask}
-          dashboardType={dashboardType}
-          dateRange={dateRange.filtered ? dateRange : null}
-        />
+        {mainTab === "default" && (
+          <DefaultView
+            dashboardType={dashboardType}
+            taskView={taskView}
+            setTaskView={setTaskView}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            filterStaff={filterStaff}
+            setFilterStaff={setFilterStaff}
+            departmentData={departmentData}
+            getTasksByView={getTasksByView}
+            getFrequencyColor={getFrequencyColor}
+            isLoadingMore={isLoadingMore}
+            hasMoreData={hasMoreData}
+            displayStats={displayStats}
+            notDoneTask={notDoneTask}
+            dateRange={dateRange}
+            activeTab={activeTab}
+            dashboardStaffFilter={dashboardStaffFilter}
+            departmentFilter={departmentFilter}
+            parseTaskStartDate={parseTaskStartDate}
+          />
+        )}
 
+        {mainTab === "maintenance" && (
+          <MaintenanceView stats={displayStats} tasks={departmentData.allTasks} />
+        )}
 
-        <TaskNavigationTabs
-          taskView={taskView}
-          setTaskView={setTaskView}
-          dashboardType={dashboardType}
-          dashboardStaffFilter={dashboardStaffFilter}
-          departmentFilter={departmentFilter}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          filterStaff={filterStaff}
-          setFilterStaff={setFilterStaff}
-          departmentData={departmentData}
-          getTasksByView={getTasksByView}
-          getFrequencyColor={getFrequencyColor}
-          isLoadingMore={isLoadingMore}
-          hasMoreData={hasMoreData}
-        />
-        {activeTab === "overview" && (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-purple-200 shadow-md bg-white">
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-4">
-                <h3 className="text-purple-700 font-medium">Staff Task Summary</h3>
-                <p className="text-purple-600 text-sm">Overview of tasks assigned to each staff member</p>
-              </div>
-              <div className="p-4">
-                <StaffTasksTable
-                  dashboardType={dashboardType}
-                  dashboardStaffFilter={dashboardStaffFilter}
-                  departmentFilter={departmentFilter}
-                  parseTaskStartDate={parseTaskStartDate}
-                />
-              </div>
-            </div>
-          </div>
+        {mainTab === "repair" && (
+          <RepairView stats={displayStats} tasks={departmentData.allTasks} />
         )}
       </div>
     </AdminLayout>

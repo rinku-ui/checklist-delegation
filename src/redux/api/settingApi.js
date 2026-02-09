@@ -153,8 +153,8 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
       .select()
       .single();
 
-      console.log(data,"data")
-      console.log(error,"error")
+    console.log(data, "data")
+    console.log(error, "error")
     if (error) {
       console.log("Error when update data", error);
       throw error;
@@ -320,5 +320,60 @@ export const fetchGivenByDataApi = async () => {
   } catch (error) {
     console.log("error from supabase", error);
     return [];
+  }
+};
+
+export const fetchCustomDropdownsApi = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, user_access, given_by') // user_access=Category, given_by=Value
+      .eq('role', 'custom_dropdown')
+      .order('user_access', { ascending: true });
+
+    if (error) {
+      console.log("error fetching custom dropdowns", error);
+      return [];
+    }
+    return data;
+  } catch (error) {
+    console.log("error from supabase", error);
+    return [];
+  }
+};
+
+export const createCustomDropdownApi = async (item) => {
+  try {
+    // Get max ID
+    const { data: maxIdData } = await supabase.from('users').select('id').order('id', { ascending: false }).limit(1);
+    const newId = (maxIdData?.[0]?.id || 0) + 1;
+
+    const { data, error } = await supabase
+      .from('users')
+      .insert([{
+        id: newId,
+        role: 'custom_dropdown',
+        user_access: item.category, // Category Name
+        given_by: item.value,       // Option Value
+        department: null,
+        user_name: null
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.log("error creating custom dropdown", error);
+  }
+};
+
+export const deleteCustomDropdownApi = async (id) => {
+  try {
+    const { error } = await supabase.from('users').delete().eq('id', id);
+    if (error) throw error;
+    return id;
+  } catch (error) {
+    console.log("error deleting custom dropdown", error);
   }
 };

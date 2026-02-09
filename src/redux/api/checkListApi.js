@@ -36,10 +36,12 @@ export const fetchChechListDataSortByDate = async (page = 1, limit = 50, searchT
     // Apply role filter
     if (role === 'user' && username) {
       query = query.eq('name', username);
-    } else if (role === 'admin' && userAccess) {
+    } else if (role === 'admin' && userAccess && userAccess !== 'all') {
       // Filter by departments in user_access for admin
-      const allowedDepartments = userAccess.split(',').map(dept => dept.trim());
-      query = query.in('department', allowedDepartments);
+      const allowedDepartments = userAccess.split(',').map(dept => dept.trim()).filter(d => d && d !== 'all');
+      if (allowedDepartments.length > 0) {
+        query = query.in('department', allowedDepartments);
+      }
     }
 
     const { data, error, count } = await query;
@@ -61,7 +63,7 @@ export const fetchChechListDataSortByDate = async (page = 1, limit = 50, searchT
 export const fetchChechListDataForHistory = async (page = 1, searchTerm = '') => {
   const itemsPerPage = 50;
   const start = (page - 1) * itemsPerPage;
-  
+
   const role = localStorage.getItem('role');
   const username = localStorage.getItem('user-name');
   const userAccess = localStorage.getItem('user_access');
@@ -83,10 +85,12 @@ export const fetchChechListDataForHistory = async (page = 1, searchTerm = '') =>
 
     if (role === 'user' && username) {
       query = query.eq('name', username);
-    } else if (role === 'admin' && userAccess) {
+    } else if (role === 'admin' && userAccess && userAccess !== 'all') {
       // Filter by departments in user_access for admin
-      const allowedDepartments = userAccess.split(',').map(dept => dept.trim());
-      query = query.in('department', allowedDepartments);
+      const allowedDepartments = userAccess.split(',').map(dept => dept.trim()).filter(d => d && d !== 'all');
+      if (allowedDepartments.length > 0) {
+        query = query.in('department', allowedDepartments);
+      }
     }
 
     const { data, error, count } = await query;
@@ -147,7 +151,7 @@ export const updateChecklistData = async (submissionData) => {
             .getPublicUrl(filePath);
 
           if (!publicUrl) throw new Error('Failed to generate public URL');
-          
+
           imageUrl = publicUrl;
           console.log('Image uploaded successfully:', imageUrl);
         } catch (uploadError) {
@@ -159,7 +163,7 @@ export const updateChecklistData = async (submissionData) => {
       // Prepare update object
       return {
         task_id: item.taskId,
-        status: item.status , // Convert to boolean if needed
+        status: item.status?.toLowerCase(), // Convert to lowercase for DB enum
         remark: item.remarks,
         submission_date: new Date().toISOString(),
         image: imageUrl,
@@ -218,7 +222,7 @@ export const postChecklistAdminDoneAPI = async (selectedHistoryItems) => {
 
     console.log("Successfully updated items:", data);
     return { data };
-    
+
   } catch (error) {
     console.error("Error in supabase operation:", error);
     return { error };

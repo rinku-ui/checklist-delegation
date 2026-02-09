@@ -1,152 +1,219 @@
-"use client"
+
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
-import { useState } from "react"
+import "./index.css"
+
+// --- Page Imports ---
 import LoginPage from "./pages/LoginPage"
 import AdminDashboard from "./pages/admin/Dashboard"
 import AdminAssignTask from "./pages/admin/AssignTask"
-import DataPage from "./pages/admin/DataPage"
-import AdminDataPage from "./pages/admin/admin-data-page"
-import AccountDataPage from "./pages/delegation"
+import ChecklistTask from "./pages/admin/ChecklistTask"     // New
+import MaintenanceTask from "./pages/admin/MaintenanceTask" // New
+import RepairTask from "./pages/admin/RepairTask"           // New
+import CalendarPage from "./pages/admin/CalendarPage"       // New
 import QuickTask from "./pages/QuickTask"
-import AdminDelegationTask from "./pages/delegation-data"
-import "./index.css"
 import Demo from "./pages/user/Demo"
 import Setting from "./pages/Setting"
 import MisReport from "./pages/MisReport"
-import RealtimeLogoutListener from "./components/RealtimeLogoutListener"   // ✅ Added listener
 
-// Auth wrapper component to protect routes
+// --- Data & Delegation Imports ---
+import DataPage from "./pages/admin/DataPage"
+import AdminDataPage from "./pages/admin/admin-data-page"
+import AccountDataPage from "./pages/delegation"
+import AdminDelegationTask from "./pages/delegation-data"
+import AllTasks from "./pages/admin/AllTasks"
+
+// --- Components ---
+import RealtimeLogoutListener from "./components/RealtimeLogoutListener"
+
+// --- Auth Wrapper ---
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-  const username = localStorage.getItem("user-name")
-  const userRole = localStorage.getItem("role")
+    const username = localStorage.getItem("user-name")
+    const role = localStorage.getItem("role")
 
-  // If no user is logged in, redirect to login
-  if (!username) {
-    return <Navigate to="/login" replace />
-  }
+    // 1. Check if user is logged in
+    if (!username) {
+        return <Navigate to="/login" replace />
+    }
 
-  // If this is an admin-only route and user is not admin, redirect to tasks
-  if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-    return <Navigate to="/dashboard/admin" replace />
-  }
+    // 2. Check if user has permission (if roles are defined)
+    if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+        // Redirect unauthorized users to the safe dashboard view
+        return <Navigate to="/dashboard/admin" replace />
+    }
 
-  return children
+    return children
 }
 
 function App() {
-  return (
-    <Router>
-      {/* ✅ Realtime listener inside Router so useNavigate works */}
-      <RealtimeLogoutListener />
+    return (
+        <Router>
+            {/* Realtime listener handles logout logic across tabs */}
+            <RealtimeLogoutListener />
 
-      <Routes>
-        {/* Root redirect */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+            <Routes>
+                {/* --- Public Routes --- */}
+                <Route path="/" element={<Navigate to="/login" replace />} />
+                <Route path="/login" element={<LoginPage />} />
 
-        {/* Login route */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/demo" element={<Demo />} />
+                {/* --- Main Dashboard Redirect --- */}
+                {/* Redirects /dashboard to /dashboard/admin to ensure canonical URL */}
+                <Route path="/dashboard" element={<Navigate to="/dashboard/admin" replace />} />
 
-        {/* Dashboard redirect */}
-        <Route path="/dashboard" element={<Navigate to="/dashboard/admin" replace />} />
+                {/* --- Core Dashboard Routes --- */}
+                <Route
+                    path="/dashboard/admin"
+                    element={
+                        <ProtectedRoute>
+                            <AdminDashboard />
+                        </ProtectedRoute>
+                    }
+                />
 
-        {/* Admin & User Dashboard route */}
-        <Route
-          path="/dashboard/admin"
-          element={
-            <ProtectedRoute>
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard/quick-task"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <QuickTask />
-            </ProtectedRoute>
-          }
-        />
+                <Route
+                    path="/dashboard/demo"
+                    element={
+                        <ProtectedRoute>
+                            <Demo />
+                        </ProtectedRoute>
+                    }
+                />
 
-        {/* Assign Task route - only for admin */}
-        <Route
-          path="/dashboard/assign-task"
-          element={
-            <ProtectedRoute>
-              <AdminAssignTask />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard/delegation-task"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminDelegationTask />
-            </ProtectedRoute>
-          }
-        />
+                {/* --- Task Management (Admin Only) --- */}
+                <Route
+                    path="/dashboard/assign-task"
+                    element={
+                        <ProtectedRoute allowedRoles={["admin"]}>
+                            <AdminAssignTask />
+                        </ProtectedRoute>
+                    }
+                />
 
-        {/* Delegation route for user */}
-        <Route
-          path="/dashboard/delegation"
-          element={
-            <ProtectedRoute>
-              <AccountDataPage />
-            </ProtectedRoute>
-          }
-        />
+                {/* --- Operational Tasks (All Authenticated Users) --- */}
+                {/* Based on snippet 2, these are open to all users. Add allowedRoles={['admin']} if they should be restricted. */}
+                <Route
+                    path="/dashboard/quick-task"
+                    element={
+                        <ProtectedRoute>
+                            <QuickTask />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/checklist"
+                    element={
+                        <ProtectedRoute>
+                            <ChecklistTask />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/maintenance"
+                    element={
+                        <ProtectedRoute>
+                            <MaintenanceTask />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/repair"
+                    element={
+                        <ProtectedRoute>
+                            <RepairTask />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/calendar"
+                    element={
+                        <ProtectedRoute>
+                            <CalendarPage />
+                        </ProtectedRoute>
+                    }
+                />
 
-        <Route
-          path="/dashboard/setting"
-          element={
-            <ProtectedRoute>
-              <Setting />
-            </ProtectedRoute>
-          }
-        />
+                <Route
+                    path="/dashboard/task"
+                    element={
+                        <ProtectedRoute>
+                            <AllTasks />
+                        </ProtectedRoute>
+                    }
+                />
 
-        <Route
-          path="/dashboard/mis-report"
-          element={
-            <ProtectedRoute>
-              <MisReport />
-            </ProtectedRoute>
-          }
-        />
+                {/* --- Data & Reporting (Admin Only) --- */}
+                <Route
+                    path="/dashboard/data"
+                    element={
+                        <ProtectedRoute allowedRoles={["admin"]}>
+                            <DataPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/data/:category"
+                    element={
+                        <ProtectedRoute>
+                            <DataPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/admin-data"
+                    element={
+                        <ProtectedRoute allowedRoles={["admin"]}>
+                            <AdminDataPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/delegation"
+                    element={
+                        <ProtectedRoute allowedRoles={["admin"]}>
+                            <AccountDataPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/delegation-data"
+                    element={
+                        <ProtectedRoute allowedRoles={["admin"]}>
+                            <AdminDelegationTask />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/mis-report"
+                    element={
+                        <ProtectedRoute allowedRoles={["admin"]}>
+                            <MisReport />
+                        </ProtectedRoute>
+                    }
+                />
 
-        {/* Data routes */}
-        <Route
-          path="/dashboard/data/:category"
-          element={
-            <ProtectedRoute>
-              <DataPage />
-            </ProtectedRoute>
-          }
-        />
+                {/* --- Settings (Admin Only) --- */}
+                <Route
+                    path="/dashboard/setting"
+                    element={
+                        <ProtectedRoute allowedRoles={["admin"]}>
+                            <Setting />
+                        </ProtectedRoute>
+                    }
+                />
 
-        {/* Specific route for Admin Data Page */}
-        <Route
-          path="/dashboard/data/admin"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminDataPage />
-            </ProtectedRoute>
-          }
-        />
+                {/* --- Backward Compatibility Redirects (From Snippet 1) --- */}
+                {/* These catch old URLs and forward them to the new structure */}
+                <Route path="/admin/*" element={<Navigate to="/dashboard/admin" replace />} />
+                <Route path="/admin/dashboard" element={<Navigate to="/dashboard/admin" replace />} />
+                <Route path="/admin/quick" element={<Navigate to="/dashboard/quick-task" replace />} />
+                <Route path="/admin/assign-task" element={<Navigate to="/dashboard/assign-task" replace />} />
+                <Route path="/admin/delegation-task" element={<Navigate to="/dashboard/delegation-data" replace />} />
+                <Route path="/admin/mis-report" element={<Navigate to="/dashboard/mis-report" replace />} />
+                <Route path="/user/*" element={<Navigate to="/dashboard/admin" replace />} />
 
-        {/* Backward compatibility redirects */}
-        <Route path="/admin/*" element={<Navigate to="/dashboard/admin" replace />} />
-        <Route path="/admin/dashboard" element={<Navigate to="/dashboard/admin" replace />} />
-        <Route path="/admin/quick" element={<Navigate to="/dashboard/quick-task" replace />} />
-        <Route path="/admin/assign-task" element={<Navigate to="/dashboard/assign-task" replace />} />
-        <Route path="/admin/delegation-task" element={<Navigate to="/dashboard/delegation-task" replace />} />
-        <Route path="/admin/mis-report" element={<Navigate to="/dashboard/mis-report" replace />} />
-        <Route path="/admin/data/:category" element={<Navigate to="/dashboard/data/:category" replace />} />
-        <Route path="/user/*" element={<Navigate to="/dashboard/admin" replace />} />
-      </Routes>
-    </Router>
-  )
+            </Routes>
+        </Router>
+    )
 }
 
 export default App

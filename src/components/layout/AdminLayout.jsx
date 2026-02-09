@@ -16,12 +16,13 @@ import {
   CirclePlus,
   UserRound,
   CalendarCheck,
+  Calendar as CalendarIcon,
   BookmarkCheck,
   CrossIcon,
   X,
 } from "lucide-react";
 
-export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
+export default function AdminLayout({ children, darkMode, toggleDarkMode, showLayout = true }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -62,10 +63,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
     window.location.href = "/login";
   };
 
-  // Filter dataCategories based on user role
-  const dataCategories = [
-    { id: "sales", name: "Checklist", link: "/dashboard/data/sales" },
-  ];
+  // No data categories needed as Task is now a main route
 
   // Update the routes array based on user role and super admin status
   const routes = [
@@ -99,11 +97,17 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       showFor: ["admin", "user"],
     },
     {
-      href: "#",
-      label: "Data",
-      icon: Database,
-      active: location.pathname.includes("/dashboard/data"),
-      submenu: true,
+      href: "/dashboard/task",
+      label: "Task",
+      icon: CalendarCheck,
+      active: location.pathname === "/dashboard/task",
+      showFor: ["admin", "user"],
+    },
+    {
+      href: "/dashboard/calendar",
+      label: "Calendar",
+      icon: CalendarIcon,
+      active: location.pathname === "/dashboard/calendar",
       showFor: ["admin", "user"],
     },
     // {
@@ -125,10 +129,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
   ];
 
   const getAccessibleDepartments = () => {
-    const userRole = localStorage.getItem("role") || "user";
-    return dataCategories.filter(
-      (cat) => !cat.showFor || cat.showFor.includes(userRole)
-    );
+    return [];
   };
 
   // Filter routes based on user role and super admin status
@@ -137,19 +138,15 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
     return routes.filter((route) => route.showFor.includes(userRole));
   };
 
-  // Check if the current path is a data category page
-  const isDataPage = location.pathname.includes("/dashboard/data/");
-
-  // If it's a data page, expand the submenu by default
-  useEffect(() => {
-    if (isDataPage && !isDataSubmenuOpen) {
-      setIsDataSubmenuOpen(true);
-    }
-  }, [isDataPage, isDataSubmenuOpen]);
+  // Submenu logic removed
 
   // Get accessible routes and departments
   const accessibleRoutes = getAccessibleRoutes();
-  const accessibleDepartments = getAccessibleDepartments();
+  const accessibleDepartments = getAccessibleDepartments(); // This function is now redundant but kept as per original structure
+
+  if (!showLayout) {
+    return <>{children}</>;
+  }
 
   return (
     <div
@@ -170,67 +167,19 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
           <ul className="space-y-1">
             {accessibleRoutes.map((route) => (
               <li key={route.label}>
-                {route.submenu ? (
-                  <div>
-                    <button
-                      onClick={() => setIsDataSubmenuOpen(!isDataSubmenuOpen)}
-                      className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${route.active
-                        ? "bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700"
-                        : "text-gray-700 hover:bg-blue-50"
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <route.icon
-                          className={`h-4 w-4 ${route.active ? "text-blue-600" : ""
-                            }`}
-                        />
-                        {route.label}
-                      </div>
-                      {isDataSubmenuOpen ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </button>
-                    {isDataSubmenuOpen && (
-                      <ul className="mt-1 ml-6 space-y-1 border-l border-blue-100 pl-2">
-                        {accessibleDepartments.map((category) => (
-                          <li key={category.id}>
-                            <Link
-                              to={
-                                category.link ||
-                                `/dashboard/data/${category.id}`
-                              }
-                              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${location.pathname ===
-                                (category.link ||
-                                  `/dashboard/data/${category.id}`)
-                                ? "bg-blue-50 text-blue-700 font-medium"
-                                : "text-gray-600 hover:bg-blue-50 hover:text-blue-700 "
-                                }`}
-                              onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                              {category.name}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ) : (
-                  <Link
-                    to={route.href}
-                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${route.active
-                      ? "bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700"
-                      : "text-gray-700 hover:bg-blue-50"
+                <Link
+                  to={route.href}
+                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${route.active
+                    ? "bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700"
+                    : "text-gray-700 hover:bg-blue-50"
+                    }`}
+                >
+                  <route.icon
+                    className={`h-4 w-4 ${route.active ? "text-blue-600" : ""
                       }`}
-                  >
-                    <route.icon
-                      className={`h-4 w-4 ${route.active ? "text-blue-600" : ""
-                        }`}
-                    />
-                    {route.label}
-                  </Link>
-                )}
+                  />
+                  {route.label}
+                </Link>
               </li>
             ))}
           </ul>
@@ -349,70 +298,20 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
               <ul className="space-y-1">
                 {accessibleRoutes.map((route) => (
                   <li key={route.label}>
-                    {route.submenu ? (
-                      <div>
-                        <button
-                          onClick={() =>
-                            setIsDataSubmenuOpen(!isDataSubmenuOpen)
-                          }
-                          className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${route.active
-                            ? "bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700"
-                            : "text-gray-700 hover:bg-blue-50"
-                            }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <route.icon
-                              className={`h-4 w-4 ${route.active ? "text-blue-600" : ""
-                                }`}
-                            />
-                            {route.label}
-                          </div>
-                          {isDataSubmenuOpen ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </button>
-                        {isDataSubmenuOpen && (
-                          <ul className="mt-1 ml-6 space-y-1 border-l border-blue-100 pl-2">
-                            {accessibleDepartments.map((category) => (
-                              <li key={category.id}>
-                                <Link
-                                  to={
-                                    category.link ||
-                                    `/dashboard/data/${category.id}`
-                                  }
-                                  className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${location.pathname ===
-                                    (category.link ||
-                                      `/dashboard/data/${category.id}`)
-                                    ? "bg-blue-50 text-blue-700 font-medium"
-                                    : "text-gray-600 hover:bg-blue-50 hover:text-blue-700"
-                                    }`}
-                                  onClick={() => setIsMobileMenuOpen(false)}
-                                >
-                                  {category.name}
-                                </Link>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    ) : (
-                      <Link
-                        to={route.href}
-                        className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${route.active
-                          ? "bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700"
-                          : "text-gray-700 hover:bg-blue-50"
+                    <Link
+                      to={route.href}
+                      className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${route.active
+                        ? "bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700"
+                        : "text-gray-700 hover:bg-blue-50"
+                        }`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <route.icon
+                        className={`h-4 w-4 ${route.active ? "text-blue-600" : ""
                           }`}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        <route.icon
-                          className={`h-4 w-4 ${route.active ? "text-blue-600" : ""
-                            }`}
-                        />
-                        {route.label}
-                      </Link>
-                    )}
+                      />
+                      {route.label}
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -500,98 +399,92 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
 
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-14 items-center justify-between border-b border-blue-200 bg-white px-4 md:px-6">
+        <header className="flex h-16 items-center justify-between border-b border-purple-100 bg-white px-4 md:px-6 shadow-sm z-30">
           <div className="flex md:hidden w-8"></div>
-          <h1 className="text-lg font-semibold text-blue-700">
-            Task Management System
-          </h1>
-          <div className="flex items-center">
-            {/* <img
-              src="/logo.jpg"
-              alt="Company Logo"
-              className="h-8 w-auto md:h-10 lg:h-12 transition-all duration-300"
-            /> */}
+          <div className="flex flex-col items-center">
+            <h1 className="text-lg font-bold bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent">
+              TMS Dashboard
+            </h1>
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-[0.2em] -mt-1 hidden xs:block">
+              Task Management System
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex flex-col items-end mr-1">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Welcome</span>
+              <span className="text-sm font-black text-purple-700 -mt-1">Hello, {username || 'User'}</span>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center shadow-lg border-2 border-white ring-2 ring-purple-100/50">
+              <span className="text-white text-sm font-black uppercase">{username ? username.charAt(0) : 'U'}</span>
+            </div>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gradient-to-br from-blue-50 to-purple-50 pb-20 sm:pb-6">
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gradient-to-br from-blue-50/50 to-purple-50/50 pb-24 md:pb-6">
           {children}
 
-          <div className="fixed md:left-64 left-0 right-0 bottom-0 py-1 px-4 gradient-bg text-white text-center text-sm shadow-lg z-10 backdrop-blur-sm">  <div className="sm:hidden flex justify-between items-center mb-[-10px]">
-            <div className="p-2 rounded-full hover:bg-white/20 transition-all duration-300 cursor-pointer transform hover:scale-110">
-              <Link
-                to={"/dashboard/admin"}
-                className={` ${location.pathname === `/dashboard/admin`
-                  ? "bg-white/20"
-                  : ""
-                  }`}
-              // onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Home size={29} className="drop-shadow-md" />
-              </Link>
-            </div>
-            <div className="p-2 rounded-full hover:bg-white/20 transition-all duration-300 cursor-pointer transform hover:scale-110">
-              <Link
-                to={"/dashboard/data/sales"}
-                className={` ${location.pathname === `/dashboard/data/sales`
-                  ? "bg-white/20"
-                  : ""
-                  }`}
-              >
-                <CalendarCheck size={29} className="drop-shadow-md" />
-              </Link>
-            </div>
-            <div className="p-3 rounded-full bg-white text-purple-600 hover:bg-purple-100 transition-all duration-300 cursor-pointer transform hover:scale-110 shadow-lg -mt-6">
-              <Link
-                to={"/dashboard/assign-task"}
-                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${location.pathname === `/dashboard/assign-task`
-                  ? "bg-white/20"
-                  : ""
-                  }`}
-              >
-                <CirclePlus size={29} className="drop-shadow-md" />
-              </Link>
-            </div>
-            <div className="p-2 rounded-full hover:bg-white/20 transition-all duration-300 cursor-pointer transform hover:scale-110">
-              <Link
-                to={"/dashboard/delegation"}
-                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${location.pathname === `/dashboard/delegation`
-                  ? "bg-white/20"
-                  : ""
-                  }`}
-              >
-                <BookmarkCheck size={29} className="drop-shadow-md" />
-              </Link>
-            </div>
-            <div
-              className="p-2 rounded-full hover:bg-white/20 transition-all duration-300 cursor-pointer transform hover:scale-110"
-              onClick={() => setIsUserPopupOpen(true)}
+          {/* Premium Bottom Navigation for Mobile */}
+          <div className="md:hidden fixed bottom-6 left-4 right-4 h-16 bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] z-50 flex items-center justify-around px-2">
+            <Link
+              to="/dashboard/admin"
+              className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 ${location.pathname === "/dashboard/admin"
+                ? "text-purple-600 bg-purple-50"
+                : "text-gray-400 hover:text-purple-400"
+                }`}
             >
-              <UserRound size={29} className="drop-shadow-md" />
-            </div>
-          </div>
-            <a
-              // href="https://www.botivate.in/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="sm:hidden sm:hover:underline flex items-center justify-center gap-1 text-gray-900 transition-colors duration-300 mb-[-5px]"
-            >
-              All Right Reserved by -
-              <span className="font-bold drop-shadow-md text-gray-900">
-                Chitrasen Tandi
-              </span>
-            </a>
+              <Home size={22} strokeWidth={location.pathname === "/dashboard/admin" ? 2.5 : 2} />
+              <span className="text-[10px] mt-1 font-bold">Home</span>
+            </Link>
 
-            <a
-              href="https://www.botivate.in/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden  hover:underline sm:flex items-center justify-center gap-1 text-white/90 hover:text-white transition-colors duration-300 mb-[-5px]"
+            <Link
+              to="/dashboard/calendar"
+              className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 ${location.pathname === "/dashboard/calendar"
+                ? "text-purple-600 bg-purple-50"
+                : "text-gray-400 hover:text-purple-400"
+                }`}
             >
-              All Right Reserved by -
-              <span className="font-bold text-white drop-shadow-md">
-                Chitrasen Tandi
-              </span>
-            </a>
+              <CalendarIcon size={22} strokeWidth={location.pathname === "/dashboard/calendar" ? 2.5 : 2} />
+              <span className="text-[10px] mt-1 font-bold">Calendar</span>
+            </Link>
+
+            <Link
+              to="/dashboard/task"
+              className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 ${location.pathname === "/dashboard/task"
+                ? "text-purple-600 bg-purple-50"
+                : "text-gray-400 hover:text-purple-400"
+                }`}
+            >
+              <CalendarCheck size={22} strokeWidth={location.pathname === "/dashboard/task" ? 2.5 : 2} />
+              <span className="text-[10px] mt-1 font-bold">Tasks</span>
+            </Link>
+
+            <div className="relative -mt-12">
+              <Link
+                to="/dashboard/assign-task"
+                className="flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-2xl shadow-lg shadow-purple-200 text-white transform active:scale-90 transition-all duration-300 border-4 border-blue-50"
+              >
+                <CirclePlus size={28} strokeWidth={2.5} />
+              </Link>
+            </div>
+
+            <Link
+              to="/dashboard/delegation"
+              className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 ${location.pathname === "/dashboard/delegation"
+                ? "text-purple-600 bg-purple-50"
+                : "text-gray-400 hover:text-purple-400"
+                }`}
+            >
+              <BookmarkCheck size={22} strokeWidth={location.pathname === "/dashboard/delegation" ? 2.5 : 2} />
+              <span className="text-[10px] mt-1 font-bold">Status</span>
+            </Link>
+
+            <button
+              onClick={() => setIsUserPopupOpen(true)}
+              className="flex flex-col items-center justify-center w-12 h-12 rounded-xl text-gray-400 hover:text-purple-400 transition-all"
+            >
+              <UserRound size={22} strokeWidth={2} />
+              <span className="text-[10px] mt-1 font-bold">Profile</span>
+            </button>
           </div>
         </main>
 

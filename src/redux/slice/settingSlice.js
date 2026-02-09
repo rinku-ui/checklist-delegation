@@ -11,8 +11,11 @@ import {
   fetchUserDetailsApi,
   updateDepartmentDataApi,
   updateUserDataApi,
-  fetchDepartmentsOnlyApi,  // Add this import
-  fetchGivenByDataApi       // Add this import
+  fetchDepartmentsOnlyApi,
+  fetchGivenByDataApi,
+  fetchCustomDropdownsApi,
+  createCustomDropdownApi,
+  deleteCustomDropdownApi
 } from '../api/settingApi';
 
 
@@ -93,6 +96,30 @@ export const deleteUser = createAsyncThunk(
   }
 );
 
+export const customDropdownDetails = createAsyncThunk(
+  'fetch/custom-dropdowns',
+  async () => {
+    const dropdowns = await fetchCustomDropdownsApi();
+    return dropdowns;
+  }
+);
+
+export const createCustomDropdown = createAsyncThunk(
+  'post/custom-dropdown',
+  async (item) => {
+    const dropdown = await createCustomDropdownApi(item);
+    return dropdown;
+  }
+);
+
+export const deleteCustomDropdown = createAsyncThunk(
+  'delete/custom-dropdown',
+  async (id) => {
+    const deletedId = await deleteCustomDropdownApi(id);
+    return deletedId;
+  }
+);
+
 
 
 const settingsSlice = createSlice({
@@ -100,8 +127,9 @@ const settingsSlice = createSlice({
   initialState: {
     userData: [],
     department: [],
-    departmentsOnly: [], // Add this for departments tab
-    givenBy: [], // Add this for given by tab
+    departmentsOnly: [],
+    givenBy: [],
+    customDropdowns: [],
     error: null,
     loading: false,
     isLoggedIn: false,
@@ -227,6 +255,42 @@ const settingsSlice = createSlice({
         state.userData = state.userData.filter((user) => user.id !== action.payload);
       })
       .addCase(deleteUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(customDropdownDetails.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(customDropdownDetails.fulfilled, (state, action) => {
+        state.loading = false;
+        state.customDropdowns = action.payload;
+      })
+      .addCase(customDropdownDetails.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(createCustomDropdown.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createCustomDropdown.fulfilled, (state, action) => {
+        state.loading = false;
+        state.customDropdowns.push(action.payload);
+      })
+      .addCase(createCustomDropdown.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(deleteCustomDropdown.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteCustomDropdown.fulfilled, (state, action) => {
+        state.loading = false;
+        state.customDropdowns = state.customDropdowns.filter((item) => item.id !== action.payload);
+      })
+      .addCase(deleteCustomDropdown.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });
