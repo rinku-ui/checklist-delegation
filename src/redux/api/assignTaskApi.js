@@ -1,33 +1,28 @@
 import supabase from "../../SupabaseClient";
 
-export const fetchUniqueDepartmentDataApi = async (user_name) => {
+export const fetchUniqueDepartmentDataApi = async () => {
   try {
-    // 1. Get the logged-in user's role + access
-    const { data: userData } = await supabase
+    console.log("🔍 Fetching unique departments from users table (role=user)...");
+
+    // Fetch all user_access values for users with role='user'
+    const { data, error } = await supabase
       .from("users")
-      .select("role, user_access")
-      .eq("user_name", user_name)
-      .single();
+      .select("user_access")
+      .eq("role", "user")
+      .not("user_access", "is", null);
 
-    // 2. If admin or manager → show all departments from dedicated table
-    if (userData?.role === "admin" || userData?.role === "manager") {
-      const { data, error } = await supabase
-        .from("departments")
-        .select("name")
-        .order("name", { ascending: true });
+    if (error) throw error;
 
-      if (error) throw error;
-      return data.map(d => d.name);
-    }
+    // Filter out nulls/empties and get unique values
+    const uniqueDepartments = [...new Set(data
+      .map(item => item.user_access)
+      .filter(dept => dept && dept.trim() !== "")
+    )].sort();
 
-    // 3. If user → show only their own department (fallback if table data missing)
-    if (userData?.role === "user") {
-      return [userData.user_access];
-    }
-
-    return [];
+    console.log("✅ Unique departments found:", uniqueDepartments);
+    return uniqueDepartments;
   } catch (error) {
-    console.error("Error from Supabase:", error);
+    console.error("❌ Error fetching departments from users table:", error);
     return [];
   }
 };
@@ -52,11 +47,11 @@ export const fetchUniqueGivenByDataApi = async () => {
 
 export const fetchUniqueDoerNameDataApi = async (department) => {
   try {
-    console.log("Department passed:", department);
+    console.log("🔍 Fetching doer names for department:", department);
 
     let query = supabase
       .from("users")
-      .select("user_name, role, user_access")
+      .select("user_name, role, user_access, status")
       .eq("status", "active")
       .eq("role", "user")
       .order("user_name", { ascending: true });
@@ -69,16 +64,23 @@ export const fetchUniqueDoerNameDataApi = async (department) => {
 
     const { data, error } = await query;
 
+    console.log("📊 Raw user data:", data);
+    console.log("❌ Error:", error);
+
+    if (error) {
+      console.error("Error when fetching data", error);
+      return [];
+    }
+
     const uniqueDoerName = [...new Set(data?.map((d) => d.user_name))];
 
-    if (!error) {
-      console.log("Fetched successfully", uniqueDoerName);
-    } else {
-      console.log("Error when fetching data", error);
-    }
+    console.log("✅ Unique doer names:", uniqueDoerName);
+    console.log("📈 Total doers found:", uniqueDoerName.length);
+
     return uniqueDoerName;
   } catch (error) {
-    console.log("Error from Supabase", error);
+    console.error("❌ Error from Supabase:", error);
+    return [];
   }
 };
 

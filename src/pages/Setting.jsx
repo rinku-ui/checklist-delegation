@@ -1,9 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw } from 'lucide-react';
 import AdminLayout from '../components/layout/AdminLayout';
 import { useDispatch, useSelector } from 'react-redux';
-import { createDepartment, createUser, deleteUser, departmentOnlyDetails, givenByDetails, departmentDetails, updateDepartment, updateUser, userDetails, customDropdownDetails, createCustomDropdown, deleteCustomDropdown, createAssignFrom, deleteDepartment, deleteAssignFrom, updateCustomDropdown } from '../redux/slice/settingSlice';
+import { createDepartment, createUser, deleteUser, departmentOnlyDetails, givenByDetails, departmentDetails, updateDepartment, updateUser, userDetails, customDropdownDetails, createCustomDropdown, deleteCustomDropdown, createAssignFrom, deleteDepartment, deleteAssignFrom, updateCustomDropdown, updateAssignFrom } from '../redux/slice/settingSlice';
 import supabase from '../SupabaseClient';
+import CalendarComponent from '../components/CalendarComponent';
+
+const formatDateLong = (date) => date ? date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
+const formatDateISO = (date) => date ? date.toISOString().split('T')[0] : "";
 
 const Setting = () => {
   const [activeTab, setActiveTab] = useState('users');
@@ -15,6 +19,7 @@ const Setting = () => {
   const [usernameFilter, setUsernameFilter] = useState('');
   const [usernameDropdownOpen, setUsernameDropdownOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const lastSyncError = useRef({ status: null, timestamp: 0 });
 
   const [activeDeptSubTab, setActiveDeptSubTab] = useState('departments');
   // Leave Management State
@@ -23,6 +28,8 @@ const Setting = () => {
   const [leaveEndDate, setLeaveEndDate] = useState('');
   const [remark, setRemark] = useState('');
   const [leaveUsernameFilter, setLeaveUsernameFilter] = useState('');
+  const [showStartCalendar, setShowStartCalendar] = useState(false);
+  const [showEndCalendar, setShowEndCalendar] = useState(false);
 
   const { userData, department, departmentsOnly, givenBy, customDropdowns, loading, error } = useSelector((state) => state.setting);
   const dispatch = useDispatch();
@@ -236,44 +243,63 @@ const Setting = () => {
 
 
   const fetchDeviceLogsAndUpdateStatus = async () => {
+    // Set to true to enable background sync when the hardware API is online
+    const ENABLE_DEVICE_SYNC = false;
+    if (!ENABLE_DEVICE_SYNC) return;
+
     try {
+      const now = Date.now();
+      // Only sync once every 30 mins if we are in an error state
+      if (lastSyncError.current.status === 400 && (now - lastSyncError.current.timestamp) < 30 * 60 * 1000) {
+        return;
+      }
+
       setIsRefreshing(true);
       const today = new Date().toISOString().split('T')[0];
 
-      // Using the device log APIs (In and Out)
-      const IN_API_URL = `https://api.allorigins.win/raw?url=${encodeURIComponent(`http://139.167.179.193:90/api/v2/WebAPI/GetDeviceLogs?APIKey=205511032522&SerialNumber=E03C1CB34D83AA02&FromDate=${today}&ToDate=${today}`)}`;
-      const OUT_API_URL = `https://api.allorigins.win/raw?url=${encodeURIComponent(`http://139.167.179.193:90/api/v2/WebAPI/GetDeviceLogs?APIKey=205511032522&SerialNumber=E03C1CB36042AA02&FromDate=${today}&ToDate=${today}`)}`;
+      const urls = [
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(`http://139.167.179.193:90/api/v2/WebAPI/GetDeviceLogs?APIKey=205511032522&SerialNumber=E03C1CB34D83AA02&FromDate=${today}&ToDate=${today}`)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(`http://139.167.179.193:90/api/v2/WebAPI/GetDeviceLogs?APIKey=205511032522&SerialNumber=E03C1CB36042AA02&FromDate=${today}&ToDate=${today}`)}`
+      ];
 
-      // Use try-catch for the fetch itself to handle connectivity issues
       let allLogs = [];
-      try {
-        const [inResponse, outResponse] = await Promise.all([
-          fetch(IN_API_URL),
-          fetch(OUT_API_URL)
-        ]);
+      let encountered400 = false;
 
-        if (inResponse.ok && outResponse.ok) {
-          const inLogs = await inResponse.json();
-          const outLogs = await outResponse.json();
-          allLogs = [...inLogs, ...outLogs];
-        } else {
-          console.warn('One or more device sync APIs returned an error');
-          return;
+      // Sequential fetch to isolate errors
+      for (const url of urls) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            const logs = await response.json();
+            if (Array.isArray(logs)) allLogs = [...allLogs, ...logs];
+          } else if (response.status === 400) {
+            encountered400 = true;
+          }
+        } catch (e) {
+          // Network errors are caught here
         }
-      } catch (err) {
-        console.warn('Device sync APIs unreachable (CORS or Network issue). Skipping background sync.');
+      }
+
+      // Back-off logic if entirely failing
+      if (encountered400 && allLogs.length === 0) {
+        if (lastSyncError.current.status !== 400) {
+          console.log('ℹ️ Device APIs unreachable (400). Sync paused for 30 minutes.');
+        }
+        lastSyncError.current = { status: 400, timestamp: now };
         return;
       }
 
-      if (allLogs.length === 0) {
-        console.log('No device logs found for today.');
-        return;
+      // Clear back-off if we got any data
+      if (allLogs.length > 0 && lastSyncError.current.status === 400) {
+        console.log('✅ Device sync partially or fully restored.');
+        lastSyncError.current = { status: null, timestamp: 0 };
       }
+
+      if (allLogs.length === 0) return;
 
       // Sort logs by date (latest first)
       allLogs.sort((a, b) => new Date(b.LogDate) - new Date(a.LogDate));
 
-      // Simple logic: Check latest punch for each employee
       const employeeStatus = {};
       allLogs.forEach(log => {
         const employeeCode = log.EmployeeCode;
@@ -285,8 +311,8 @@ const Setting = () => {
         }
       });
 
-      // Update users in database if status has changed
       const updatePromises = Object.entries(employeeStatus).map(async ([employeeCode, statusInfo]) => {
+        if (!userData || !Array.isArray(userData)) return;
         const user = userData.find(u => u.employee_id === employeeCode);
         if (user && user.status !== statusInfo.status) {
           const { error } = await supabase
@@ -300,9 +326,8 @@ const Setting = () => {
 
       await Promise.all(updatePromises);
       dispatch(userDetails());
-      console.log('Device sync completed successfully.');
     } catch (error) {
-      console.warn('Device sync encountered an unexpected error:', error.message);
+      // Final catch for logic errors
     } finally {
       setIsRefreshing(false);
     }
@@ -646,7 +671,7 @@ const Setting = () => {
       try {
         await dispatch(updateCustomDropdown({
           id: currentDeptId,
-          category: deptForm.name,
+          category: 'Machine Name', // Force Machine Name category
           value: deptForm.givenBy
         })).unwrap();
         resetDeptForm();
@@ -671,8 +696,16 @@ const Setting = () => {
           console.error('Error updating department:', error);
         }
       } else if (activeDeptSubTab === 'givenBy') {
-        alert('Updating "Assign From" entries is not supported via this modal. Please delete and recreate.');
-        return;
+        try {
+          await dispatch(updateAssignFrom({
+            id: currentDeptId,
+            given_by: deptForm.name
+          })).unwrap();
+          resetDeptForm();
+          setShowDeptModal(false);
+        } catch (error) {
+          console.error('Error updating assign_from:', error);
+        }
       }
     }
   };
@@ -683,7 +716,7 @@ const Setting = () => {
     if (activeTab === 'categories') {
       try {
         await dispatch(createCustomDropdown({
-          category: deptForm.name,
+          category: 'Machine Name', // Force Machine Name category
           value: deptForm.givenBy
         })).unwrap();
         resetDeptForm();
@@ -881,99 +914,81 @@ const Setting = () => {
   return (
     <AdminLayout>
       <div className="space-y-8">
-        {/* Header and Tabs */}
-        {/* Header and Tabs */}
-        <div className="my-5 flex justify-between">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font bold text-purple-600 font-bold">User Management System</h1>
-          </div>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 py-6">
+          <h1 className="text-2xl font-bold text-purple-600">User Management System</h1>
 
-          <div className="flex items-center gap-4">
-            <div className="flex border border-purple-200 rounded-md overflow-hidden self-start">
-              {/* Your existing tab buttons */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex border border-purple-200 rounded-lg overflow-x-auto scrollbar-hide bg-white shadow-sm">
               <button
-                className={`flex px-4 py-3 text-sm font-medium ${activeTab === 'users' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all ${activeTab === 'users' ? 'bg-purple-600 text-white shadow-inner' : 'text-purple-600 hover:bg-purple-50'}`}
                 onClick={() => {
                   handleTabChange('users');
                   dispatch(userDetails());
                 }}
               >
-                <User size={18} />
-                Users
+                <User size={16} />
+                <span>Users</span>
               </button>
               <button
-                className={`flex px-4 py-3 text-sm font-medium ${activeTab === 'departments' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-l border-purple-100 transition-all ${activeTab === 'departments' ? 'bg-purple-600 text-white shadow-inner' : 'text-purple-600 hover:bg-purple-50'}`}
                 onClick={() => {
                   handleTabChange('departments');
-                  dispatch(departmentDetails()); // Fetch departments when switching to this tab
-                  dispatch(givenByDetails()); // Fetch givenBy when switching to this tab
+                  dispatch(departmentDetails());
+                  dispatch(givenByDetails());
                 }}
               >
-                <Building size={18} />
-                Departments
+                <Building size={16} />
+                <span>Departments</span>
               </button>
               <button
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium ${activeTab === 'leave' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-l border-purple-100 transition-all ${activeTab === 'leave' ? 'bg-purple-600 text-white shadow-inner' : 'text-purple-600 hover:bg-purple-50'}`}
                 onClick={() => handleTabChange('leave')}
               >
-                <Calendar size={18} />
-                Leave
+                <Calendar size={16} />
+                <span>Leave</span>
               </button>
               <button
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium ${activeTab === 'categories' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-l border-purple-100 transition-all ${activeTab === 'categories' ? 'bg-purple-600 text-white shadow-inner' : 'text-purple-600 hover:bg-purple-50'}`}
                 onClick={() => handleTabChange('categories')}
               >
-                <Settings size={18} />
-                Categories
+                <Settings size={16} />
+                <span>Machines</span>
               </button>
             </div>
 
-            {/* Add this debug button temporarily next to your refresh button */}
-            <button
-              onClick={debugUserStatus}
-              className="rounded-md bg-yellow-600 py-2 px-4 text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2"
-            >
-              <div className="flex items-center">
-                <Search size={18} className="mr-2" />
-                <span>Debug User</span>
-              </div>
-            </button>
-
-            {/* Refresh Button */}
-            <button
-              onClick={handleManualRefresh}
-              disabled={isRefreshing}
-              className="rounded-md bg-green-600 py-2 px-4 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="flex items-center">
-                <RefreshCw size={18} className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>{isRefreshing ? 'Refreshing...' : 'Refresh Status'}</span>
-              </div>
-            </button>
-
-            {/* Add button - hide for leave tab */}
-            {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'categories') && (
+            <div className="flex items-center gap-2 ml-auto">
               <button
-                onClick={() => {
-                  if (activeTab === 'categories') {
-                    // Logic for custom dropdown modal if needed, or repurposed Dept modal
-                    resetDeptForm();
-                    setShowDeptModal(true);
-                  } else {
-                    handleAddButtonClick();
-                  }
-                }}
-                className="rounded-md gradient-bg py-2 px-6 text-white hover:opacity-90 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2"
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                className="p-2.5 rounded-lg bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-all disabled:opacity-50"
+                title="Refresh Status"
               >
-                <Plus size={18} />
-                <span>
-                  {activeTab === 'users' ? 'New User' :
-                    activeTab === 'departments' ?
-                      (activeDeptSubTab === 'departments' ? 'New Department' : 'New Assign From') :
-                      'New Category'}
-                </span>
+                <RefreshCw size={20} className={isRefreshing ? 'animate-spin' : ''} />
               </button>
-            )}
+
+              {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'categories') && (
+                <button
+                  onClick={() => {
+                    if (activeTab === 'categories') {
+                      resetDeptForm();
+                      setShowDeptModal(true);
+                    } else {
+                      handleAddButtonClick();
+                    }
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-lg font-bold shadow-md hover:bg-purple-700 transition-all text-sm"
+                >
+                  <Plus size={18} />
+                  <span className="hidden sm:inline">
+                    {activeTab === 'users' ? 'New User' :
+                      activeTab === 'departments' ?
+                        (activeDeptSubTab === 'departments' ? 'New Department' : 'New Assign From') :
+                        'New Machine'}
+                  </span>
+                  <span className="sm:hidden">Add</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
         {/* <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
@@ -990,356 +1005,317 @@ const Setting = () => {
 
 
         {/* Leave Management Tab */}
-        {activeTab === 'leave' && (
-          <div className="bg-white shadow rounded-lg overflow-hidden border border-purple-200">
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-6 py-4 border-gray-200 flex justify-between items-center">
-              <h2 className="text-lg font-medium text-purple-700">Leave Management</h2>
+        {
+          activeTab === 'leave' && (
+            <div className="bg-white shadow rounded-lg overflow-hidden border border-purple-200">
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-4 py-4 md:px-6 flex flex-col md:flex-row gap-4 md:items-center justify-between">
+                <h2 className="text-lg font-bold text-purple-700">Leave Management</h2>
 
-              <div className="flex items-center gap-4">
-                {/* Username Search Filter for Leave Tab */}
-                <div className="relative">
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                      <input
-                        type="text"
-                        list="leaveUsernameOptions"
-                        placeholder="Filter by username..."
-                        value={leaveUsernameFilter}
-                        onChange={(e) => setLeaveUsernameFilter(e.target.value)}
-                        className="w-48 pl-10 pr-8 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                      />
-                      <datalist id="leaveUsernameOptions">
-                        {userData?.map(user => (
-                          <option key={user.id} value={user.user_name} />
-                        ))}
-                      </datalist>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      list="leaveUsernameOptions"
+                      placeholder="Filter users..."
+                      value={leaveUsernameFilter}
+                      onChange={(e) => setLeaveUsernameFilter(e.target.value)}
+                      className="w-full sm:w-48 pl-10 pr-8 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                    />
+                    <datalist id="leaveUsernameOptions">
+                      {userData?.map(user => (
+                        <option key={`opt-leave-${user.id}`} value={user.user_name} />
+                      ))}
+                    </datalist>
+                  </div>
 
-                      {/* Clear button for input */}
-                      {leaveUsernameFilter && (
-                        <button
-                          onClick={clearLeaveUsernameFilter}
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
-                    </div>
+                  <button
+                    onClick={handleSubmitLeave}
+                    className="rounded-md bg-green-600 py-2 px-6 text-white font-bold hover:bg-green-700 shadow-md transition-all text-sm"
+                  >
+                    Submit Leave
+                  </button>
+                </div>
+              </div>
+
+
+              {/* Leave Form */}
+              <div className="p-4 md:p-6 border-b border-gray-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="relative">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Leave Start Date
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowStartCalendar(!showStartCalendar)}
+                      className="w-full border border-gray-200 rounded-lg shadow-sm py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50 focus:bg-white transition-all text-sm text-left flex justify-between items-center"
+                    >
+                      {leaveStartDate ? formatDateLong(new Date(leaveStartDate)) : "Select start date"}
+                      <Calendar size={16} className="text-gray-400" />
+                    </button>
+                    {showStartCalendar && (
+                      <div className="absolute top-full left-0 mt-2 z-50">
+                        <CalendarComponent
+                          date={leaveStartDate ? new Date(leaveStartDate) : null}
+                          onChange={(date) => setLeaveStartDate(formatDateISO(date))}
+                          onClose={() => setShowStartCalendar(false)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Leave End Date
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowEndCalendar(!showEndCalendar)}
+                      className="w-full border border-gray-200 rounded-lg shadow-sm py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50 focus:bg-white transition-all text-sm text-left flex justify-between items-center"
+                    >
+                      {leaveEndDate ? formatDateLong(new Date(leaveEndDate)) : "Select end date"}
+                      <Calendar size={16} className="text-gray-400" />
+                    </button>
+                    {showEndCalendar && (
+                      <div className="absolute top-full left-0 mt-2 z-50">
+                        <CalendarComponent
+                          date={leaveEndDate ? new Date(leaveEndDate) : null}
+                          onChange={(date) => setLeaveEndDate(formatDateISO(date))}
+                          onClose={() => setShowEndCalendar(false)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Remarks
+                    </label>
+                    <input
+                      type="text"
+                      value={remark}
+                      onChange={(e) => setRemark(e.target.value)}
+                      placeholder="Enter remarks..."
+                      className="w-full border border-gray-200 rounded-lg shadow-sm py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50 focus:bg-white transition-all text-sm"
+                    />
                   </div>
                 </div>
-
-                {/* Submit Button */}
-                <button
-                  onClick={handleSubmitLeave}
-                  className="rounded-md bg-green-600 py-2 px-4 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                >
-                  Submit Leave
-                </button>
               </div>
-            </div>
 
-
-            {/* Leave Form */}
-            <div className="p-6 border-b border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Leave Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={leaveStartDate}
-                    onChange={(e) => setLeaveStartDate(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Leave End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={leaveEndDate}
-                    onChange={(e) => setLeaveEndDate(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Remarks
-                  </label>
-                  <input
-                    type="text"
-                    value={remark}
-                    onChange={(e) => setRemark(e.target.value)}
-                    placeholder="Enter remarks"
-                    className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Users List for Leave Selection - Updated with filter */}
-            {/* Users List for Leave Selection */}
-            <div className="h-[calc(100vh-400px)] overflow-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <input
-                        type="checkbox"
-                        onChange={handleSelectAll}
-                        checked={selectedUsers.length === filteredLeaveUsers?.length && filteredLeaveUsers?.length > 0}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Username
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Current Leave Start Date
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Current Leave End Date
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Current Remarks
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredLeaveUsers?.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+              {/* Users List for Leave Selection - Updated with filter */}
+              {/* Users List for Leave Selection */}
+              <div className="h-[calc(100vh-400px)] overflow-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <input
                           type="checkbox"
-                          checked={selectedUsers.includes(user.id)}
-                          onChange={(e) => handleUserSelection(user.id, e.target.checked)}
+                          onChange={handleSelectAll}
+                          checked={selectedUsers.length === filteredLeaveUsers?.length && filteredLeaveUsers?.length > 0}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{user.user_name}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {user.leave_date ? new Date(user.leave_date).toLocaleDateString() : 'No leave set'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {user.leave_end_date ? new Date(user.leave_end_date).toLocaleDateString() : 'No end date set'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{user.remark || 'No remarks'}</div>
-                      </td>
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Username
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Current Leave Start Date
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Current Leave End Date
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Current Remarks
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredLeaveUsers?.map((user) => (
+                      <tr key={`leave-${user.id}`} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.includes(user.id)}
+                            onChange={(e) => handleUserSelection(user.id, e.target.checked)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{user.user_name}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {user.leave_date ? new Date(user.leave_date).toLocaleDateString() : 'No leave set'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {user.leave_end_date ? new Date(user.leave_end_date).toLocaleDateString() : 'No end date set'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{user.remark || 'No remarks'}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
 
         {/* Users Tab */}
         {activeTab === 'users' && (
           <div className="bg-white shadow rounded-lg overflow-hidden border border-purple-200">
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-6 py-4 border-gray-200 flex justify-between items-center">
-              <h2 className="text-lg font-medium text-purple-700">User List</h2>
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-4 py-4 md:px-6 flex flex-col md:flex-row gap-4 md:items-center justify-between">
+              <h2 className="text-lg font-bold text-purple-700">User List</h2>
 
-              {/* Username Filter */}
-              <div className="relative">
-                <div className="flex items-center gap-2">
-                  {/* Input with datalist for autocomplete */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                    <input
-                      type="text"
-                      list="usernameOptions"
-                      placeholder="Filter by username..."
-                      value={usernameFilter}
-                      onChange={(e) => setUsernameFilter(e.target.value)}
-                      className="w-48 pl-10 pr-8 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                    />
-                    <datalist id="usernameOptions">
-                      {userData?.map(user => (
-                        <option key={user.id} value={user.user_name} />
-                      ))}
-                    </datalist>
-
-                    {/* Clear button for input */}
-                    {usernameFilter && (
-                      <button
-                        onClick={clearUsernameFilter}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X size={16} />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Dropdown button */}
-                  <button
-                    onClick={toggleUsernameDropdown}
-                    className="flex items-center gap-1 px-3 py-2 border border-purple-200 rounded-md bg-white text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <ChevronDown size={16} className={`transition-transform ${usernameDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
+              <div className="flex items-center gap-2">
+                <div className="relative w-full sm:w-auto">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="text"
+                    list="usernameOptions"
+                    placeholder="Search users..."
+                    value={usernameFilter}
+                    onChange={(e) => setUsernameFilter(e.target.value)}
+                    className="w-full sm:w-48 pl-10 pr-8 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm shadow-sm"
+                  />
+                  <datalist id="usernameOptions">
+                    {userData?.map(user => (
+                      <option key={`opt-user-${user.id}`} value={user.user_name} />
+                    ))}
+                  </datalist>
                 </div>
-
-                {/* Dropdown menu */}
-                {usernameDropdownOpen && (
-                  <div className="absolute z-50 mt-1 w-56 rounded-md bg-white shadow-lg border border-gray-200 max-h-60 overflow-auto top-full right-0">
-                    <div className="py-1">
-                      <button
-                        onClick={clearUsernameFilter}
-                        className={`block w-full text-left px-4 py-2 text-sm ${!usernameFilter ? 'bg-purple-100 text-purple-900' : 'text-gray-700 hover:bg-gray-100'}`}
-                      >
-                        All Usernames
-                      </button>
-                      {userData?.map(user => (
-                        <button
-                          key={user.id}
-                          onClick={() => handleUsernameFilterSelect(user.user_name)}
-                          className={`block w-full text-left px-4 py-2 text-sm ${usernameFilter === user.user_name ? 'bg-purple-100 text-purple-900' : 'text-gray-700 hover:bg-gray-100'}`}
-                        >
-                          {user.user_name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
-            <div className="h-[calc(100vh-275px)] overflow-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Username
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Phone No.
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Employee ID
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Department
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Role
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {userData
-                    ?.filter(user =>
-                      user.user_name !== 'admin' &&
-                      user.user_name !== 'DSMC' && (
-                        !usernameFilter || user.user_name.toLowerCase().includes(usernameFilter.toLowerCase()))
-                    )
-                    .map((user, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="text-sm font-medium text-gray-900">{user?.user_name}</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{user?.email_id}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{user?.number}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{user?.employee_id || 'N/A'}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{user?.user_access || 'N/A'}</div>
-                        </td>
+            <div className="max-h-[calc(100vh-250px)] overflow-auto scrollbar-thin">
+              <div className="inline-block min-w-full align-middle">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Username
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Phone No.
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Employee ID
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Department
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Role
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {userData
+                      ?.filter(user =>
+                        user.user_name !== 'admin' &&
+                        user.user_name !== 'DSMC' && (
+                          !usernameFilter || user.user_name.toLowerCase().includes(usernameFilter.toLowerCase()))
+                      )
+                      .map((user, index) => (
+                        <tr key={`user-${user?.id || index}`} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="text-sm font-medium text-gray-900">{user?.user_name}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{user?.email_id}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{user?.number}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{user?.employee_id || 'N/A'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{user?.user_access || 'N/A'}</div>
+                          </td>
 
-                        {/* ADD THE STATUS CELL HERE */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(user?.status)}`}>
-                              {user?.status}
+                          {/* ADD THE STATUS CELL HERE */}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(user?.status)}`}>
+                                {user?.status}
+                              </span>
+                              {user?.status === 'active' && (
+                                <span className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live Status"></span>
+                              )}
+                            </div>
+                          </td>
+                          {/* END OF STATUS CELL */}
+
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleColor(user?.role)}`}>
+                              {user?.role}
                             </span>
-                            {user?.status === 'active' && (
-                              <span className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live Status"></span>
-                            )}
-                          </div>
-                        </td>
-                        {/* END OF STATUS CELL */}
-
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleColor(user?.role)}`}>
-                            {user?.role}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleEditUser(user?.id)}
-                              className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                              title="Edit User"
-                            >
-                              <Edit size={18} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(user?.id)}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                              title="Delete User"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => handleEditUser(user?.id)}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                title="Edit User"
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(user?.id)}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                title="Delete User"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
 
         {/* Departments Tab */}
-        {/* Departments Tab */}
-        {/* Departments Tab */}
         {activeTab === 'departments' && (
           <div className="bg-white shadow rounded-lg overflow-hidden border border-purple-200">
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-6 py-4 border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-medium text-purple-700">Department Management</h2>
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-4 py-4 md:px-6">
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center text-center sm:text-left">
+                <h2 className="text-lg font-bold text-purple-700">Department Management</h2>
 
-                {/* Sub-tabs for Departments and Given By */}
-                <div className="flex border border-purple-200 rounded-md overflow-hidden">
+                <div className="flex border border-purple-200 rounded-lg overflow-hidden bg-white shadow-sm">
                   <button
-                    className={`px-4 py-2 text-sm font-medium ${activeDeptSubTab === 'departments' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
+                    className={`px-4 py-2 text-xs font-bold transition-all ${activeDeptSubTab === 'departments' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
                     onClick={() => {
                       setActiveDeptSubTab('departments');
-                      dispatch(departmentDetails()); // Fetch departments when switching sub-tab
+                      dispatch(departmentDetails());
                     }}
                   >
-                    Departments
+                    Main Departments
                   </button>
                   <button
-                    className={`px-4 py-2 text-sm font-medium ${activeDeptSubTab === 'givenBy' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
+                    className={`px-4 py-2 text-xs font-bold border-l border-purple-100 transition-all ${activeDeptSubTab === 'givenBy' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
                     onClick={() => {
                       setActiveDeptSubTab('givenBy');
-                      dispatch(givenByDetails()); // Fetch givenBy when switching sub-tab
+                      dispatch(givenByDetails());
                     }}
                   >
                     Assign From
@@ -1365,62 +1341,64 @@ const Setting = () => {
 
             {/* Departments Sub-tab - Show only department names */}
             {activeDeptSubTab === 'departments' && !loading && (
-              <div className="h-[calc(100vh-275px)] overflow-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ID
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Department Name
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Given By
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {department && department.length > 0 ? (
-                      department.map((dept, index) => (
-                        <tr key={dept.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept.department}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{dept.given_by || 'N/A'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex space-x-2 justify-end">
-                              <button
-                                onClick={() => handleEditDepartment(dept.id)}
-                                className="p-1 text-blue-600 hover:bg-blue-50 rounded-md"
-                              >
-                                <Edit size={16} />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (window.confirm('Delete this department?')) {
-                                    dispatch(deleteDepartment(dept.id));
-                                  }
-                                }}
-                                className="p-1 text-red-600 hover:bg-red-50 rounded-md"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
+              <div className="max-h-[calc(100vh-250px)] overflow-auto scrollbar-thin">
+                <div className="inline-block min-w-full align-middle">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          ID
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Department Name
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Assign By
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {department && department.length > 0 ? (
+                        department.map((dept, index) => (
+                          <tr key={`dept-${dept.id || index}`} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept.department}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{dept.given_by || 'N/A'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex space-x-2 justify-end">
+                                <button
+                                  onClick={() => handleEditDepartment(dept.id)}
+                                  className="p-1 text-blue-600 hover:bg-blue-50 rounded-md"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm('Delete this department?')) {
+                                      dispatch(deleteDepartment(dept.id));
+                                    }
+                                  }}
+                                  className="p-1 text-red-600 hover:bg-red-50 rounded-md"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                            No departments found
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
-                          No departments found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
@@ -1438,7 +1416,7 @@ const Setting = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {givenBy && givenBy.length > 0 ? (
                       givenBy.map((item, index) => (
-                        <tr key={item.id || index} className="hover:bg-gray-50"> {/* Use item.id if available, else index */}
+                        <tr key={`given-${item.id || index}`} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.given_by}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1467,69 +1445,73 @@ const Setting = () => {
           </div>
         )}
 
-        {/* Categories Tab (Dropdown Management) */}
+        {/* Machines Tab (Machine Management) */}
         {activeTab === 'categories' && (
           <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-purple-100">
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-8 py-6 flex justify-between items-center border-b border-purple-100">
               <div>
-                <h2 className="text-xl font-bold text-indigo-900">Category Manager</h2>
-                <p className="text-sm text-indigo-600">Manage custom dropdown lists and task categories</p>
+                <h2 className="text-xl font-bold text-indigo-900">Machine Manager</h2>
+                <p className="text-sm text-indigo-600">Add and manage machines for tasks</p>
               </div>
             </div>
 
-            <div className="h-[calc(100vh-320px)] overflow-auto scrollbar-hide">
-              <table className="min-w-full divide-y divide-gray-100">
-                <thead className="bg-gray-50/50 sticky top-0 backdrop-blur-sm">
-                  <tr>
-                    <th className="px-8 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Type / Activity</th>
-                    <th className="px-8 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Value / Option</th>
-                    <th className="px-8 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-widest">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-50">
-                  {customDropdowns && customDropdowns.length > 0 ? (
-                    customDropdowns.map((item) => (
-                      <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
-                        <td className="px-8 py-4 text-sm font-semibold text-gray-700">{item.category}</td> {/* Changed from user_access */}
-                        <td className="px-8 py-4">
-                          <span className="px-3 py-1 bg-white border border-indigo-100 rounded-full text-xs font-bold text-indigo-700 shadow-sm">
-                            {item.value} {/* Changed from given_by */}
-                          </span>
-                        </td>
-                        <td className="px-8 py-4 text-right">
-                          <div className="flex space-x-2 justify-end">
-                            <button
-                              onClick={() => handleEditDepartment(item.id)}
-                              className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (window.confirm('Delete this category option?')) {
-                                  dispatch(deleteCustomDropdown(item.id));
-                                }
-                              }}
-                              className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+            <div className="max-h-[calc(100vh-250px)] overflow-auto scrollbar-hide">
+              <div className="inline-block min-w-full align-middle">
+                <table className="min-w-full divide-y divide-gray-100">
+                  <thead className="bg-gray-50/50 sticky top-0 backdrop-blur-sm z-10 shadow-sm">
+                    <tr>
+                      <th className="px-8 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">ID</th>
+                      <th className="px-8 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Machine Name</th>
+                      <th className="px-8 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-widest">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-50">
+                    {customDropdowns && customDropdowns.filter(item => item.category === 'Machine Name').length > 0 ? (
+                      customDropdowns
+                        .filter(item => item.category === 'Machine Name')
+                        .map((item, idx) => (
+                          <tr key={`cat-${item.id}-${item.category}`} className="hover:bg-indigo-50/30 transition-colors group">
+                            <td className="px-8 py-4 text-sm font-semibold text-gray-700">{idx + 1}</td>
+                            <td className="px-8 py-4">
+                              <span className="px-3 py-1 bg-white border border-indigo-100 rounded-full text-xs font-bold text-indigo-700 shadow-sm">
+                                {item.value}
+                              </span>
+                            </td>
+                            <td className="px-8 py-4 text-right">
+                              <div className="flex space-x-2 justify-end">
+                                <button
+                                  onClick={() => handleEditDepartment(item.id)}
+                                  className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm('Delete this category option?')) {
+                                      dispatch(deleteCustomDropdown(item.id));
+                                    }
+                                  }}
+                                  className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                    ) : (
+                      <tr>
+                        <td colSpan="3" className="px-8 py-20 text-center">
+                          <div className="flex flex-col items-center gap-2 text-gray-400">
+                            <Settings size={40} className="opacity-20 mb-2" />
+                            <p className="font-medium italic">No custom categories found</p>
                           </div>
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="3" className="px-8 py-20 text-center">
-                        <div className="flex flex-col items-center gap-2 text-gray-400">
-                          <Settings size={40} className="opacity-20 mb-2" />
-                          <p className="font-medium italic">No custom categories found</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -1696,7 +1678,7 @@ const Setting = () => {
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-8 py-6 flex justify-between items-center border-b border-purple-100">
                 <h3 className="text-xl font-bold text-purple-900">
                   {activeTab === 'categories'
-                    ? (isEditing ? 'Edit Category' : 'Create New Category')
+                    ? (isEditing ? 'Edit Machine' : 'Add New Machine')
                     : (activeDeptSubTab === 'givenBy'
                       ? (isEditing ? 'Edit Assign From' : 'Create New Assign From')
                       : (isEditing ? 'Edit Department' : 'Create New Department'))}
@@ -1709,56 +1691,74 @@ const Setting = () => {
                 </button>
               </div>
 
-              <div className="p-8">
+              <div className="p-4 md:p-8 overflow-y-auto">
                 <form onSubmit={isEditing ? handleUpdateDepartment : handleAddDepartment} className="space-y-6">
                   <div className="space-y-2">
-                    <label htmlFor="name" className="block text-sm font-bold text-gray-700 ml-1">
-                      {activeTab === 'categories' ? 'Category / Type' :
+                    <label htmlFor="givenBy" className="block text-sm font-bold text-gray-700 ml-1">
+                      {activeTab === 'categories' ? 'Machine Name' :
                         activeDeptSubTab === 'givenBy' ? 'Assign From Name' : 'Department Name'}
                     </label>
-                    <input
-                      type="text"
-                      name="name"
-                      id="name"
-                      value={deptForm.name}
-                      onChange={handleDeptInputChange}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-                      placeholder={activeTab === 'categories' ? 'e.g. Activity Type' :
-                        activeDeptSubTab === 'givenBy' ? 'e.g. CEO' : 'e.g. Marketing'}
-                    />
-                  </div>
-
-                  {activeTab === 'categories' && (
-                    <div className="space-y-2">
-                      <label htmlFor="givenBy" className="block text-sm font-bold text-gray-700 ml-1">
-                        Value / Option
-                      </label>
+                    {activeTab === 'categories' ? (
                       <input
                         type="text"
-                        name="givenBy"
+                        name="givenBy" // Using givenBy as the value field for categories
                         id="givenBy"
                         value={deptForm.givenBy}
                         onChange={handleDeptInputChange}
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-                        placeholder="Enter value..."
+                        placeholder="Enter machine name..."
                       />
+                    ) : (
+                      <input
+                        type="text"
+                        name="name"
+                        id="name"
+                        value={deptForm.name}
+                        onChange={handleDeptInputChange}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+                        placeholder={activeDeptSubTab === 'givenBy' ? 'e.g. CEO' : 'e.g. Marketing'}
+                      />
+                    )}
+                    {deptForm.name === "Temperature" && (
+                      <p className="text-xs text-amber-600 ml-1 mt-1 font-bold">
+                        ⚠️ Temperature strictly uses: 'Low', 'Medium', 'High'
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Value field removed for categories as it's now handled by machine name input */}
+                  {/* {activeTab === 'categories' && (
+                    <div className="space-y-2">
+                       ...
                     </div>
-                  )}
+                  )} */}
 
                   {activeTab === 'departments' && activeDeptSubTab === 'departments' && (
                     <div className="space-y-2">
                       <label htmlFor="givenBy" className="block text-sm font-bold text-gray-700 ml-1">
-                        Given By (Optional)
+                        Assign By (Authorized Personnel)
                       </label>
-                      <input
-                        type="text"
+                      <select
                         id="givenBy"
                         name="givenBy"
                         value={deptForm.givenBy}
                         onChange={handleDeptInputChange}
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-                        placeholder="e.g. CEO, Manager, System Admin"
-                      />
+                      >
+                        <option value="">Select individual or role...</option>
+                        {givenBy && givenBy.length > 0 ? (
+                          givenBy.map((item) => (
+                            <option key={`assign-opt-${item.id}`} value={item.given_by}>
+                              {item.given_by}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="" disabled>No Assign From data available</option>
+                        )}
+                      </select>
+                      <p className="text-xs text-indigo-500 ml-1 mt-1">
+                        💡 Manage these roles in the "Assign From" sub-tab
+                      </p>
                     </div>
                   )}
 

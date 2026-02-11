@@ -2,31 +2,28 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { fetchUniqueDepartmentDataApi, fetchUniqueDoerNameDataApi, fetchUniqueGivenByDataApi, pushAssignTaskApi } from '../api/assignTaskApi';
 
-export const uniqueDepartmentData = createAsyncThunk( 'fetch/department',async (user_name) => {
-    const department = await fetchUniqueDepartmentDataApi(user_name);
-   
-   
-    return department;
-  }
+export const uniqueDepartmentData = createAsyncThunk('fetch/department', async () => {
+  const department = await fetchUniqueDepartmentDataApi();
+  return department;
+});
+export const uniqueGivenByData = createAsyncThunk('fetch/given_by', async () => {
+  const givenBy = await fetchUniqueGivenByDataApi();
+
+  return givenBy;
+}
 );
-export const uniqueGivenByData = createAsyncThunk( 'fetch/given_by',async () => {
-    const givenBy = await fetchUniqueGivenByDataApi();
-   
-    return givenBy;
-  }
-);
-export const uniqueDoerNameData = createAsyncThunk( 'fetch/doerName',async (department) => {
-    const doerName = await fetchUniqueDoerNameDataApi(department);
-   
-    return doerName;
-  }
+export const uniqueDoerNameData = createAsyncThunk('fetch/doerName', async (department) => {
+  const doerName = await fetchUniqueDoerNameDataApi(department);
+
+  return doerName;
+}
 );
 
-export const assignTaskInTable = createAsyncThunk( 'post/delegation',async (generatedTasks) => {
-    const assignTask = await pushAssignTaskApi(generatedTasks);
-   
-    return assignTask;
-  }
+export const assignTaskInTable = createAsyncThunk('post/delegation', async (generatedTasks) => {
+  const assignTask = await pushAssignTaskApi(generatedTasks);
+
+  return assignTask;
+}
 );
 
 
@@ -35,15 +32,15 @@ const assignTaskSlice = createSlice({
   name: 'department',
   name: 'givenBy',
   name: 'doerName',
-  name:'assignTask',
+  name: 'assignTask',
   initialState: {
     department: [],
-    givenBy:[],
-    doerName:[],
-    assignTask:[],
+    givenBy: [],
+    doerName: [],
+    assignTask: [],
     error: null,
     loading: false,
-   
+
   },
   reducers: {},
   extraReducers: (builder) => {
@@ -60,7 +57,7 @@ const assignTaskSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-       .addCase(uniqueGivenByData.pending, (state) => {
+      .addCase(uniqueGivenByData.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
@@ -72,7 +69,7 @@ const assignTaskSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-       .addCase(uniqueDoerNameData.pending, (state) => {
+      .addCase(uniqueDoerNameData.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
@@ -84,7 +81,7 @@ const assignTaskSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-       .addCase(assignTaskInTable.pending, (state) => {
+      .addCase(assignTaskInTable.pending, (state) => {
         state.loading = true;
         state.error = null;
       })

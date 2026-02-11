@@ -23,10 +23,10 @@ export default function AssignTask() {
       subLabel: "Preventive Care",
       icon: Wrench,
       path: "/dashboard/maintenance",
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-      border: "hover:border-blue-500",
-      ring: "hover:ring-blue-200"
+      color: "text-purple-600",
+      bg: "bg-purple-50",
+      border: "hover:border-purple-500",
+      ring: "hover:ring-purple-200"
     },
     {
       id: "repair",
@@ -34,10 +34,10 @@ export default function AssignTask() {
       subLabel: "Issue Resolution",
       icon: Hammer,
       path: "/dashboard/repair",
-      color: "text-orange-600",
-      bg: "bg-orange-50",
-      border: "hover:border-orange-500",
-      ring: "hover:ring-orange-200"
+      color: "text-purple-600",
+      bg: "bg-purple-50",
+      border: "hover:border-purple-500",
+      ring: "hover:ring-purple-200"
     },
     {
       id: "ea",
@@ -45,10 +45,10 @@ export default function AssignTask() {
       subLabel: "Executive Assistant",
       icon: Users,
       path: "/dashboard/ea-task",
-      color: "text-green-600",
-      bg: "bg-green-50",
-      border: "hover:border-green-500",
-      ring: "hover:ring-green-200"
+      color: "text-purple-600",
+      bg: "bg-purple-50",
+      border: "hover:border-purple-500",
+      ring: "hover:ring-purple-200"
     }
   ];
 

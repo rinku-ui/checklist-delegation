@@ -233,17 +233,32 @@ const AllTasks = () => {
           dateColumn = "created_at";
           completionField = "status";
           nameField = "assigned_person";
-          headers = [
-            { id: "task_id", label: "Task ID" },
-            { id: "filled_by", label: "Form Filled By" },
-            { id: "assigned_person", label: "Assigned To" },
-            { id: "machine_name", label: "Machine Name" },
-            { id: "issue_description", label: "Issue Detail" },
-            { id: "status", label: "Status" },
-            { id: "part_replaced", label: "Part Replaced" },
-            { id: "bill_amount", label: "Bill Amount" },
-            { id: "action", label: "Action" },
-          ];
+          if (showHistory) {
+            headers = [
+              { id: "task_id", label: "Task ID" },
+              { id: "submission_date", label: "Submission Date" },
+              { id: "filled_by", label: "Form Filled By" },
+              { id: "assigned_person", label: "Assigned To" },
+              { id: "machine_name", label: "Machine Name" },
+              { id: "issue_description", label: "Issue Detail" },
+              { id: "status", label: "Status" },
+              { id: "part_replaced", label: "Part Replaced" },
+              { id: "bill_amount", label: "Bill Amount" },
+              { id: "remarks", label: "Remarks" },
+            ];
+          } else {
+            headers = [
+              { id: "action", label: "Action" },
+              { id: "task_id", label: "Task ID" },
+              { id: "filled_by", label: "Form Filled By" },
+              { id: "assigned_person", label: "Assigned To" },
+              { id: "machine_name", label: "Machine Name" },
+              { id: "issue_description", label: "Issue Detail" },
+              { id: "status", label: "Status" },
+              { id: "part_replaced", label: "Part Replaced" },
+              { id: "bill_amount", label: "Bill Amount" },
+            ];
+          }
           break;
         case "ea":
           tableName = "ea_tasks";
@@ -490,7 +505,8 @@ const AllTasks = () => {
 
       // Upload Work Photo if selected
       if (updateForm.workPhoto) {
-        const fileName = `work_${selectedUpdateTask.task_id}_${Date.now()}`;
+        const fileExt = updateForm.workPhoto.name.split('.').pop();
+        const fileName = `work_${selectedUpdateTask.task_id}_${Date.now()}.${fileExt}`;
         const { data, error } = await supabase.storage.from('repair').upload(fileName, updateForm.workPhoto);
         if (error) throw error;
         const { data: { publicUrl } } = supabase.storage.from('repair').getPublicUrl(fileName);
@@ -499,7 +515,8 @@ const AllTasks = () => {
 
       // Upload Bill Copy if selected
       if (updateForm.billCopy) {
-        const fileName = `bill_${selectedUpdateTask.task_id}_${Date.now()}`;
+        const fileExt = updateForm.billCopy.name.split('.').pop();
+        const fileName = `bill_${selectedUpdateTask.task_id}_${Date.now()}.${fileExt}`;
         const { data, error } = await supabase.storage.from('repair').upload(fileName, updateForm.billCopy);
         if (error) throw error;
         const { data: { publicUrl } } = supabase.storage.from('repair').getPublicUrl(fileName);
@@ -509,11 +526,11 @@ const AllTasks = () => {
       await updateRepairData([{
         taskId: selectedUpdateTask.task_id,
         status: updateForm.status,
-        partReplaced: updateForm.partReplaced,
-        billAmount: updateForm.billAmount,
-        remarks: updateForm.remarks,
-        workDone: updateForm.workDone,
-        vendorName: updateForm.vendorName,
+        partReplaced: updateForm.partReplaced || null,
+        billAmount: updateForm.billAmount ? parseFloat(updateForm.billAmount) : null, // Fix empty string issue
+        remarks: updateForm.remarks || null,
+        workDone: updateForm.workDone || null,
+        vendorName: updateForm.vendorName || null,
         workPhotoUrl: workPhotoUrl,
         billCopyUrl: billCopyUrl
       }]);
@@ -908,7 +925,19 @@ const AllTasks = () => {
                         )}
                         {activeTab === "repair" ? (
                           <>
+                            {!showHistory && (
+                              <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">
+                                <button onClick={() => openUpdateModal(task)} className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors flex items-center gap-1">
+                                  <Edit className="h-3 w-3" /> Process
+                                </button>
+                              </td>
+                            )}
                             <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.task_id}</td>
+                            {showHistory && (
+                              <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">
+                                {task.submission_date ? new Date(task.submission_date).toLocaleString() : "—"}
+                              </td>
+                            )}
                             <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.filled_by}</td>
                             <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.assigned_person}</td>
                             <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.machine_name}</td>
@@ -920,14 +949,9 @@ const AllTasks = () => {
                             </td>
                             <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.part_replaced || "—"}</td>
                             <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.bill_amount ? `₹${task.bill_amount}` : "—"}</td>
-                            <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">
-                              {!showHistory && (
-                                <button onClick={() => openUpdateModal(task)} className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors flex items-center gap-1">
-                                  <Edit className="h-3 w-3" /> Process
-                                </button>
-                              )}
-                              {showHistory && (task.remarks || "—")}
-                            </td>
+                            {showHistory && (
+                              <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm text-gray-800 max-w-xs truncate">{task.remarks || "—"}</td>
+                            )}
                           </>
                         ) : (
                           <>

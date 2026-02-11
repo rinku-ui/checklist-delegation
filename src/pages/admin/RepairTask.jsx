@@ -5,11 +5,13 @@ import AdminLayout from "../../components/layout/AdminLayout";
 import { useDispatch, useSelector } from "react-redux";
 import { createRepair } from "../../redux/slice/repairSlice";
 import { uniqueGivenByData, uniqueDoerNameData } from "../../redux/slice/assignTaskSlice";
+import { customDropdownDetails } from "../../redux/slice/settingSlice";
 
 export default function RepairTask() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { givenBy, doerName } = useSelector((state) => state.assignTask);
+    const { customDropdowns = [] } = useSelector((state) => state.setting || {});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Form State aligned with your requirements
@@ -23,6 +25,7 @@ export default function RepairTask() {
     useEffect(() => {
         dispatch(uniqueGivenByData());
         dispatch(uniqueDoerNameData("Maintenance")); // Or generic
+        dispatch(customDropdownDetails());
     }, [dispatch]);
 
     // Hardcoded Options
@@ -49,7 +52,7 @@ export default function RepairTask() {
             await dispatch(createRepair(formData)).unwrap();
 
             alert("Repair Request Submitted Successfully!");
-            navigate('/dashboard/task-management'); // Redirect back to list
+            navigate('/dashboard/assign-task'); // Redirect back to assign task page
         } catch (error) {
             console.error("Submission failed:", error);
             alert("Failed to submit request. Please try again.");
@@ -89,7 +92,7 @@ export default function RepairTask() {
                                 name="filledBy"
                                 value={formData.filledBy}
                                 onChange={handleChange}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-gray-50 focus:bg-white transition-all text-sm font-medium"
                             >
                                 <option value="">Select Assign From...</option>
                                 {givenBy.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -105,7 +108,7 @@ export default function RepairTask() {
                                 name="assignedPerson"
                                 value={formData.assignedPerson}
                                 onChange={handleChange}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-gray-50 focus:bg-white transition-all text-sm font-medium"
                             >
                                 <option value="">Select person... (Doer)</option>
                                 {doerName.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -121,10 +124,19 @@ export default function RepairTask() {
                                 name="machineName"
                                 value={formData.machineName}
                                 onChange={handleChange}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-gray-50 focus:bg-white transition-all text-sm font-medium"
                             >
                                 <option value="">Select machine...</option>
-                                {machineOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                {customDropdowns
+                                    .filter(item => item.category === "Machine Name")
+                                    .map((item) => (
+                                        <option key={item.id} value={item.value}>{item.value}</option>
+                                    ))
+                                }
+                                {/* Fallback hardcoded if no dynamic data */}
+                                {(!customDropdowns.some(item => item.category === "Machine Name")) && (
+                                    machineOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)
+                                )}
                             </select>
                         </div>
 
@@ -139,7 +151,7 @@ export default function RepairTask() {
                                 onChange={handleChange}
                                 rows="4"
                                 // Placeholder - waiting for view_file="Describe the issue in detail..."
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none transition-all"
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none bg-gray-50 focus:bg-white transition-all text-sm font-medium"
                             />
                         </div>
 
@@ -151,7 +163,7 @@ export default function RepairTask() {
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                            className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg transform transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
                         >
                             {isSubmitting ? (
                                 <>

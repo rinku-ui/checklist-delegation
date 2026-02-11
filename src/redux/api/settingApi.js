@@ -1,5 +1,17 @@
 import supabase from "../../SupabaseClient";
 
+const CATEGORY_TO_COLUMN = {
+  "Machine Name": "machine_name",
+  "Machine Area": "machine_area",
+  "Part Name": "part_name",
+  "Priority": "priority",
+  "Task Priority": "task_priority",
+  "Project Type": "project_type",
+  "Task Status": "task_status",
+  "Sound Test": "sound_test",
+  "Temperature": "temperature"
+};
+
 export const fetchUserDetailsApi = async () => {
   try {
     const { data, error } = await supabase
@@ -60,7 +72,7 @@ export const fetchDepartmentDataApi = async () => {
     const formatted = data.map(d => ({
       id: d.id,
       department: d.name,
-      given_by: "" // Placeholder as it's now decoupled
+      given_by: d.given_by || ""
     }));
 
     console.log("fetch successfully", formatted);
@@ -172,7 +184,10 @@ export const createDepartmentApi = async (newDept) => {
   try {
     const { data, error } = await supabase
       .from("departments")
-      .insert([{ name: newDept.name }])
+      .insert([{
+        name: newDept.department,
+        given_by: newDept.given_by
+      }])
       .select()
       .single();
 
@@ -188,7 +203,10 @@ export const updateDepartmentDataApi = async ({ id, updatedDept }) => {
   try {
     const { data, error } = await supabase
       .from("departments")
-      .update({ name: updatedDept.department })
+      .update({
+        name: updatedDept.department,
+        given_by: updatedDept.given_by
+      })
       .eq("id", id)
       .select()
       .single();
@@ -234,9 +252,12 @@ export const deleteAssignFromApi = async (id) => {
 
 export const updateCustomDropdownApi = async ({ id, category, value }) => {
   try {
+    const column = CATEGORY_TO_COLUMN[category];
+    if (!column) throw new Error(`Invalid category: ${category}`);
+
     const { data, error } = await supabase
       .from("dropdown_options")
-      .update({ category, value })
+      .update({ [column]: value })
       .eq("id", id)
       .select()
       .single();
@@ -244,8 +265,8 @@ export const updateCustomDropdownApi = async ({ id, category, value }) => {
     if (error) throw error;
     return {
       id: data.id,
-      category: data.category,
-      value: data.value
+      category: category,
+      value: data[column]
     };
   } catch (error) {
     console.log("Error updating custom dropdown:", error);
@@ -298,11 +319,11 @@ export const fetchGivenByDataApi = async () => {
   try {
     const { data, error } = await supabase
       .from('assign_from')
-      .select('name')
+      .select('id, name')
       .order('name', { ascending: true });
 
     if (error) throw error;
-    return data.map(d => ({ given_by: d.name }));
+    return data.map(d => ({ id: d.id, given_by: d.name }));
   } catch (error) {
     console.log("error fetching assign_from data", error);
     return [];
@@ -324,33 +345,60 @@ export const createAssignFromApi = async (name) => {
   }
 };
 
+export const updateAssignFromApi = async ({ id, given_by }) => {
+  try {
+    const { data, error } = await supabase
+      .from("assign_from")
+      .update({ name: given_by })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.log("error updating assign_from", error);
+    throw error;
+  }
+};
+
 export const fetchCustomDropdownsApi = async () => {
   try {
     const { data, error } = await supabase
       .from('dropdown_options')
-      .select('*')
-      .order('category', { ascending: true });
+      .select('*');
 
     if (error) throw error;
-    // Format to match old expectations: user_access=category, given_by=value
-    return data.map(item => ({
-      id: item.id,
-      category: item.category,
-      value: item.value
-    }));
+
+    const formatted = [];
+    data.forEach(item => {
+      Object.keys(CATEGORY_TO_COLUMN).forEach(category => {
+        const column = CATEGORY_TO_COLUMN[category];
+        if (item[column] !== null && item[column] !== undefined && item[column] !== "") {
+          formatted.push({
+            id: item.id,
+            category: category,
+            value: item[column]
+          });
+        }
+      });
+    });
+
+    return formatted;
   } catch (error) {
-    console.log("error fetching custom dropdowns", error);
+    console.error("❌ Error fetching custom dropdowns:", error);
     return [];
   }
 };
 
 export const createCustomDropdownApi = async (item) => {
   try {
+    const column = CATEGORY_TO_COLUMN[item.category];
+    if (!column) throw new Error(`Invalid category: ${item.category}`);
+
     const { data, error } = await supabase
       .from('dropdown_options')
       .insert([{
-        category: item.category,
-        value: item.value
+        [column]: item.value
       }])
       .select()
       .single();
@@ -358,14 +406,16 @@ export const createCustomDropdownApi = async (item) => {
     if (error) throw error;
     return {
       id: data.id,
-      category: data.category,
-      value: data.value
+      category: item.category,
+      value: data[column]
     };
   } catch (error) {
     console.log("error creating custom dropdown", error);
     throw error;
   }
 };
+
+// End of file
 
 export const deleteCustomDropdownApi = async (id) => {
   try {

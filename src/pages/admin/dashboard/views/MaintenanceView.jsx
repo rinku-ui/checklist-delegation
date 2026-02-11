@@ -1,4 +1,5 @@
-import React, { useMemo } from "react"
+import React, { useMemo, useState } from "react"
+import { isToday, isThisWeek, isThisMonth } from "date-fns"
 import { Settings, Calendar, CheckCircle, Clock, AlertTriangle, IndianRupee, FileText } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 
@@ -14,10 +15,29 @@ const StatCard = ({ icon: Icon, label, value, color }) => (
     </div>
 )
 
-export default function MaintenanceView({ stats, chartData, tasks = [] }) {
-    // Process data for charts if tasks are provided
+export default function MaintenanceView({ stats: originalStats, chartData, tasks = [] }) {
+    const [maintFilter, setMaintFilter] = useState('today');
+
+    // Filter tasks based on selected time range
+    const filteredTasks = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        return tasks.filter(task => {
+            if (!task.originalTaskStartDate) return false;
+            const taskDate = new Date(task.originalTaskStartDate);
+
+            if (maintFilter === 'today') return isToday(taskDate);
+            if (maintFilter === 'week') return isThisWeek(taskDate, { weekStartsOn: 1 });
+            if (maintFilter === 'month') return isThisMonth(taskDate);
+            return true; // Use 'all' if needed, but the request says today/week/month
+        });
+    }, [tasks, maintFilter]);
+
+    // Process data for charts and stats based on FILTERED tasks
     const processedData = useMemo(() => {
-        if (!tasks || tasks.length === 0) return {
+        const currentTasks = filteredTasks;
+        if (!currentTasks || currentTasks.length === 0) return {
             totalMachines: 0,
             totalCost: 0,
             freqData: [],
@@ -42,7 +62,7 @@ export default function MaintenanceView({ stats, chartData, tasks = [] }) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        tasks.forEach(task => {
+        currentTasks.forEach(task => {
             // Count unique machines
             if (task.machine_name) uniqueMachines.add(task.machine_name);
 
@@ -116,10 +136,10 @@ export default function MaintenanceView({ stats, chartData, tasks = [] }) {
             {/* Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                 <StatCard icon={Settings} label="Total Machines" value={processedData?.totalMachines || 0} color="bg-blue-500" />
-                <StatCard icon={Calendar} label="Total Tasks" value={stats?.totalTasks || 0} color="bg-indigo-500" />
-                <StatCard icon={CheckCircle} label="Total Tasks Complete" value={stats?.completedTasks || 0} color="bg-green-500" />
-                <StatCard icon={Clock} label="Total Tasks Pending" value={stats?.pendingTasks || 0} color="bg-amber-500" />
-                <StatCard icon={AlertTriangle} label="Total Tasks Overdue" value={stats?.overdueTasks || 0} color="bg-red-500" />
+                <StatCard icon={Calendar} label="Total Tasks" value={filteredTasks.length} color="bg-indigo-500" />
+                <StatCard icon={CheckCircle} label="Tasks Complete" value={processedData?.completedCount || 0} color="bg-green-500" />
+                <StatCard icon={Clock} label="Tasks Pending" value={processedData?.pendingCount || 0} color="bg-amber-500" />
+                <StatCard icon={AlertTriangle} label="Tasks Overdue" value={processedData?.overdueCount || 0} color="bg-red-500" />
                 <StatCard icon={IndianRupee} label="Total Cost" value={`₹${processedData?.totalCost || 0}`} color="bg-purple-500" />
             </div>
 
@@ -230,10 +250,28 @@ export default function MaintenanceView({ stats, chartData, tasks = [] }) {
 
             {/* Maintenance Tasks Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-gray-400" />
                         <h3 className="text-base font-bold text-gray-800">Maintenance Tasks</h3>
+                        <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100 uppercase tracking-wider">
+                            {maintFilter}
+                        </span>
+                    </div>
+
+                    <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 shadow-inner">
+                        {['today', 'week', 'month', 'all'].map((f) => (
+                            <button
+                                key={f}
+                                onClick={() => setMaintFilter(f)}
+                                className={`px-4 py-1.5 text-[10px] font-extrabold rounded-md transition-all uppercase tracking-tight ${maintFilter === f
+                                    ? 'bg-white text-purple-700 shadow-sm border border-gray-100'
+                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                    }`}
+                            >
+                                {f}
+                            </button>
+                        ))}
                     </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -255,8 +293,8 @@ export default function MaintenanceView({ stats, chartData, tasks = [] }) {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-100">
-                            {tasks.length > 0 ? (
-                                tasks.map((task, index) => (
+                            {filteredTasks.length > 0 ? (
+                                filteredTasks.map((task, index) => (
                                     <tr key={task.id || index} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">#{task.id}</td>
                                         <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{task.machine_name}</td>

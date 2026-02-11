@@ -22,9 +22,6 @@ export const insertDelegationDoneAndUpdate = createAsyncThunk(
             task_description: taskData.task_description,
             given_by: taskData.given_by,
             image_url: taskData.image_url, // Will be updated after image upload
-            department: taskData.department,
-            task_start_date: taskData.task_start_date,
-            planned_date: taskData.planned_date,
           };
 
           console.log('Inserting into delegation_done:', delegationDoneData);

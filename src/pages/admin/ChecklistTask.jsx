@@ -6,58 +6,11 @@ import {
 import AdminLayout from "../../components/layout/AdminLayout";
 import { useDispatch, useSelector } from "react-redux";
 import { assignTaskInTable, uniqueDepartmentData, uniqueDoerNameData, uniqueGivenByData } from "../../redux/slice/assignTaskSlice";
+import { customDropdownDetails } from "../../redux/slice/settingSlice";
+import supabase from "../../SupabaseClient";
+import CalendarComponent from "../../components/CalendarComponent";
 
-const CalendarComponent = ({ date, onChange, onClose }) => {
-    const [currentMonth, setCurrentMonth] = useState(new Date());
 
-    const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
-    const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
-
-    const handleDateClick = (day) => {
-        const selectedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-        onChange(selectedDate);
-        onClose();
-    };
-
-    const renderDays = () => {
-        const days = [];
-        const daysInMonth = getDaysInMonth(currentMonth.getFullYear(), currentMonth.getMonth());
-        const firstDayOfMonth = getFirstDayOfMonth(currentMonth.getFullYear(), currentMonth.getMonth());
-
-        for (let i = 0; i < firstDayOfMonth; i++) {
-            days.push(<div key={`empty-${i}`} className="h-8 w-8"></div>);
-        }
-
-        for (let day = 1; day <= daysInMonth; day++) {
-            const isSelected = date && date.getDate() === day && date.getMonth() === currentMonth.getMonth() && date.getFullYear() === currentMonth.getFullYear();
-            days.push(
-                <button
-                    key={day}
-                    type="button"
-                    onClick={() => handleDateClick(day)}
-                    className={`h-8 w-8 rounded-full flex items-center justify-center text-sm transition-colors ${isSelected ? "bg-purple-600 text-white" : "hover:bg-purple-100 text-gray-700"}`}
-                >
-                    {day}
-                </button>
-            );
-        }
-        return days;
-    };
-
-    return (
-        <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-xl w-72">
-            <div className="flex justify-between items-center mb-4">
-                <button type="button" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} className="p-1 hover:bg-gray-100 rounded-full text-gray-600">&lt;</button>
-                <div className="text-sm font-bold text-gray-800">{currentMonth.toLocaleString("default", { month: "long" })} {currentMonth.getFullYear()}</div>
-                <button type="button" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} className="p-1 hover:bg-gray-100 rounded-full text-gray-600">&gt;</button>
-            </div>
-            <div className="grid grid-cols-7 gap-1 mb-2">
-                {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (<div key={day} className="h-8 w-8 flex items-center justify-center text-xs font-semibold text-gray-400">{day}</div>))}
-            </div>
-            <div className="grid grid-cols-7 gap-1">{renderDays()}</div>
-        </div>
-    );
-};
 
 const formatDate = (date) => date ? date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
 
@@ -65,6 +18,7 @@ export default function ChecklistTask() {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { department, doerName, givenBy } = useSelector((state) => state.assignTask);
+    const { customDropdowns = [] } = useSelector((state) => state.setting || {});
     const username = localStorage.getItem('user-name');
 
     const [date, setSelectedDate] = useState(null);
@@ -97,10 +51,11 @@ export default function ChecklistTask() {
 
     // Fetch Logic
     useEffect(() => {
-        dispatch(uniqueDepartmentData(username));
+        dispatch(uniqueDepartmentData());
         dispatch(uniqueGivenByData());
+        dispatch(customDropdownDetails());
         if (formData.department) dispatch(uniqueDoerNameData(formData.department));
-    }, [dispatch, username, formData.department]);
+    }, [dispatch, formData.department]);
 
     const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     const handleToggle = (name) => setFormData(prev => ({ ...prev, [name]: !prev[name] }));
@@ -108,7 +63,7 @@ export default function ChecklistTask() {
     // Add weeks/days helper
     const addDays = (date, days) => { const d = new Date(date); d.setDate(d.getDate() + days); return d; };
 
-    const generateTasksPreview = () => {
+    const generateTasksPreview = async () => {
         if (!date || !time || !formData.doer || !formData.description || !formData.department) {
             alert("Please fill in all required fields (Department, Given By, Doer, Date, Time, Description).");
             return;
@@ -121,36 +76,65 @@ export default function ChecklistTask() {
             "Weekly": "weekly",
             "Monthly": "monthly"
         };
-        const freqKey = freqMap[formData.frequency];
+        const freqKey = freqMap[formData.frequency] || "one-time";
 
         if (freqKey === "one-time") {
+            const d = new Date(date);
             tasks.push({
                 ...formData,
                 taskType: "checklist",
-                dueDate: `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}T${time}:00`,
-                displayDate: formatDate(date) + ` at ${time}`
+                dueDate: `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}T${time}:00`,
+                displayDate: formatDate(d) + ` at ${time}`,
+                frequency: freqKey
             });
         } else {
             let current = new Date(date);
             const endDate = new Date(date);
             endDate.setFullYear(endDate.getFullYear() + 1);
 
+            // Fetch working days
+            let workingDaySet = new Set();
+            try {
+                const { data: workingData, error: wdError } = await supabase
+                    .from('working_day_calender')
+                    .select('working_date')
+                    .gte('working_date', date.toISOString().split('T')[0])
+                    .lte('working_date', endDate.toISOString().split('T')[0]);
+
+                if (wdError) throw wdError;
+                if (workingData) {
+                    workingData.forEach(d => workingDaySet.add(d.working_date));
+                }
+            } catch (err) {
+                console.error("Error fetching working days:", err);
+                alert("Failed to fetch working day calendar. Tasks may be generated incorrectly.");
+                return;
+            }
+
             const isHoliday = (d) => {
-                const dateStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+                const dateStr = d.toISOString().split('T')[0];
                 return holidays.includes(dateStr);
             };
+
+            const isWorkingDay = (d) => {
+                const dStr = d.toISOString().split('T')[0];
+                return workingDaySet.has(dStr);
+            };
+
+            const addDays = (date, days) => { const d = new Date(date); d.setDate(d.getDate() + days); return d; };
 
             let attempts = 0;
             // Generate tasks for 1 year
             while (current <= endDate && attempts < 1000) {
                 attempts++;
-                if (!isHoliday(current)) {
+                if (!isHoliday(current) && isWorkingDay(current)) {
                     const dateStr = formatDate(current) + ` at ${time}`;
                     tasks.push({
                         ...formData,
                         taskType: "checklist",
                         dueDate: `${current.getFullYear()}-${(current.getMonth() + 1).toString().padStart(2, '0')}-${current.getDate().toString().padStart(2, '0')}T${time}:00`,
-                        displayDate: dateStr
+                        displayDate: dateStr,
+                        frequency: freqKey
                     });
                 }
 

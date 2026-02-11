@@ -801,10 +801,10 @@ function DelegationDataPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Timestamp
+                        Task ID
                       </th>
                       <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Task ID
+                        Timestamp
                       </th>
                       <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
                         Task
@@ -836,14 +836,14 @@ function DelegationDataPage() {
                       filteredHistoryData.map((history, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-3 sm:px-6 py-2 sm:py-4">
-                            <div className="text-xs sm:text-sm font-medium text-gray-900 whitespace-normal break-words">
-                              {formatDateTimeForDisplay(history.created_at) ||
-                                "—"}
+                            <div className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words">
+                              {history.task_id || "—"}
                             </div>
                           </td>
                           <td className="px-3 sm:px-6 py-2 sm:py-4">
-                            <div className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words">
-                              {history.task_id || "—"}
+                            <div className="text-xs sm:text-sm font-medium text-gray-900 whitespace-normal break-words">
+                              {formatDateTimeForDisplay(history.created_at) ||
+                                "—"}
                             </div>
                           </td>
                           <td className="px-3 sm:px-6 py-2 sm:py-4 min-w-[200px] max-w-[300px]">
@@ -943,9 +943,6 @@ function DelegationDataPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                      Seq No.
-                    </th>
                     <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       <input
                         type="checkbox"
@@ -1004,11 +1001,6 @@ function DelegationDataPage() {
                           className={`${isSelected ? "bg-purple-50" : ""
                             } hover:bg-gray-50 ${rowColorClass}`}
                         >
-                          <td className="px-2 sm:px-6 py-2 sm:py-4">
-                            <div className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words">
-                              {sequenceNumber}
-                            </div>
-                          </td>
                           <td className="px-2 sm:px-6 py-2 sm:py-4">
                             <input
                               type="checkbox"

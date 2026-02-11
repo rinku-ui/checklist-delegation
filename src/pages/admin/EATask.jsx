@@ -3,43 +3,72 @@ import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { Users, Phone, Calendar, FileText, Save, ArrowLeft, Loader2 } from "lucide-react";
 import supabase from "../../SupabaseClient";
+import { useDispatch, useSelector } from "react-redux";
+import { userDetails } from "../../redux/slice/settingSlice";
+import CalendarComponent from "../../components/CalendarComponent";
+
+const formatDateLong = (date) => date ? date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
+const formatDateISO = (date) => date ? date.toISOString().split('T')[0] : "";
 
 export default function EATask() {
     const navigate = useNavigate();
+    const dispatch = useDispatch();
+    const { userData } = useSelector((state) => state.setting || {});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
     const [formData, setFormData] = useState({
         doer_name: "",
         phone_number: "",
         planned_date: "",
-        task_description: "",
-        frequency: "One Time"
+        planned_time: "09:00",
+        task_description: ""
     });
-    const [holidays, setHolidays] = useState([]);
+    const [showCalendar, setShowCalendar] = useState(false);
 
     // Autocomplete states
     const [doerSuggestions, setDoerSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [allDoers, setAllDoers] = useState([]);
+    const [historicalDoers, setHistoricalDoers] = useState([]);
 
     // Fetch unique doers and holidays on component mount
     useEffect(() => {
         fetchUniqueDoers();
-        fetchHolidays();
-    }, []);
+        dispatch(userDetails()); // Fetch all users from database
+    }, [dispatch]);
 
-    const fetchHolidays = async () => {
-        try {
-            const { data, error } = await supabase.from('holidays').select('holiday_date');
-            if (error) throw error;
-            if (data) setHolidays(data.map(h => h.holiday_date));
-        } catch (err) {
-            console.error("Error fetching holidays:", err);
+    // Merge historical doers and system users
+    useEffect(() => {
+        const combined = [...historicalDoers];
+        const existingNames = new Set(combined.map(d => d.name));
+
+        if (userData && Array.isArray(userData)) {
+            userData
+                .filter(user => user.role === 'user') // Only show users with 'user' role
+                .forEach(user => {
+                    if (user.user_name && !existingNames.has(user.user_name)) {
+                        combined.push({
+                            name: user.user_name,
+                            phone: user.phone || user.number ? String(user.phone || user.number) : ""
+                        });
+                        existingNames.add(user.user_name);
+                    }
+                });
         }
-    };
+
+        // Sort alphabetically
+        combined.sort((a, b) => a.name.localeCompare(b.name));
+
+        // Only update if different length to avoid render loops (simple check)
+        if (combined.length !== allDoers.length || allDoers.length === 0) {
+            setAllDoers(combined);
+        }
+    }, [historicalDoers, userData]);
+
 
     const fetchUniqueDoers = async () => {
         try {
+            // 1. Fetch historical doers from ea_tasks
             const { data, error } = await supabase
                 .from('ea_tasks')
                 .select('doer_name, phone_number')
@@ -49,7 +78,9 @@ export default function EATask() {
 
             // Create unique doers map (latest phone for each name)
             const doersMap = {};
-            data.forEach(task => {
+
+            // Add historical doers
+            data?.forEach(task => {
                 if (task.doer_name && !doersMap[task.doer_name]) {
                     doersMap[task.doer_name] = task.phone_number || "";
                 }
@@ -60,7 +91,7 @@ export default function EATask() {
                 phone: doersMap[name]
             }));
 
-            setAllDoers(uniqueDoers);
+            setHistoricalDoers(uniqueDoers);
         } catch (err) {
             console.error("Error fetching doers:", err);
         }
@@ -82,7 +113,9 @@ export default function EATask() {
                 setDoerSuggestions(filtered);
                 setShowSuggestions(true);
             } else {
-                setShowSuggestions(false);
+                // Show all suggestions when cleared
+                setDoerSuggestions(allDoers);
+                setShowSuggestions(true);
             }
         }
     };
@@ -110,53 +143,22 @@ export default function EATask() {
         try {
             const givenBy = localStorage.getItem("user-name") || "Admin";
             const tasksToInsert = [];
-            const startDate = new Date(formData.planned_date);
 
-            if (formData.frequency === "One Time") {
-                tasksToInsert.push({
-                    doer_name: formData.doer_name,
-                    phone_number: formData.phone_number,
-                    planned_date: startDate.toISOString(),
-                    task_description: formData.task_description,
-                    status: 'pending',
-                    given_by: givenBy
-                });
-            } else {
-                let current = new Date(startDate);
-                const endDate = new Date(startDate);
-                endDate.setFullYear(endDate.getFullYear() + 1);
-
-                const isHoliday = (d) => {
-                    const dateStr = d.toISOString().split('T')[0];
-                    return holidays.includes(dateStr);
-                };
-
-                const addDays = (date, days) => {
-                    const d = new Date(date);
-                    d.setDate(d.getDate() + days);
-                    return d;
-                };
-
-                let attempts = 0;
-                while (current <= endDate && attempts < 1000) {
-                    attempts++;
-                    if (!isHoliday(current)) {
-                        tasksToInsert.push({
-                            doer_name: formData.doer_name,
-                            phone_number: formData.phone_number,
-                            planned_date: current.toISOString(),
-                            task_description: formData.task_description,
-                            status: 'pending',
-                            given_by: givenBy
-                        });
-                    }
-
-                    if (formData.frequency === 'Daily') current = addDays(current, 1);
-                    else if (formData.frequency === 'Weekly') current = addDays(current, 7);
-                    else if (formData.frequency === 'Monthly') current.setMonth(current.getMonth() + 1);
-                    else break;
-                }
+            if (!formData.planned_date) {
+                alert("Please select a date");
+                return;
             }
+
+            const startDate = new Date(`${formData.planned_date}T${formData.planned_time || "00:00"}:00`);
+
+            tasksToInsert.push({
+                doer_name: formData.doer_name,
+                phone_number: formData.phone_number,
+                planned_date: startDate.toISOString(),
+                task_description: formData.task_description,
+                status: 'pending',
+                given_by: givenBy
+            });
 
             const { error } = await supabase
                 .from('ea_tasks')
@@ -171,8 +173,8 @@ export default function EATask() {
                 doer_name: "",
                 phone_number: "",
                 planned_date: "",
-                task_description: "",
-                frequency: "One Time"
+                planned_time: "09:00",
+                task_description: ""
             });
 
             // Refresh doers list
@@ -180,7 +182,7 @@ export default function EATask() {
 
             // Navigate to tasks page after 1.5 seconds
             setTimeout(() => {
-                navigate("/dashboard/all-tasks");
+                navigate("/dashboard/assign-task");
             }, 1500);
 
         } catch (err) {
@@ -193,86 +195,82 @@ export default function EATask() {
 
     return (
         <AdminLayout>
-            <div className="max-w-4xl mx-auto p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-700 rounded text-white">
-                            <Users size={20} />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900 uppercase tracking-tight">EA Task Assignment</h1>
-                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Executive Assistant Operations</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={() => navigate("/dashboard/assign-task")}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                    >
-                        <ArrowLeft size={16} />
-                        Back
-                    </button>
-                </div>
+            <div className="max-w-2xl mx-auto p-6">
+                <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden mt-6">
 
-                {/* Success Message */}
-                {successMessage && (
-                    <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Save size={18} />
-                            <span className="font-medium">{successMessage}</span>
+                    {/* Header */}
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-purple-600 rounded text-white shadow-md">
+                                <Users size={20} />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-bold text-gray-800">EA Task Assignment</h1>
+                                <p className="text-sm text-gray-500 mt-0.5 font-medium">Create and manage executive assistant tasks</p>
+                            </div>
                         </div>
-                        <button onClick={() => setSuccessMessage("")} className="text-green-600 hover:text-green-800">
-                            ×
+                        <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                            <ArrowLeft className="w-6 h-6" />
                         </button>
                     </div>
-                )}
 
-                {/* Form */}
-                <div className="bg-white border border-gray-200 rounded shadow-sm">
-                    <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                        <h2 className="text-sm font-bold text-gray-700 uppercase">Task Details</h2>
-                    </div>
+                    {/* Success Message */}
+                    {successMessage && (
+                        <div className="m-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                            <div className="flex items-center gap-2">
+                                <Save size={18} />
+                                <span className="font-bold text-sm">{successMessage}</span>
+                            </div>
+                            <button onClick={() => setSuccessMessage("")} className="text-green-600 hover:text-green-800 text-xl font-bold">
+                                ×
+                            </button>
+                        </div>
+                    )}
 
                     <form onSubmit={handleSubmit} className="p-6 space-y-6">
                         {/* Doer Name */}
                         <div className="relative">
-                            <label className="block text-sm font-bold text-gray-700 mb-2 uppercase">
-                                <Users className="inline w-4 h-4 mr-1" />
-                                Doer Name *
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Doer Name <span className="text-red-500">*</span>
                             </label>
-                            <input
-                                type="text"
-                                name="doer_name"
-                                value={formData.doer_name}
-                                onChange={handleInputChange}
-                                onFocus={() => {
-                                    if (formData.doer_name.trim() && doerSuggestions.length > 0) {
-                                        setShowSuggestions(true);
-                                    }
-                                }}
-                                onBlur={() => {
-                                    // Delay to allow click on suggestion
-                                    setTimeout(() => setShowSuggestions(false), 200);
-                                }}
-                                required
-                                placeholder="Enter or select doer name"
-                                className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                                autoComplete="off"
-                            />
+                            <div className="relative">
+                                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    name="doer_name"
+                                    value={formData.doer_name}
+                                    onChange={handleInputChange}
+                                    onFocus={() => {
+                                        if (!formData.doer_name.trim()) {
+                                            setDoerSuggestions(allDoers);
+                                            setShowSuggestions(true);
+                                        } else if (doerSuggestions.length > 0) {
+                                            setShowSuggestions(true);
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        setTimeout(() => setShowSuggestions(false), 200);
+                                    }}
+                                    required
+                                    placeholder="Enter or select doer name"
+                                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-gray-50 focus:bg-white transition-all text-sm font-medium"
+                                    autoComplete="off"
+                                />
+                            </div>
 
                             {/* Autocomplete Dropdown */}
                             {showSuggestions && doerSuggestions.length > 0 && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto">
+                                <div className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto ring-1 ring-black ring-opacity-5 animate-in fade-in zoom-in duration-150">
                                     {doerSuggestions.map((doer, index) => (
                                         <div
                                             key={index}
-                                            onClick={() => selectDoer(doer)}
-                                            className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                            onMouseDown={() => selectDoer(doer)}
+                                            className="px-4 py-3 hover:bg-purple-50 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors duration-150 flex justify-between items-center group"
                                         >
-                                            <div className="font-medium text-gray-900">{doer.name}</div>
+                                            <div className="font-bold text-gray-800 group-hover:text-purple-700">{doer.name}</div>
                                             {doer.phone && (
-                                                <div className="text-xs text-gray-500 mt-0.5">
-                                                    <Phone className="inline w-3 h-3 mr-1" />
+                                                <div className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-full group-hover:bg-purple-100 group-hover:text-purple-600 flex items-center gap-1">
+                                                    <Phone className="w-2.5 h-2.5" />
                                                     {doer.phone}
                                                 </div>
                                             )}
@@ -284,98 +282,99 @@ export default function EATask() {
 
                         {/* Phone Number */}
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2 uppercase">
-                                <Phone className="inline w-4 h-4 mr-1" />
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
                                 Phone Number
                             </label>
-                            <input
-                                type="tel"
-                                name="phone_number"
-                                value={formData.phone_number}
-                                onChange={handleInputChange}
-                                placeholder="Enter contact number"
-                                className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                            />
+                            <div className="relative">
+                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="tel"
+                                    name="phone_number"
+                                    value={formData.phone_number}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter contact number"
+                                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-gray-50 focus:bg-white transition-all text-sm font-medium"
+                                />
+                            </div>
                         </div>
 
                         {/* Planned Date & Frequency */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2 uppercase">
-                                    <Calendar className="inline w-4 h-4 mr-1" />
-                                    Planned Date *
+                            <div className="relative">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Planned Date <span className="text-red-500">*</span>
                                 </label>
-                                <input
-                                    type="datetime-local"
-                                    name="planned_date"
-                                    value={formData.planned_date}
-                                    onChange={handleInputChange}
-                                    required
-                                    className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCalendar(!showCalendar)}
+                                    className="w-full px-4 py-3 text-left border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all flex items-center justify-between text-sm font-medium"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="w-4 h-4 text-gray-400" />
+                                        {formData.planned_date ? formatDateLong(new Date(formData.planned_date)) : "Select a date"}
+                                    </div>
+                                    <Calendar className="w-4 h-4 text-gray-400" />
+                                </button>
+                                {showCalendar && (
+                                    <div className="absolute top-full left-0 mt-2 z-50">
+                                        <CalendarComponent
+                                            date={formData.planned_date ? new Date(formData.planned_date) : null}
+                                            onChange={(date) => setFormData(prev => ({ ...prev, planned_date: formatDateISO(date) }))}
+                                            onClose={() => setShowCalendar(false)}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2 uppercase">
-                                    Recurrence
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Time <span className="text-red-500">*</span>
                                 </label>
-                                <select
-                                    name="frequency"
-                                    value={formData.frequency}
+                                <input
+                                    type="time"
+                                    name="planned_time"
+                                    value={formData.planned_time}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium bg-white"
-                                >
-                                    <option>One Time</option>
-                                    <option>Daily</option>
-                                    <option>Weekly</option>
-                                    <option>Monthly</option>
-                                </select>
-                                <p className="text-[10px] text-gray-500 mt-1 uppercase font-semibold">
-                                    {formData.frequency !== "One Time" ? `Will generate tasks for 1 year (skipping holidays)` : "One unique task instance"}
-                                </p>
+                                    required
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-gray-50 focus:bg-white transition-all text-sm font-medium"
+                                />
                             </div>
+
+
                         </div>
 
                         {/* Task Description */}
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2 uppercase">
-                                <FileText className="inline w-4 h-4 mr-1" />
-                                Task Description *
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Task Description <span className="text-red-500">*</span>
                             </label>
                             <textarea
                                 name="task_description"
                                 value={formData.task_description}
                                 onChange={handleInputChange}
                                 required
-                                rows="6"
-                                placeholder="Describe the task in detail..."
-                                className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium resize-none"
+                                rows="5"
+                                placeholder="Describe the task instructions in detail..."
+                                className="w-full p-4 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none bg-gray-50 focus:bg-white transition-all text-sm font-medium"
                             />
                         </div>
 
                         {/* Submit Button */}
-                        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                            <button
-                                type="button"
-                                onClick={() => navigate("/dashboard/assign-task")}
-                                className="px-6 py-2 text-sm font-bold text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
+                        <div className="pt-4">
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-blue-700 rounded hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow"
+                                className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg transform transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2 group"
                             >
                                 {isSubmitting ? (
                                     <>
-                                        <Loader2 size={16} className="animate-spin" />
-                                        Assigning...
+                                        <Loader2 size={20} className="animate-spin" />
+                                        Processing Assignment...
                                     </>
                                 ) : (
                                     <>
-                                        <Save size={16} />
-                                        Assign Task
+                                        <Save size={20} className="group-hover:scale-110 transition-transform" />
+                                        Initialize Task Assignment
                                     </>
                                 )}
                             </button>

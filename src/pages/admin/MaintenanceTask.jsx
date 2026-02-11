@@ -8,13 +8,17 @@ import { customDropdownDetails } from "../../redux/slice/settingSlice";
 import { postMaintenanceTaskApi } from "../../redux/api/maintenanceApi";
 import { maintenanceData } from "../../redux/slice/maintenanceSlice";
 import supabase from "../../SupabaseClient";
+import CalendarComponent from "../../components/CalendarComponent";
+
+const formatDateLong = (date) => date ? date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
+const formatDateISO = (date) => date ? date.toISOString().split('T')[0] : "";
 
 export default function MaintenanceTask() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { department, doerName, givenBy } = useSelector((state) => state.assignTask);
     const maintenance = useSelector((state) => state.maintenance.maintenance);
-    const { customDropdowns } = useSelector((state) => state.setting);
+    const { customDropdowns = [] } = useSelector((state) => state.setting || {});
     const username = localStorage.getItem('user-name');
 
     const [formData, setFormData] = useState({
@@ -39,6 +43,9 @@ export default function MaintenanceTask() {
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [holidays, setHolidays] = useState([]);
+    const [generatedTasks, setGeneratedTasks] = useState([]);
+    const [showPreview, setShowPreview] = useState(false);
+    const [showCalendar, setShowCalendar] = useState(false);
 
     useEffect(() => {
         const fetchHolidays = async () => {
@@ -48,13 +55,21 @@ export default function MaintenanceTask() {
         fetchHolidays();
     }, []);
 
+
     useEffect(() => {
-        dispatch(uniqueDepartmentData(username));
+        dispatch(uniqueDepartmentData());
         dispatch(uniqueGivenByData());
         dispatch(uniqueDoerNameData("Maintenance"));
         dispatch(maintenanceData(1));
         dispatch(customDropdownDetails());
-    }, [dispatch, username]);
+    }, [dispatch]);
+
+    // Debug: Log customDropdowns whenever it changes
+    useEffect(() => {
+        console.log('🔄 CustomDropdowns in component:', customDropdowns);
+        console.log('📊 Total dropdown items:', customDropdowns?.length || 0);
+    }, [customDropdowns]);
+
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -64,40 +79,57 @@ export default function MaintenanceTask() {
         }));
     };
 
-    const handleSubmit = async (e) => {
+    const generatePreview = async (e) => {
         e.preventDefault();
-        setIsSubmitting(true);
 
         // Validate required fields
         if (!formData.startDate) {
             alert("Please select a start date");
-            setIsSubmitting(false);
             return;
         }
 
         if (!formData.doerName) {
             alert("Please select a doer name");
-            setIsSubmitting(false);
             return;
         }
 
         if (!formData.givenBy) {
             alert("Please select who is giving the task");
-            setIsSubmitting(false);
             return;
         }
 
+        setIsSubmitting(true);
+
         try {
-            const tasksToInsert = [];
+            const tasks = [];
             const startDate = new Date(formData.startDate);
             const freq = formData.frequency.toLowerCase();
+
+            // Fetch working days if recurring
+            let workingDaySet = new Set();
+            if (freq !== 'one-time') {
+                const yearEndDate = new Date(startDate);
+                yearEndDate.setFullYear(yearEndDate.getFullYear() + 1);
+
+                const { data: workingData, error: wdError } = await supabase
+                    .from('working_day_calender')
+                    .select('working_date')
+                    .gte('working_date', startDate.toISOString().split('T')[0])
+                    .lte('working_date', yearEndDate.toISOString().split('T')[0]);
+
+                if (wdError) throw wdError;
+
+                if (workingData) {
+                    workingData.forEach(d => workingDaySet.add(d.working_date));
+                }
+            }
 
             if (freq === 'one-time') {
                 const timestamp = Date.now();
                 const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
                 const taskId = `MNT-${timestamp}-${randomSuffix}`;
 
-                tasksToInsert.push({
+                tasks.push({
                     task_id: taskId,
                     company_name: formData.department,
                     name: formData.doerName,
@@ -105,8 +137,7 @@ export default function MaintenanceTask() {
                     task_start_date: `${formData.startDate}T${formData.startTime}:00`,
                     task_description: `${formData.machineName} - ${formData.workDescription} (Area: ${formData.machineArea}, Part: ${formData.partName})`,
                     freq: formData.frequency,
-                    enable_reminder: formData.enableReminder,
-                    status: null,
+                    status: "Pending",
                     submission_date: null,
                 });
             } else {
@@ -119,6 +150,11 @@ export default function MaintenanceTask() {
                     return holidays.includes(dStr);
                 };
 
+                const isWorkingDay = (d) => {
+                    const dStr = d.toISOString().split('T')[0];
+                    return workingDaySet.has(dStr);
+                };
+
                 const addDays = (date, days) => {
                     const d = new Date(date);
                     d.setDate(d.getDate() + days);
@@ -129,12 +165,13 @@ export default function MaintenanceTask() {
                 let counter = 0;
                 while (current <= endDate && attempts < 1000) {
                     attempts++;
-                    if (!isHoliday(current)) {
+
+                    if (!isHoliday(current) && isWorkingDay(current)) {
                         const timestamp = Date.now();
                         const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
                         const taskId = `MNT-${timestamp}-${counter}-${randomSuffix}`;
 
-                        tasksToInsert.push({
+                        tasks.push({
                             task_id: taskId,
                             company_name: formData.department,
                             name: formData.doerName,
@@ -142,8 +179,7 @@ export default function MaintenanceTask() {
                             task_start_date: `${current.toISOString().split('T')[0]}T${formData.startTime}:00`,
                             task_description: `${formData.machineName} - ${formData.workDescription} (Area: ${formData.machineArea}, Part: ${formData.partName})`,
                             freq: formData.frequency,
-                            enable_reminder: formData.enableReminder,
-                            status: null,
+                            status: "Pending",
                             submission_date: null,
                         });
                         counter++;
@@ -156,16 +192,29 @@ export default function MaintenanceTask() {
                 }
             }
 
-            // Using insert for multiple rows if needed, or loop through postMaintenanceTaskApi
-            // Given the pattern, let's use the API for each or update API to handle array.
-            // Since postMaintenanceTaskApi is already defined, let's use it properly.
+            if (tasks.length === 0) {
+                alert("No valid tasks generated. Please check start date, holidays, or working day calendar.");
+                return;
+            }
 
-            if (tasksToInsert.length > 1) {
+            setGeneratedTasks(tasks);
+            setShowPreview(true);
+
+        } catch (error) {
+            console.error(error);
+            alert("Error generating preview");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const confirmSubmission = async () => {
+        setIsSubmitting(true);
+        try {
+            if (generatedTasks.length > 0) {
                 // Batch insert using supabase directly as the api might not support arrays
-                const { error } = await supabase.from('maintenance_tasks').insert(tasksToInsert);
+                const { error } = await supabase.from('maintenance_tasks').insert(generatedTasks);
                 if (error) throw error;
-            } else if (tasksToInsert.length === 1) {
-                await postMaintenanceTaskApi(tasksToInsert[0]);
             }
 
             // Reset form
@@ -184,31 +233,14 @@ export default function MaintenanceTask() {
                 requireAttachment: false
             });
 
-            alert(`Successfully assigned ${tasksToInsert.length} maintenance task(s)!`);
-
-            // Navigate to task management page
-            navigate('/dashboard/task-management');
+            alert(`Successfully assigned ${generatedTasks.length} maintenance task(s)!`);
+            navigate('/dashboard/assign-task');
         } catch (error) {
             console.error(error);
-            alert("Error assigning task");
-
-            // Reset form on error as well
-            setFormData({
-                department: "Maintenance",
-                machineName: "",
-                machineArea: "",
-                partName: "",
-                workDescription: "",
-                doerName: "",
-                givenBy: "",
-                startDate: "",
-                startTime: "09:00",
-                frequency: "one-time",
-                enableReminder: false,
-                requireAttachment: false
-            });
+            alert("Error assigning tasks: " + error.message);
         } finally {
             setIsSubmitting(false);
+            setShowPreview(false);
         }
     };
 
@@ -217,8 +249,8 @@ export default function MaintenanceTask() {
             <div className="max-w-4xl mx-auto p-4">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-orange-100 rounded-lg">
-                            <Wrench className="h-6 w-6 text-orange-600" />
+                        <div className="p-2 bg-purple-100 rounded-lg">
+                            <Wrench className="h-6 w-6 text-purple-600" />
                         </div>
                         <h1 className="text-2xl font-bold text-gray-800">Assign Maintenance Task</h1>
                     </div>
@@ -231,7 +263,7 @@ export default function MaintenanceTask() {
                 </div>
 
                 <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-                    <form onSubmit={handleSubmit} className="p-8 space-y-6">
+                    <form onSubmit={generatePreview} className="p-8 space-y-6">
                         {/* Row 1: Department */}
                         <div className="space-y-2">
                             <label className="text-sm font-bold text-gray-700">Department</label>
@@ -239,7 +271,7 @@ export default function MaintenanceTask() {
                                 name="department"
                                 value={formData.department}
                                 onChange={handleChange}
-                                className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                                className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all"
                             >
                                 <option value="Maintenance">Maintenance</option>
                                 {department.map((dept, i) => (
@@ -252,7 +284,7 @@ export default function MaintenanceTask() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Machine Name</label>
-                                <select name="machineName" value={formData.machineName} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none">
+                                <select name="machineName" value={formData.machineName} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all">
                                     <option value="">Select Machine</option>
                                     {customDropdowns
                                         .filter(item => item.category === "Machine Name")
@@ -264,7 +296,7 @@ export default function MaintenanceTask() {
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Task Status</label>
-                                <select name="taskStatus" value={formData.taskStatus} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none">
+                                <select name="taskStatus" value={formData.taskStatus} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all">
                                     <option value="">Select Task Status</option>
                                     {customDropdowns
                                         .filter(item => item.category === "Task Status")
@@ -287,14 +319,27 @@ export default function MaintenanceTask() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Assign From</label>
-                                <select name="givenBy" value={formData.givenBy} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none">
+                                <select name="givenBy" value={formData.givenBy} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all">
                                     <option value="">Select Assign From</option>
                                     {givenBy.map((g, i) => <option key={i} value={g}>{g}</option>)}
                                 </select>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Machine Area</label>
-                                <input name="machineArea" value={formData.machineArea} onChange={handleChange} placeholder="Enter task area..." className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" />
+                                <select
+                                    name="machineArea"
+                                    value={formData.machineArea}
+                                    onChange={handleChange}
+                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all"
+                                >
+                                    <option value="">Select Area</option>
+                                    {customDropdowns
+                                        .filter(item => item.category === "Machine Area")
+                                        .map((item) => (
+                                            <option key={item.id} value={item.value}>{item.value}</option>
+                                        ))
+                                    }
+                                </select>
                             </div>
                         </div>
 
@@ -302,15 +347,37 @@ export default function MaintenanceTask() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Doer's Department</label>
-                                <select name="doerDepartment" value={formData.doerDepartment} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none">
+                                <select
+                                    name="doerDepartment"
+                                    value={formData.doerDepartment}
+                                    onChange={(e) => {
+                                        handleChange(e);
+                                        dispatch(uniqueDoerNameData(e.target.value));
+                                    }}
+                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all"
+                                >
                                     <option value="">Select Doer's Department</option>
-                                    <option value="Mechanical">Mechanical</option>
-                                    <option value="Electrical">Electrical</option>
+                                    {department.map((dept, i) => (
+                                        <option key={i} value={dept}>{dept}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Part Name</label>
-                                <input name="partName" value={formData.partName} onChange={handleChange} placeholder="Enter part name..." className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" />
+                                <select
+                                    name="partName"
+                                    value={formData.partName}
+                                    onChange={handleChange}
+                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all"
+                                >
+                                    <option value="">Select Part</option>
+                                    {customDropdowns
+                                        .filter(item => item.category === "Part Name")
+                                        .map((item) => (
+                                            <option key={item.id} value={item.value}>{item.value}</option>
+                                        ))
+                                    }
+                                </select>
                             </div>
                         </div>
 
@@ -318,17 +385,28 @@ export default function MaintenanceTask() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Doer's Name</label>
-                                <select name="doerName" value={formData.doerName} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none">
+                                <select name="doerName" value={formData.doerName} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all">
                                     <option value="">Select Doer Name</option>
                                     {doerName.map((d, i) => <option key={i} value={d}>{d}</option>)}
                                 </select>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Need Sound Test</label>
-                                <select name="needSoundTest" value={formData.needSoundTest} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none">
+                                <select name="needSoundTest" value={formData.needSoundTest} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all">
                                     <option value="">Select Need Sound Test</option>
-                                    <option value="Yes">Yes</option>
-                                    <option value="No">No</option>
+                                    {customDropdowns
+                                        .filter(item => item.category === "Sound Test")
+                                        .map((item) => (
+                                            <option key={item.id} value={item.value}>{item.value}</option>
+                                        ))
+                                    }
+                                    {/* Fallback hardcoded if no dynamic data */}
+                                    {(!customDropdowns.some(item => item.category === "Sound Test")) && (
+                                        <>
+                                            <option value="Yes">Yes</option>
+                                            <option value="No">No</option>
+                                        </>
+                                    )}
                                 </select>
                             </div>
                         </div>
@@ -337,19 +415,42 @@ export default function MaintenanceTask() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Temperature</label>
-                                <select name="temperature" value={formData.temperature} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none">
+                                <select name="temperature" value={formData.temperature} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all">
                                     <option value="">Select Temperature</option>
-                                    <option value="Normal">Normal</option>
-                                    <option value="High">High</option>
+                                    {customDropdowns
+                                        .filter(item => item.category === "Temperature")
+                                        .map((item) => (
+                                            <option key={item.id} value={item.value}>{item.value}</option>
+                                        ))
+                                    }
+                                    {/* Fallback strictly uses 'Low', 'Medium', 'High' */}
+                                    {(!customDropdowns.some(item => item.category === "Temperature")) && (
+                                        <>
+                                            <option value="Low">Low</option>
+                                            <option value="Medium">Medium</option>
+                                            <option value="High">High</option>
+                                        </>
+                                    )}
                                 </select>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Priority</label>
-                                <select name="priority" value={formData.priority} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none">
+                                <select name="priority" value={formData.priority} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all">
                                     <option value="">Select Priority</option>
-                                    <option value="Low">Low</option>
-                                    <option value="Medium">Medium</option>
-                                    <option value="High">High</option>
+                                    {customDropdowns
+                                        .filter(item => item.category === "Task Priority")
+                                        .map((item) => (
+                                            <option key={item.id} value={item.value}>{item.value}</option>
+                                        ))
+                                    }
+                                    {/* Fallback hardcoded if no dynamic data */}
+                                    {(!customDropdowns.some(item => item.category === "Task Priority")) && (
+                                        <>
+                                            <option value="Low">Low</option>
+                                            <option value="Medium">Medium</option>
+                                            <option value="High">High</option>
+                                        </>
+                                    )}
                                 </select>
                             </div>
                         </div>
@@ -363,23 +464,39 @@ export default function MaintenanceTask() {
                                 onChange={handleChange}
                                 rows="4"
                                 placeholder="Enter work description..."
-                                className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+                                className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none resize-none bg-gray-50 focus:bg-white transition-all"
                             ></textarea>
                         </div>
 
                         {/* Row 8: Date | Time | Frequency */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="space-y-2">
+                            <div className="space-y-2 relative">
                                 <label className="text-sm font-bold text-gray-700">Task Start Date</label>
-                                <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCalendar(!showCalendar)}
+                                    className="w-full p-2.5 text-left border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all flex items-center justify-between text-sm"
+                                >
+                                    {formData.startDate ? formatDateLong(new Date(formData.startDate)) : "Select a date"}
+                                    <Calendar className="h-4 w-4 text-gray-400" />
+                                </button>
+                                {showCalendar && (
+                                    <div className="absolute bottom-full left-0 mb-2 z-50">
+                                        <CalendarComponent
+                                            date={formData.startDate ? new Date(formData.startDate) : null}
+                                            onChange={(date) => setFormData(prev => ({ ...prev, startDate: formatDateISO(date) }))}
+                                            onClose={() => setShowCalendar(false)}
+                                        />
+                                    </div>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Task Time</label>
-                                <input type="time" name="startTime" value={formData.startTime} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" />
+                                <input type="time" name="startTime" value={formData.startTime} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all" />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Frequency</label>
-                                <select name="frequency" value={formData.frequency} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none">
+                                <select name="frequency" value={formData.frequency} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all">
                                     <option value="one-time">One Time</option>
                                     <option value="daily">Daily</option>
                                     <option value="weekly">Weekly</option>
@@ -398,7 +515,7 @@ export default function MaintenanceTask() {
                                 </div>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" name="enableReminder" checked={formData.enableReminder} onChange={handleChange} className="sr-only peer" />
-                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                                 </label>
                             </div>
                             <div className="flex items-center justify-between border-t border-gray-200 pt-4">
@@ -408,7 +525,7 @@ export default function MaintenanceTask() {
                                 </div>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" name="requireAttachment" checked={formData.requireAttachment} onChange={handleChange} className="sr-only peer" />
-                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                                 </label>
                             </div>
                         </div>
@@ -416,12 +533,70 @@ export default function MaintenanceTask() {
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 rounded-xl shadow-lg transform transition-all active:scale-95 disabled:opacity-50"
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl shadow-lg transform transition-all active:scale-95 disabled:opacity-50"
                         >
-                            {isSubmitting ? "Assigning..." : "Assign Task"}
+                            {isSubmitting ? "Generating Preview..." : "Preview Tasks"}
                         </button>
                     </form>
                 </div>
+
+                {/* Preview Modal */}
+                {showPreview && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                                <h3 className="text-xl font-bold text-gray-800">Confirm Tasks Assignment</h3>
+                                <button onClick={() => setShowPreview(false)} className="p-2 hover:bg-gray-100 rounded-full">
+                                    <X className="h-5 w-5 text-gray-500" />
+                                </button>
+                            </div>
+
+                            <div className="p-6 overflow-y-auto flex-1">
+                                <div className="mb-4 bg-purple-50 text-purple-800 p-4 rounded-lg flex items-start gap-3">
+                                    <FileCheck className="h-5 w-5 mt-0.5" />
+                                    <div>
+                                        <p className="font-bold">Summary</p>
+                                        <p className="text-sm">You are about to assign <span className="font-bold">{generatedTasks.length}</span> task(s).</p>
+                                        {formData.frequency !== 'one-time' && (
+                                            <p className="text-xs mt-1 opacity-80">Recurring tasks have been filtered based on holidays and the working day calendar.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {generatedTasks.map((task, index) => (
+                                        <div key={index} className="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 text-sm">
+                                            <Calendar className="h-4 w-4 text-gray-400" />
+                                            <span className="font-medium text-gray-700">
+                                                {new Date(task.task_start_date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                            </span>
+                                            <span className="text-gray-400">at</span>
+                                            <span className="font-medium text-gray-700">
+                                                {new Date(task.task_start_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="p-6 border-t border-gray-100 flex gap-3">
+                                <button
+                                    onClick={() => setShowPreview(false)}
+                                    className="flex-1 py-3 px-4 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition-colors"
+                                >
+                                    Edit Details
+                                </button>
+                                <button
+                                    onClick={confirmSubmission}
+                                    disabled={isSubmitting}
+                                    className="flex-1 py-3 px-4 rounded-xl bg-purple-600 text-white font-bold hover:bg-purple-700 transition-colors shadow-lg disabled:opacity-50"
+                                >
+                                    {isSubmitting ? "Assigning..." : "Confirm & Assign"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </AdminLayout>
     );
