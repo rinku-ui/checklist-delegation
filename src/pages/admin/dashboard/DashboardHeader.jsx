@@ -22,6 +22,8 @@ export default function DashboardHeader({
     const [showDateRangePicker, setShowDateRangePicker] = useState(false)
     const [startDate, setStartDate] = useState("")
     const [endDate, setEndDate] = useState("")
+    const normalizedRole = (userRole || "").toLowerCase();
+    const isAdmin = normalizedRole === "admin";
 
     // Fetch total users count - UPDATED VERSION
     useEffect(() => {
@@ -65,7 +67,7 @@ export default function DashboardHeader({
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-4">
                 <h1 className="text-2xl font-bold tracking-tight text-purple-500">Dashboard</h1>
-                {userRole === "admin" && mainTab === "default" && (
+                {isAdmin && mainTab === "default" && (
                     <div className="flex items-center gap-2 ml-auto mr-5">
                         <div className="text-sm text-gray-600">
                             {departmentFilter !== "all" ? `Users in ${departmentFilter}` : "Total Users"}
@@ -85,7 +87,7 @@ export default function DashboardHeader({
                     <div className="md:hidden w-full">
                         <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 mt-4">
                             {/* Date Range Filter */}
-                            {userRole === "admin" && (
+                            {isAdmin && (
                                 <div className="relative">
                                     <button
                                         onClick={() => setShowDateRangePicker(!showDateRangePicker)}
@@ -165,7 +167,7 @@ export default function DashboardHeader({
                             </div>
 
                             {/* Department Filter - Only show for checklist */}
-                            {dashboardType === "checklist" && userRole === "admin" && (
+                            {dashboardType === "checklist" && isAdmin && (
                                 <div className="relative">
                                     <select
                                         value={departmentFilter}
@@ -187,7 +189,7 @@ export default function DashboardHeader({
 
                             {/* Dashboard Staff Filter */}
                             <div className="relative">
-                                {userRole === "admin" ? (
+                                {isAdmin ? (
                                     <select
                                         value={dashboardStaffFilter}
                                         onChange={(e) => setDashboardStaffFilter(e.target.value)}
@@ -209,7 +211,7 @@ export default function DashboardHeader({
                                         <option value={username || ""}>{username || "Current User"}</option>
                                     </select>
                                 )}
-                                {userRole === "admin" && (
+                                {isAdmin && (
                                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-purple-400">
                                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </div>
@@ -221,7 +223,7 @@ export default function DashboardHeader({
                     {/* Desktop View - Original layout */}
                     <div className="hidden md:flex items-center gap-2">
                         {/* Date Range Filter */}
-                        {userRole === "admin" && (
+                        {isAdmin && (
                             <div className="relative">
                                 <button
                                     onClick={() => setShowDateRangePicker(!showDateRangePicker)}
@@ -290,7 +292,7 @@ export default function DashboardHeader({
                         </select>
 
                         {/* Department Filter - Only show for checklist */}
-                        {dashboardType === "checklist" && userRole === "admin" && (
+                        {dashboardType === "checklist" && isAdmin && (
                             <select
                                 value={departmentFilter}
                                 onChange={(e) => setDepartmentFilter(e.target.value)}
@@ -306,7 +308,7 @@ export default function DashboardHeader({
                         )}
 
                         {/* Dashboard Staff Filter */}
-                        {userRole === "admin" ? (
+                        {isAdmin ? (
                             <select
                                 value={dashboardStaffFilter}
                                 onChange={(e) => setDashboardStaffFilter(e.target.value)}

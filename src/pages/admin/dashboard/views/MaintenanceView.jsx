@@ -310,7 +310,21 @@ export default function MaintenanceView({ stats: originalStats, chartData, tasks
                                         <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{task.given_by}</td>
                                         <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{task.assignedTo}</td>
                                         <td className="px-4 py-3 text-sm text-gray-600">
-                                            <div className="line-clamp-2" title={task.title}>{task.title}</div>
+                                            {(task.task_description || task.title) && (
+                                                (task.task_description || task.title).startsWith('http') &&
+                                                ((task.task_description || task.title).includes('voice-notes') || (task.task_description || task.title).includes('.webm'))
+                                            ) ? (
+                                                <audio
+                                                    controls
+                                                    src={task.task_description || task.title}
+                                                    className="h-8 w-48"
+                                                    title="Voice Note"
+                                                />
+                                            ) : (
+                                                <div className="line-clamp-2" title={task.task_description || task.title}>
+                                                    {task.task_description || task.title}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
                                             {task.originalTaskStartDate ? new Date(task.originalTaskStartDate).toLocaleString('en-IN', {

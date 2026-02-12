@@ -610,7 +610,9 @@ const Setting = () => {
 
   const [deptForm, setDeptForm] = useState({
     name: '',
-    givenBy: ''
+    givenBy: '',
+    partName: '',
+    machineArea: ''
   });
 
   useEffect(() => {
@@ -719,14 +721,34 @@ const Setting = () => {
 
     if (activeTab === 'categories') {
       try {
-        await dispatch(createCustomDropdown({
-          category: 'Machine Name', // Force Machine Name category
-          value: deptForm.givenBy
-        })).unwrap();
+        // Add Machine Name
+        if (deptForm.givenBy) {
+          await dispatch(createCustomDropdown({
+            category: 'Machine Name', // Force Machine Name category
+            value: deptForm.givenBy
+          })).unwrap();
+        }
+
+        // Add Part Name if provided
+        if (deptForm.partName) {
+          await dispatch(createCustomDropdown({
+            category: 'Part Name',
+            value: deptForm.partName
+          })).unwrap();
+        }
+
+        // Add Machine Area if provided
+        if (deptForm.machineArea) {
+          await dispatch(createCustomDropdown({
+            category: 'Machine Area',
+            value: deptForm.machineArea
+          })).unwrap();
+        }
+
         resetDeptForm();
         setShowDeptModal(false);
       } catch (error) {
-        console.error('Error adding category:', error);
+        console.error('Error adding category option:', error);
       }
       return;
     }
@@ -890,7 +912,9 @@ const Setting = () => {
   const resetDeptForm = () => {
     setDeptForm({
       name: '',
-      givenBy: ''
+      givenBy: '',
+      partName: '',
+      machineArea: ''
     });
     setCurrentDeptId(null);
     setIsEditing(false); // Reset editing state for department modal
@@ -1731,12 +1755,39 @@ const Setting = () => {
                     )}
                   </div>
 
-                  {/* Value field removed for categories as it's now handled by machine name input */}
-                  {/* {activeTab === 'categories' && (
-                    <div className="space-y-2">
-                       ...
-                    </div>
-                  )} */}
+                  {activeTab === 'categories' && !isEditing && (
+                    <>
+                      <div className="space-y-2 pt-2">
+                        <label htmlFor="partName" className="block text-sm font-bold text-gray-700 ml-1">
+                          Part Name <span className="text-gray-400 font-normal text-xs">(Optional - adds to Part Name list)</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="partName"
+                          id="partName"
+                          value={deptForm.partName}
+                          onChange={handleDeptInputChange}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+                          placeholder="Enter part name..."
+                        />
+                      </div>
+
+                      <div className="space-y-2 pt-2">
+                        <label htmlFor="machineArea" className="block text-sm font-bold text-gray-700 ml-1">
+                          Machine Area <span className="text-gray-400 font-normal text-xs">(Optional - adds to Machine Area list)</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="machineArea"
+                          id="machineArea"
+                          value={deptForm.machineArea}
+                          onChange={handleDeptInputChange}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+                          placeholder="Enter machine area..."
+                        />
+                      </div>
+                    </>
+                  )}
 
                   {activeTab === 'departments' && activeDeptSubTab === 'departments' && (
                     <div className="space-y-2">

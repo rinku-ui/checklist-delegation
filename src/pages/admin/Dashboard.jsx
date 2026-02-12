@@ -102,7 +102,37 @@ export default function AdminDashboard() {
       try {
         setIsLoadingMore(true);
 
-        if (dashboardType === "checklist") {
+        if (mainTab === 'maintenance' || departmentFilter === 'Maintenance') {
+          // For maintenance, we'll fetch all and filter in processFilteredData or use specific API
+          // For now, let's use the standard fetch but it will be filtered by processFilteredData
+          const result = await fetchAllMaintenanceTasksForDashboard(1, batchSize);
+          const data = result.data || [];
+
+          // Filter data by date range on client side
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          const filteredData = data.filter(task => {
+            const taskDate = parseTaskStartDate(task.task_start_date);
+            return taskDate && taskDate >= start && taskDate <= end;
+          });
+
+          processFilteredData(filteredData, null);
+        } else if (mainTab === 'repair' || departmentFilter === 'Repair') {
+          const result = await fetchAllRepairTasks(1, batchSize);
+          const data = result.data || [];
+
+          // Client side filter
+          const start = new Date(startDate); start.setHours(0, 0, 0, 0);
+          const end = new Date(endDate); end.setHours(23, 59, 59, 999);
+          const filteredData = data.filter(task => {
+            const taskDate = parseTaskStartDate(task.task_start_date);
+            return taskDate && taskDate >= start && taskDate <= end;
+          });
+          processFilteredData(filteredData, null);
+        } else if (dashboardType === "checklist") {
           // Use the new date range API for checklist
           const filteredData = await fetchChecklistDataByDateRangeApi(
             startDate,
@@ -156,7 +186,7 @@ export default function AdminDashboard() {
 
   const processFilteredData = (data, stats) => {
     const username = localStorage.getItem("user-name");
-    const userRole = localStorage.getItem("role");
+    const userRole = (localStorage.getItem("role") || "").toLowerCase();
     const today = new Date();
     today.setHours(23, 59, 59, 999);
 
@@ -486,10 +516,10 @@ export default function AdminDashboard() {
       let data = []
 
       // Determine what data to fetch based on mainTab and dashboardType
-      if (mainTab === 'maintenance') {
+      if (mainTab === 'maintenance' || departmentFilter === 'Maintenance') {
         const result = await fetchAllMaintenanceTasksForDashboard(page, batchSize);
         data = result.data || [];
-      } else if (mainTab === 'repair') {
+      } else if (mainTab === 'repair' || departmentFilter === 'Repair') {
         const result = await fetchAllRepairTasks(page, batchSize);
         data = result.data || [];
       } else {
@@ -513,10 +543,10 @@ export default function AdminDashboard() {
         return
       }
 
-      console.log(`Fetched ${data.length} records successfully`)
+      console.log(`Fetched ${data.length} records successfully for ${mainTab || departmentFilter}`)
 
       const username = localStorage.getItem("user-name")
-      const userRole = localStorage.getItem("role")
+      const userRole = (localStorage.getItem("role") || "").toLowerCase()
       const today = new Date()
       today.setHours(23, 59, 59, 999)
 
@@ -582,7 +612,7 @@ export default function AdminDashboard() {
       const processedTasks = filteredData
         .map((task) => {
           // Skip if not assigned to current user (for non-admin)
-          if (userRole !== "admin" && task.name?.toLowerCase() !== username?.toLowerCase()) {
+          if ((userRole || "").toLowerCase() !== "admin" && task.name?.toLowerCase() !== username?.toLowerCase()) {
             return null;
           }
 
@@ -626,16 +656,22 @@ export default function AdminDashboard() {
           }
 
           // Determine status based on task type or dates
-          if (mainTab === 'repair' || mainTab === 'maintenance') {
+          if (mainTab === 'repair' || mainTab === 'maintenance' || departmentFilter === 'Maintenance' || departmentFilter === 'Repair') {
             // For repair/maintenance, use the explicit status if available, fallback to calculated
             if (task.status) {
-              status = task.status.toLowerCase();
+              const taskStatus = task.status.toLowerCase();
+              if (taskStatus === 'done' || taskStatus === 'yes' || taskStatus === 'completed') {
+                status = 'completed';
+              } else {
+                status = taskStatus;
+              }
             }
           }
 
-          return {
+          const mappedTask = {
             id: task.task_id,
             title: task.task_description || task.issue_description || "No Description",
+            task_description: task.task_description || task.issue_description,
             assignedTo: task.name || task.assigned_person || "Unassigned",
             taskStartDate: formatDateToDDMMYYYY(taskStartDate || (task.created_at ? new Date(task.created_at) : null)),
             originalTaskStartDate: task.task_start_date || task.created_at,
@@ -644,6 +680,9 @@ export default function AdminDashboard() {
             frequency: task.frequency || task.freq || "one-time",
             rating: task.color_code_for || 0,
             machine_name: task.machine_name || "-",
+            part_name: task.part_name || "-",
+            part_area: task.part_area || "-",
+            department: task.department || "-",
             given_by: task.given_by || task.filled_by || "-",
             enable_reminders: task.enable_reminders || task.enable_reminder || false,
             require_attachment: task.require_attachment || false,
@@ -655,6 +694,8 @@ export default function AdminDashboard() {
             work_done: task.work_done,
             image_url: task.image_url || task.uploaded_image_url
           };
+
+          return mappedTask;
         })
         .filter(Boolean);
 

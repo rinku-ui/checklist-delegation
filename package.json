@@ -34,6 +34,7 @@
     "react": "^18.3.0",
     "react-datepicker": "^8.2.1",
     "react-dom": "^18.3.0",
+    "react-media-recorder": "^1.7.2",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.2.0",
     "react-speech-recognition": "^4.0.1",

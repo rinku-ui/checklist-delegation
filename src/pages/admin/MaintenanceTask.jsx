@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { BellRing, FileCheck, Calendar, Clock, Wrench, X } from "lucide-react";
+import { BellRing, FileCheck, Calendar, Clock, Wrench, X, Mic, Square, Trash2 } from "lucide-react";
+import { ReactMediaRecorder } from "react-media-recorder";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { useDispatch, useSelector } from "react-redux";
 import { uniqueDepartmentData, uniqueDoerNameData, uniqueGivenByData } from "../../redux/slice/assignTaskSlice";
@@ -52,6 +53,7 @@ export default function MaintenanceTask() {
     const [generatedTasks, setGeneratedTasks] = useState([]);
     const [showPreview, setShowPreview] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
+    const [recordedAudio, setRecordedAudio] = useState(null);
 
     useEffect(() => {
         const fetchHolidays = async () => {
@@ -149,7 +151,7 @@ export default function MaintenanceTask() {
                     name: formData.doerName,
                     given_by: formData.givenBy,
                     task_start_date: `${formData.startDate}T${formData.startTime}:00`,
-                    task_description: `${formData.workDescription} (Area: ${formData.machineArea}, Part: ${formData.partName})`,
+                    task_description: formData.workDescription,
                     machine_name: formData.machineName,
                     part_name: formData.partName,
                     part_area: formData.machineArea,
@@ -184,7 +186,7 @@ export default function MaintenanceTask() {
                         name: formData.doerName,
                         given_by: formData.givenBy,
                         task_start_date: `${getLocalDateString(date)}T${formData.startTime}:00`,
-                        task_description: `${formData.workDescription} (Area: ${formData.machineArea}, Part: ${formData.partName})`,
+                        task_description: formData.workDescription,
                         machine_name: formData.machineName,
                         part_name: formData.partName,
                         part_area: formData.machineArea,
@@ -240,13 +242,13 @@ export default function MaintenanceTask() {
                         else if (freq === 'monthly') current.setMonth(current.getMonth() + 1);
                         else if (freq === 'quarterly') current.setMonth(current.getMonth() + 3);
                         else if (freq === 'half-yearly') current.setMonth(current.getMonth() + 6);
-                        else break; // Should not happen given the if/else split, but good safety
+                        else break;
                     }
                 }
             }
 
             if (tasks.length === 0) {
-                alert("No valid tasks generated. Please check start date, holidays, or working day calendar.");
+                alert("No valid tasks generated.");
                 return;
             }
 
@@ -264,13 +266,46 @@ export default function MaintenanceTask() {
     const confirmSubmission = async () => {
         setIsSubmitting(true);
         try {
-            if (generatedTasks.length > 0) {
-                // Batch insert using supabase directly as the api might not support arrays
-                const { error } = await supabase.from('maintenance_tasks').insert(generatedTasks);
-                if (error) throw error;
+            let audioUrl = "";
+            let descriptionWrapper = (desc) => desc;
+
+            // Upload audio if exists
+            if (recordedAudio && recordedAudio.blob) {
+                try {
+                    const fileName = `voice-notes/${Date.now()}-${Math.random().toString(36).substring(7)}.webm`;
+                    const { data: uploadData, error: uploadError } = await supabase.storage
+                        .from('audio-recordings')
+                        .upload(fileName, recordedAudio.blob, {
+                            contentType: recordedAudio.blob.type || 'audio/webm',
+                            upsert: false
+                        });
+
+                    if (uploadError) throw new Error(`Audio Upload Error: ${uploadError.message}`);
+
+                    const { data: publicUrlData } = supabase.storage
+                        .from('audio-recordings')
+                        .getPublicUrl(fileName);
+
+                    audioUrl = publicUrlData.publicUrl;
+                    descriptionWrapper = (desc) => audioUrl; // Store ONLY the URL if voice note exists
+                } catch (audioErr) {
+                    console.error(audioErr);
+                    alert(`Failed to upload audio: ${audioErr.message}`);
+                    setIsSubmitting(false);
+                    return; // Stop if audio fails
+                }
             }
 
-            // Reset form
+            const tasksToSubmit = generatedTasks.map(t => ({
+                ...t,
+                task_description: descriptionWrapper(t.task_description)
+            }));
+
+            if (tasksToSubmit.length > 0) {
+                const { error } = await supabase.from('maintenance_tasks').insert(tasksToSubmit);
+                if (error) throw new Error(`Database Insert Error: ${error.message}`);
+            }
+
             setFormData({
                 department: "Maintenance",
                 machineName: "",
@@ -290,9 +325,11 @@ export default function MaintenanceTask() {
                 taskStatus: "",
                 doerDepartment: ""
             });
+            setRecordedAudio(null);
 
             alert("Tasks assigned successfully!");
             navigate('/dashboard/admin');
+
         } catch (error) {
             console.error(error);
             alert("Error assigning tasks: " + error.message);
@@ -403,7 +440,10 @@ export default function MaintenanceTask() {
                                 <label className="text-sm font-bold text-gray-700">Assign From</label>
                                 <select name="givenBy" value={formData.givenBy} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all">
                                     <option value="">Select Assign From</option>
-                                    {givenBy.map((g, i) => <option key={i} value={g}>{g}</option>)}
+                                    {givenBy.map((g, i) => {
+                                        const val = typeof g === 'object' ? (g.given_by || g.name) : g;
+                                        return <option key={i} value={val}>{val}</option>;
+                                    })}
                                 </select>
                             </div>
                             <div className="space-y-2">
@@ -418,9 +458,10 @@ export default function MaintenanceTask() {
                                     className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all"
                                 >
                                     <option value="">Select Doer's Department</option>
-                                    {department.map((dept, i) => (
-                                        <option key={i} value={dept}>{dept}</option>
-                                    ))}
+                                    {department.map((dept, i) => {
+                                        const val = typeof dept === 'object' ? dept.department : dept;
+                                        return <option key={i} value={val}>{val}</option>;
+                                    })}
                                 </select>
                             </div>
                         </div>
@@ -431,7 +472,10 @@ export default function MaintenanceTask() {
                                 <label className="text-sm font-bold text-gray-700">Doer's Name</label>
                                 <select name="doerName" value={formData.doerName} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all">
                                     <option value="">Select Doer Name</option>
-                                    {doerName.map((d, i) => <option key={i} value={d}>{d}</option>)}
+                                    {doerName.map((d, i) => {
+                                        const val = typeof d === 'object' ? (d.user_name || d.name) : d;
+                                        return <option key={i} value={val}>{val}</option>;
+                                    })}
                                 </select>
                             </div>
                             <div className="space-y-2">
@@ -499,18 +543,81 @@ export default function MaintenanceTask() {
                             </div>
                         </div>
 
-                        {/* Row 7: Work Description */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-700">Work Description</label>
-                            <textarea
-                                name="workDescription"
-                                value={formData.workDescription}
-                                onChange={handleChange}
-                                rows="4"
-                                placeholder="Enter work description..."
-                                className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none resize-none bg-gray-50 focus:bg-white transition-all"
-                            ></textarea>
-                        </div>
+                        <ReactMediaRecorder
+                            audio
+                            onStop={(blobUrl, blob) => {
+                                setRecordedAudio({ blobUrl, blob });
+                            }}
+                            render={({ status, startRecording, stopRecording, mediaBlobUrl, clearBlobUrl }) => (
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700">Work Description</label>
+
+                                    {/* 1. Default View: Textarea with Mic Button */}
+                                    {status !== 'recording' && !recordedAudio && (
+                                        <div className="relative">
+                                            <textarea
+                                                name="workDescription"
+                                                value={formData.workDescription}
+                                                onChange={handleChange}
+                                                rows="4"
+                                                placeholder="Enter work description..."
+                                                className="w-full p-2.5 pb-10 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none resize-none bg-gray-50 focus:bg-white transition-all"
+                                            ></textarea>
+                                            <button
+                                                type="button"
+                                                onClick={startRecording}
+                                                className="absolute bottom-3 right-3 p-2 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200 transition-all shadow-sm group"
+                                                title="Record Voice Note"
+                                            >
+                                                <Mic className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* 2. Recording View */}
+                                    {status === 'recording' && (
+                                        <div className="flex flex-col items-center justify-center p-8 bg-red-50 border border-red-100 rounded-xl space-y-4 animate-pulse">
+                                            <div className="p-4 bg-red-100 rounded-full shadow-inner">
+                                                <Mic className="w-8 h-8 text-red-600" />
+                                            </div>
+                                            <p className="text-red-600 font-bold text-lg">Recording Voice Note...</p>
+                                            <button
+                                                type="button"
+                                                onClick={stopRecording}
+                                                className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors font-bold shadow-lg"
+                                            >
+                                                <Square className="w-4 h-4" /> Stop Recording
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* 3. Recorded View (Player) */}
+                                    {recordedAudio && status !== 'recording' && (
+                                        <div className="bg-purple-50 border border-purple-100 rounded-xl p-4">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-bold text-purple-600 uppercase tracking-wider">Voice Note Attached</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        clearBlobUrl();
+                                                        setRecordedAudio(null);
+                                                    }}
+                                                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-bold"
+                                                >
+                                                    <Trash2 className="w-3 h-3" /> Remove
+                                                </button>
+                                            </div>
+                                            <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-purple-100 shadow-sm">
+                                                <audio src={recordedAudio.blobUrl} controls className="w-full h-8" />
+                                            </div>
+                                            <p className="text-xs text-center text-gray-500 mt-2">
+                                                Note: Work description hidden while voice note is attached.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        />
 
                         {/* Row 8: Date | Time | Frequency */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

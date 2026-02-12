@@ -3,15 +3,11 @@ import supabase from "../../SupabaseClient";
 
 // Fetch Maintenance Tasks (Active/Pending)
 export const fetchMaintenanceDataSortByDate = async (page = 1, limit = 50, searchTerm = '') => {
-    const role = localStorage.getItem('role');
+    const role = (localStorage.getItem('role') || "").toLowerCase();
     const username = localStorage.getItem('user-name');
-    const userAccess = localStorage.getItem('user_access');
+    console.log(`DEBUG: fetchMaintenanceDataSortByDate - Role: ${role}, User: ${username}, Page: ${page}`);
 
     try {
-        const endOfToday = new Date();
-        endOfToday.setHours(23, 59, 59, 999);
-        const endOfTodayISO = endOfToday.toISOString();
-
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
@@ -19,13 +15,7 @@ export const fetchMaintenanceDataSortByDate = async (page = 1, limit = 50, searc
         let query = supabase
             .from('maintenance_tasks')
             .select('*', { count: 'exact' })
-            // .lte('task_start_date', endOfTodayISO) // Commented out for debugging
-            // .order('task_start_date', { ascending: true }) // Can keep order
-            .is("submission_date", null)
-        // .is("status", null) // Removed status check, pending tasks usually have status='Pending'
-        // .range(from, to);
-
-        console.log(`Fetching Maintenance Pending: Page ${page}, Role: ${role}, User: ${username}`);
+            .is("submission_date", null);
 
         if (searchTerm && searchTerm.trim() !== '') {
             const searchValue = searchTerm.trim();
@@ -33,21 +23,22 @@ export const fetchMaintenanceDataSortByDate = async (page = 1, limit = 50, searc
         }
 
         if (role === 'user' && username) {
+            console.log(`DEBUG: Applying user filter for ${username}`);
             query = query.eq('name', username);
         }
 
         const { data, error, count } = await query;
 
         if (error) {
-            console.error("Error fetching maintenance data:", error);
-            // console.error("Query used:", query); // You can't print the query object easily to see string, but error helps.
+            console.error("DEBUG: Error in fetchMaintenanceDataSortByDate:", error);
             return { data: [], totalCount: 0 };
         }
 
+        console.log(`DEBUG: fetchMaintenanceDataSortByDate Result: ${data?.length || 0} pending tasks found. Total count: ${count}`);
         return { data, totalCount: count };
 
     } catch (error) {
-        console.log("Error from Supabase", error);
+        console.error("DEBUG: Catch Error in fetchMaintenanceDataSortByDate", error);
         return { data: [], totalCount: 0 };
     }
 };
@@ -97,9 +88,9 @@ export const fetchMaintenanceDataForHistory = async (page = 1, searchTerm = '') 
 
 // Fetch ALL Maintenance Tasks (Both Pending and Completed) for Dashboard
 export const fetchAllMaintenanceTasksForDashboard = async (page = 1, limit = 1000) => {
-    const role = localStorage.getItem('role');
+    const role = (localStorage.getItem('role') || "").toLowerCase();
     const username = localStorage.getItem('user-name');
-    const userAccess = localStorage.getItem('user_access');
+    console.log(`DEBUG: fetchAllMaintenanceTasksForDashboard - Role: ${role}, User: ${username}`);
 
     try {
         const from = (page - 1) * limit;
@@ -112,25 +103,28 @@ export const fetchAllMaintenanceTasksForDashboard = async (page = 1, limit = 100
             .order('task_start_date', { ascending: false })
             .range(from, to);
 
-        console.log(`Fetching ALL Maintenance Tasks for Dashboard: Page ${page}, Role: ${role}, User: ${username}`);
-
         // Apply role-based filtering
         if (role === 'user' && username) {
+            console.log(`DEBUG: Applying user filter for ${username}`);
             query = query.eq('name', username);
         }
 
         const { data, error, count } = await query;
 
         if (error) {
-            console.error("Error fetching all maintenance tasks:", error);
+            console.error("DEBUG: Error in fetchAllMaintenanceTasksForDashboard:", error);
             return { data: [], totalCount: 0 };
         }
 
-        console.log(`Fetched ${data?.length || 0} maintenance tasks (Total: ${count})`);
+        console.log(`DEBUG: fetchAllMaintenanceTasksForDashboard Result: ${data?.length || 0} tasks found. Total count: ${count}`);
+        if (data?.length > 0) {
+            console.log("DEBUG: Sample Task IDs:", data.slice(0, 3).map(t => t.task_id));
+        }
+
         return { data, totalCount: count };
 
     } catch (error) {
-        console.log("Error from Supabase", error);
+        console.error("DEBUG: Catch Error in fetchAllMaintenanceTasksForDashboard", error);
         return { data: [], totalCount: 0 };
     }
 };
