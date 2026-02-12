@@ -72,9 +72,12 @@ export default function ChecklistTask() {
         const tasks = [];
         const freqMap = {
             "One Time (No Recurrence)": "one-time",
+            "Alternate Day": "alternate-day",
             "Daily": "daily",
             "Weekly": "weekly",
-            "Monthly": "monthly"
+            "Monthly": "monthly",
+            "Quarterly": "quarterly",
+            "Half Yearly": "half-yearly"
         };
         const freqKey = freqMap[formData.frequency] || "one-time";
 
@@ -123,25 +126,52 @@ export default function ChecklistTask() {
 
             const addDays = (date, days) => { const d = new Date(date); d.setDate(d.getDate() + days); return d; };
 
-            let attempts = 0;
-            // Generate tasks for 1 year
-            while (current <= endDate && attempts < 1000) {
-                attempts++;
-                if (!isHoliday(current) && isWorkingDay(current)) {
-                    const dateStr = formatDate(current) + ` at ${time}`;
-                    tasks.push({
-                        ...formData,
-                        taskType: "checklist",
-                        dueDate: `${current.getFullYear()}-${(current.getMonth() + 1).toString().padStart(2, '0')}-${current.getDate().toString().padStart(2, '0')}T${time}:00`,
-                        displayDate: dateStr,
-                        frequency: freqKey
-                    });
+            const addTask = (date) => {
+                const dateStr = formatDate(date) + ` at ${time}`;
+                tasks.push({
+                    ...formData,
+                    taskType: "checklist",
+                    dueDate: `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}T${time}:00`,
+                    displayDate: dateStr,
+                    frequency: freqKey
+                });
+            };
+
+            if (freqKey === 'daily' || freqKey === 'alternate-day') {
+                // Collect all valid working days first
+                const validDays = [];
+                let d = new Date(date);
+                while (d <= endDate) {
+                    if (!isHoliday(d) && isWorkingDay(d)) {
+                        validDays.push(new Date(d));
+                    }
+                    d.setDate(d.getDate() + 1);
                 }
 
-                if (freqKey === 'daily') current = addDays(current, 1);
-                else if (freqKey === 'weekly') current = addDays(current, 7);
-                else if (freqKey === 'monthly') current.setMonth(current.getMonth() + 1);
-                else break;
+                if (freqKey === 'daily') {
+                    validDays.forEach(day => addTask(day));
+                } else if (freqKey === 'alternate-day') {
+                    // Every 2nd working day
+                    validDays.forEach((day, index) => {
+                        if (index % 2 === 0) addTask(day);
+                    });
+                }
+            } else {
+                // Calendar based intervals for others
+                let current = new Date(date);
+                let attempts = 0;
+                while (current <= endDate && attempts < 1000) {
+                    attempts++;
+                    if (!isHoliday(current) && isWorkingDay(current)) {
+                        addTask(current);
+                    }
+
+                    if (freqKey === 'weekly') current = addDays(current, 7);
+                    else if (freqKey === 'monthly') current.setMonth(current.getMonth() + 1);
+                    else if (freqKey === 'quarterly') current.setMonth(current.getMonth() + 3);
+                    else if (freqKey === 'half-yearly') current.setMonth(current.getMonth() + 6);
+                    else break;
+                }
             }
         }
         setGeneratedTasks(tasks);
@@ -311,9 +341,12 @@ export default function ChecklistTask() {
                                         className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm"
                                     >
                                         <option>One Time (No Recurrence)</option>
+                                        <option>Alternate Day</option>
                                         <option>Daily</option>
                                         <option>Weekly</option>
                                         <option>Monthly</option>
+                                        <option>Quarterly</option>
+                                        <option>Half Yearly</option>
                                     </select>
                                 </div>
                             </div>

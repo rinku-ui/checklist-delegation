@@ -158,7 +158,6 @@ export default function MaintenanceTask() {
                     submission_date: null,
                 });
             } else {
-                let current = new Date(startDate);
                 const endDate = new Date(startDate);
                 endDate.setFullYear(endDate.getFullYear() + 1);
 
@@ -172,43 +171,77 @@ export default function MaintenanceTask() {
                     return workingDaySet.has(dStr);
                 };
 
-                const addDays = (date, days) => {
-                    const d = new Date(date);
-                    d.setDate(d.getDate() + days);
-                    return d;
+                const addTask = (date) => {
+                    const timestamp = Date.now();
+                    const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+                    // Use a deterministic counter or just random ID. The original had a counter.
+                    // We'll generate a unique ID here.
+                    const taskId = `MNT-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+
+                    tasks.push({
+                        task_id: taskId,
+                        department: formData.department,
+                        name: formData.doerName,
+                        given_by: formData.givenBy,
+                        task_start_date: `${getLocalDateString(date)}T${formData.startTime}:00`,
+                        task_description: `${formData.workDescription} (Area: ${formData.machineArea}, Part: ${formData.partName})`,
+                        machine_name: formData.machineName,
+                        part_name: formData.partName,
+                        part_area: formData.machineArea,
+                        freq: formData.frequency,
+                        status: "Pending",
+                        submission_date: null,
+                    });
                 };
 
-                let attempts = 0;
-                let counter = 0;
-                while (current <= endDate && attempts < 1000) {
-                    attempts++;
-
-                    if (!isHoliday(current) && isWorkingDay(current)) {
-                        const timestamp = Date.now();
-                        const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-                        const taskId = `MNT-${timestamp}-${counter}-${randomSuffix}`;
-
-                        tasks.push({
-                            task_id: taskId,
-                            department: formData.department,
-                            name: formData.doerName,
-                            given_by: formData.givenBy,
-                            task_start_date: `${getLocalDateString(current)}T${formData.startTime}:00`,
-                            task_description: `${formData.workDescription} (Area: ${formData.machineArea}, Part: ${formData.partName})`,
-                            machine_name: formData.machineName,
-                            part_name: formData.partName,
-                            part_area: formData.machineArea,
-                            freq: formData.frequency,
-                            status: "Pending",
-                            submission_date: null,
-                        });
-                        counter++;
+                if (freq === 'daily' || freq === 'alternate-day') {
+                    // Logic based on Valid Working Day Sequence
+                    // 1. Gather all valid working days in the range
+                    const validDays = [];
+                    let d = new Date(startDate);
+                    while (d <= endDate) {
+                        if (!isHoliday(d) && isWorkingDay(d)) {
+                            validDays.push(new Date(d));
+                        }
+                        d.setDate(d.getDate() + 1);
                     }
 
-                    if (freq === 'daily') current = addDays(current, 1);
-                    else if (freq === 'weekly') current = addDays(current, 7);
-                    else if (freq === 'monthly') current.setMonth(current.getMonth() + 1);
-                    else break;
+                    // 2. Select days based on frequency
+                    if (freq === 'daily') {
+                        validDays.forEach(date => addTask(date));
+                    } else if (freq === 'alternate-day') {
+                        // "Alternate Day" means every 2nd working day, starting from the first
+                        validDays.forEach((date, index) => {
+                            if (index % 2 === 0) addTask(date);
+                        });
+                    }
+                } else {
+                    // Calendar-based logic for Weekly, Monthly, Quarterly, Half-Yearly
+                    // These strictly follow calendar intervals. If a date lands on a holiday/non-working day, it is skipped (as per previous behavior).
+                    let current = new Date(startDate);
+                    let attempts = 0;
+
+                    const addDays = (date, days) => {
+                        const d = new Date(date);
+                        d.setDate(d.getDate() + days);
+                        return d;
+                    };
+
+                    while (current <= endDate && attempts < 1000) {
+                        attempts++;
+
+                        // Check validity
+                        if (!isHoliday(current) && isWorkingDay(current)) {
+                            addTask(current);
+                        }
+
+                        // Advance
+                        if (freq === 'weekly') current = addDays(current, 7);
+                        else if (freq === 'monthly') current.setMonth(current.getMonth() + 1);
+                        else if (freq === 'quarterly') current.setMonth(current.getMonth() + 3);
+                        else if (freq === 'half-yearly') current.setMonth(current.getMonth() + 6);
+                        else break; // Should not happen given the if/else split, but good safety
+                    }
                 }
             }
 
@@ -249,12 +282,17 @@ export default function MaintenanceTask() {
                 startDate: "",
                 startTime: "09:00",
                 frequency: "one-time",
+                needSoundTest: "",
+                temperature: "",
+                priority: "",
                 enableReminder: false,
-                requireAttachment: false
+                requireAttachment: false,
+                taskStatus: "",
+                doerDepartment: ""
             });
 
-            alert(`Successfully assigned ${generatedTasks.length} maintenance task(s)!`);
-            navigate('/dashboard/assign-task');
+            alert("Tasks assigned successfully!");
+            navigate('/dashboard/admin');
         } catch (error) {
             console.error(error);
             alert("Error assigning tasks: " + error.message);
@@ -284,23 +322,9 @@ export default function MaintenanceTask() {
 
                 <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
                     <form onSubmit={generatePreview} className="p-8 space-y-6">
-                        {/* Row 1: Department */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-700">Department</label>
-                            <select
-                                name="department"
-                                value={formData.department}
-                                onChange={handleChange}
-                                className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all"
-                            >
-                                <option value="Maintenance">Maintenance</option>
-                                {department.map((dept, i) => (
-                                    <option key={i} value={typeof dept === 'string' ? dept : dept.department}>{typeof dept === 'string' ? dept : dept.department}</option>
-                                ))}
-                            </select>
-                        </div>
 
-                        {/* Row 2: Machine Name | Task Status */}
+
+                        {/* Row 1: Machine Name | Machine Area */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Machine Name</label>
@@ -308,6 +332,44 @@ export default function MaintenanceTask() {
                                     <option value="">Select Machine</option>
                                     {customDropdowns
                                         .filter(item => item.category === "Machine Name")
+                                        .map((item) => (
+                                            <option key={item.id} value={item.value}>{item.value}</option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700">Machine Area</label>
+                                <select
+                                    name="machineArea"
+                                    value={formData.machineArea}
+                                    onChange={handleChange}
+                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all"
+                                >
+                                    <option value="">Select Area</option>
+                                    {customDropdowns
+                                        .filter(item => item.category === "Machine Area")
+                                        .map((item) => (
+                                            <option key={item.id} value={item.value}>{item.value}</option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Row 2: Part Name | Task Status */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700">Part Name</label>
+                                <select
+                                    name="partName"
+                                    value={formData.partName}
+                                    onChange={handleChange}
+                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all"
+                                >
+                                    <option value="">Select Part</option>
+                                    {customDropdowns
+                                        .filter(item => item.category === "Part Name")
                                         .map((item) => (
                                             <option key={item.id} value={item.value}>{item.value}</option>
                                         ))
@@ -335,7 +397,7 @@ export default function MaintenanceTask() {
                             </div>
                         </div>
 
-                        {/* Row 3: Given By | Machine Area */}
+                        {/* Row 3: Assign From | Doer's Department */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Assign From</label>
@@ -344,27 +406,6 @@ export default function MaintenanceTask() {
                                     {givenBy.map((g, i) => <option key={i} value={g}>{g}</option>)}
                                 </select>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-700">Machine Area</label>
-                                <select
-                                    name="machineArea"
-                                    value={formData.machineArea}
-                                    onChange={handleChange}
-                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all"
-                                >
-                                    <option value="">Select Area</option>
-                                    {customDropdowns
-                                        .filter(item => item.category === "Machine Area")
-                                        .map((item) => (
-                                            <option key={item.id} value={item.value}>{item.value}</option>
-                                        ))
-                                    }
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Row 4: Doer's Department | Part Name */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Doer's Department</label>
                                 <select
@@ -382,26 +423,9 @@ export default function MaintenanceTask() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-700">Part Name</label>
-                                <select
-                                    name="partName"
-                                    value={formData.partName}
-                                    onChange={handleChange}
-                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all"
-                                >
-                                    <option value="">Select Part</option>
-                                    {customDropdowns
-                                        .filter(item => item.category === "Part Name")
-                                        .map((item) => (
-                                            <option key={item.id} value={item.value}>{item.value}</option>
-                                        ))
-                                    }
-                                </select>
-                            </div>
                         </div>
 
-                        {/* Row 5: Doer's Name | Need Sound Test */}
+                        {/* Row 4: Doer's Name | Need Sound Test */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700">Doer's Name</label>
@@ -518,9 +542,12 @@ export default function MaintenanceTask() {
                                 <label className="text-sm font-bold text-gray-700">Frequency</label>
                                 <select name="frequency" value={formData.frequency} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all">
                                     <option value="one-time">One Time</option>
+                                    <option value="alternate-day">Alternate Day</option>
                                     <option value="daily">Daily</option>
                                     <option value="weekly">Weekly</option>
                                     <option value="monthly">Monthly</option>
+                                    <option value="quarterly">Quarterly</option>
+                                    <option value="half-yearly">Half Yearly</option>
                                 </select>
                             </div>
                         </div>
