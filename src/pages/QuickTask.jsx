@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { format } from 'date-fns';
 import { Search, ChevronDown, Filter, Trash2, Edit, Save, X, Play, Pause } from "lucide-react";
 import AdminLayout from "../components/layout/AdminLayout";
@@ -143,7 +143,11 @@ export default function QuickTask() {
           append: true
         }));
       } else if (activeTab === 'maintenance' && maintenanceHasMore) {
-        dispatch(maintenanceData(maintenancePage + 1));
+        dispatch(maintenanceData({
+          page: maintenancePage + 1,
+          frequency: freqFilter,
+          searchTerm: searchTerm
+        }));
       }
     }
   }, [loading, maintenanceLoading, activeTab, checklistHasMore, delegationHasMore, maintenanceHasMore, checklistPage, delegationPage, maintenancePage, dispatch]);
@@ -297,15 +301,23 @@ export default function QuickTask() {
   const handleFrequencyFilterSelect = (freq) => {
     setFreqFilter(freq);
     setDropdownOpen({ ...dropdownOpen, frequency: false });
+
+    if (activeTab === 'maintenance') {
+      dispatch(maintenanceData({ page: 1, frequency: freq, searchTerm: searchTerm }));
+    }
   };
 
   const clearFrequencyFilter = () => {
     setFreqFilter('');
     setDropdownOpen({ ...dropdownOpen, frequency: false });
+
+    if (activeTab === 'maintenance') {
+      dispatch(maintenanceData({ page: 1, frequency: '', searchTerm: searchTerm }));
+    }
   };
 
   const filteredDelegationTasks = delegationTasks.filter(task => {
-    const freqFilterPass = !freqFilter || task.frequency === freqFilter;
+    const freqFilterPass = !freqFilter || (task.frequency?.toLowerCase() === freqFilter.toLowerCase());
     const searchTermPass = !searchTerm || (
       task.task_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -315,17 +327,22 @@ export default function QuickTask() {
   });
 
   // Keep allFrequencies as is (or modify if you want to fetch frequencies from elsewhere)
-  const allFrequencies = [
-    ...new Set([
-      ...quickTask.map(task => task.frequency),
-      ...delegationTasks.map(task => task.frequency),
-      ...maintenance.map(task => task.frequency)
-    ])
-  ].filter(frequency => frequency && typeof frequency === 'string' && frequency.trim() !== '');
+  const allFrequencies = useMemo(() => {
+    const freqs = new Set();
+    // Checklist and Delegation use 'frequency'
+    [...quickTask, ...delegationTasks].forEach(task => {
+      if (task.frequency) freqs.add(task.frequency.toLowerCase());
+    });
+    // Maintenance uses 'freq'
+    maintenance.forEach(task => {
+      if (task.freq) freqs.add(task.freq.toLowerCase());
+    });
+    return Array.from(freqs).sort();
+  }, [quickTask, delegationTasks, maintenance]);
 
 
   const filteredChecklistTasks = quickTask.filter(task => {
-    const freqFilterPass = !freqFilter || task.frequency === freqFilter;
+    const freqFilterPass = !freqFilter || (task.frequency?.toLowerCase() === freqFilter.toLowerCase());
     const searchTermPass = !searchTerm || task.task_description
       ?.toLowerCase()
       .includes(searchTerm.toLowerCase());
@@ -355,7 +372,7 @@ export default function QuickTask() {
 
   const filteredMaintenance = maintenance.filter(task => {
     // Frequency Filter
-    const freqFilterPass = !freqFilter || task.frequency === freqFilter;
+    const freqFilterPass = !freqFilter || (task.freq?.toLowerCase() === freqFilter.toLowerCase());
 
     // Search Term Filter
     const searchTermPass = !searchTerm ||
@@ -449,7 +466,7 @@ export default function QuickTask() {
                 onClick={() => {
                   setActiveTab('maintenance');
                   setSelectedTasks([]);
-                  dispatch(maintenanceData(1));
+                  dispatch(maintenanceData({ page: 1, frequency: freqFilter, searchTerm: searchTerm }));
                 }}
               >
                 Maintenance
@@ -493,7 +510,7 @@ export default function QuickTask() {
                           onClick={() => handleFrequencyFilterSelect(freq)}
                           className={`block w-full text-left px-4 py-2 text-sm ${freqFilter === freq ? 'bg-purple-100 text-purple-900' : 'text-gray-700 hover:bg-gray-100'}`}
                         >
-                          {freq}
+                          <span className="capitalize">{freq}</span>
                         </button>
                       ))}
                     </div>
@@ -575,7 +592,6 @@ export default function QuickTask() {
                         { key: 'given_by', label: 'Assign From' },
                         { key: 'name', label: 'Name' },
                         { key: 'task_start_date', label: 'Start Date', bg: 'bg-yellow-50' },
-                        { key: 'submission_date', label: 'End Date', bg: 'bg-yellow-50' },
                         { key: 'frequency', label: 'Frequency' },
                         { key: 'enable_reminder', label: 'Reminders' },
                         { key: 'require_attachment', label: 'Attachment' },
@@ -693,10 +709,7 @@ export default function QuickTask() {
                             )}
                           </td>
 
-                          {/* Submission Date (End Date) */}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
-                            {formatTimestampToDDMMYYYY(task.submission_date)}
-                          </td>
+
 
                           {/* Frequency */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -757,7 +770,6 @@ export default function QuickTask() {
                             )}
                           </td>
 
-                          {/* Actions */}
                           {/* Actions */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
@@ -840,7 +852,6 @@ export default function QuickTask() {
                         { label: 'Assign From' },
                         { label: 'Name' },
                         { label: 'Start Date', bg: 'bg-yellow-50' },
-                        { label: 'End Date', bg: 'bg-yellow-50' },
                         { label: 'Frequency' },
                         { label: 'Status' },
                         { label: 'Remarks' },
@@ -882,16 +893,14 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
                             {formatTimestampToDDMMYYYY(task.task_start_date)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
-                            {formatTimestampToDDMMYYYY(task.submission_date)}
-                          </td>
+
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <span className={`px-2 py-1 rounded-full text-xs ${task.frequency === 'Daily' ? 'bg-blue-100 text-blue-800' :
-                              task.frequency === 'Weekly' ? 'bg-green-100 text-green-800' :
-                                task.frequency === 'Monthly' ? 'bg-purple-100 text-purple-800' :
+                            <span className={`px-2 py-1 rounded-full text-xs ${task.freq?.toLowerCase() === 'daily' ? 'bg-blue-100 text-blue-800' :
+                              task.freq?.toLowerCase() === 'weekly' ? 'bg-green-100 text-green-800' :
+                                task.freq?.toLowerCase() === 'monthly' ? 'bg-purple-100 text-purple-800' :
                                   'bg-gray-100 text-gray-800'
                               }`}>
-                              {task.frequency}
+                              <span className="capitalize">{task.freq}</span>
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

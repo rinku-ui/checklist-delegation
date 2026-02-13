@@ -2,10 +2,10 @@
 import supabase from "../../SupabaseClient";
 
 // Fetch Maintenance Tasks (Active/Pending)
-export const fetchMaintenanceDataSortByDate = async (page = 1, limit = 50, searchTerm = '') => {
+export const fetchMaintenanceDataSortByDate = async (page = 1, limit = 50, searchTerm = '', frequency = '') => {
     const role = (localStorage.getItem('role') || "").toLowerCase();
     const username = localStorage.getItem('user-name');
-    console.log(`DEBUG: fetchMaintenanceDataSortByDate - Role: ${role}, User: ${username}, Page: ${page}`);
+    console.log(`DEBUG: fetchMaintenanceDataSortByDate - Role: ${role}, User: ${username}, Page: ${page}, Frequency: ${frequency}`);
 
     try {
         const from = (page - 1) * limit;
@@ -16,6 +16,10 @@ export const fetchMaintenanceDataSortByDate = async (page = 1, limit = 50, searc
             .from('maintenance_tasks')
             .select('*', { count: 'exact' })
             .is("submission_date", null);
+
+        if (frequency) {
+            query = query.eq('freq', frequency);
+        }
 
         if (searchTerm && searchTerm.trim() !== '') {
             const searchValue = searchTerm.trim();

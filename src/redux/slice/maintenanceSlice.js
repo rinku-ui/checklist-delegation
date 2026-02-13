@@ -14,9 +14,14 @@ export const deleteMaintenanceTask = createAsyncThunk(
     }
 );
 
-export const maintenanceData = createAsyncThunk("maintenanceData", async (page = 1, { rejectWithValue }) => {
+export const maintenanceData = createAsyncThunk("maintenanceData", async (arg = 1, { rejectWithValue }) => {
     try {
-        const response = await fetchMaintenanceDataSortByDate(page);
+        const page = typeof arg === 'object' ? (arg.page || 1) : arg;
+        const frequency = typeof arg === 'object' ? (arg.frequency || '') : '';
+        const limit = typeof arg === 'object' ? (arg.limit || 50) : 50;
+        const searchTerm = typeof arg === 'object' ? (arg.searchTerm || '') : '';
+
+        const response = await fetchMaintenanceDataSortByDate(page, limit, searchTerm, frequency);
         return response;
     } catch (error) {
         return rejectWithValue(error.message);
@@ -60,25 +65,17 @@ const maintenanceSlice = createSlice({
         });
         builder.addCase(maintenanceData.fulfilled, (state, action) => {
             state.loading = false;
-            // If page 1, replace data. If > 1, append.
             const { data, totalCount } = action.payload;
+            const page = typeof action.meta.arg === 'object' ? (action.meta.arg.page || 1) : action.meta.arg;
 
-            // Logic to handle page 1 reset vs append could be in component or here. 
-            // Standardizing: if page arg > 1 (implied by usage in component), append. 
-            // But here we rely on the component managing state mostly? 
-            // Actually `checkListSlice` logic usually replaces or appends based on a flag or just replaces?
-            // Let's implement simple replacement for now, or check page arg?
-            // The thunk payload is just the response. `meta.arg` has the page.
-
-            if (action.meta.arg === 1) {
+            if (page === 1) {
                 state.maintenance = data;
             } else {
                 state.maintenance = [...state.maintenance, ...data];
             }
             state.totalCount = totalCount;
-            // state.hasMore = data.length === 50; // simple heuristic
             state.hasMore = state.maintenance.length < totalCount;
-            state.currentPage = action.meta.arg;
+            state.currentPage = page;
         });
         builder.addCase(maintenanceData.rejected, (state, action) => {
             state.loading = false;

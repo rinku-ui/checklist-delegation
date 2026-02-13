@@ -38,14 +38,14 @@ const AudioPlayer = ({ url }) => {
 
   return (
     <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] ${isPlaying
-        ? 'bg-indigo-50/80 border-indigo-200 shadow-sm scale-[1.02]'
-        : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xs'
+      ? 'bg-indigo-50/80 border-indigo-200 shadow-sm scale-[1.02]'
+      : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xs'
       }`}>
       <button
         onClick={togglePlay}
         className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
-            ? 'bg-gradient-to-r from-rose-500 to-pink-600'
-            : 'bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-110'
+          ? 'bg-gradient-to-r from-rose-500 to-pink-600'
+          : 'bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-110'
           }`}
       >
         {isPlaying ? (
@@ -303,9 +303,7 @@ function DelegationPage({
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50 whitespace-nowrap">
                     Start Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50 whitespace-nowrap">
-                    End Date
-                  </th>
+
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Freq
                   </th>
@@ -361,9 +359,7 @@ function DelegationPage({
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
                         {formatDateTime(task.task_start_date) || "—"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
-                        {formatDateTime(task.submission_date) || "—"}
-                      </td>
+
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${task.frequency === 'Daily' ? 'bg-blue-100 text-blue-800' :
                           task.frequency === 'Weekly' ? 'bg-green-100 text-green-800' :
