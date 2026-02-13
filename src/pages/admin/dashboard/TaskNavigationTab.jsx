@@ -1,8 +1,74 @@
 "use client"
 
-import { Filter, ChevronDown, ChevronUp } from "lucide-react"
-import { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
+import { Filter, ChevronDown, ChevronUp, Play, Pause } from "lucide-react"
 import { fetchDashboardDataApi, getDashboardDataCount } from "../../../redux/api/dashboardApi"
+
+// --- AUDIO UTILITIES ---
+const isAudioUrl = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  return url.startsWith('http') && (
+    url.includes('audio-recordings') ||
+    url.includes('voice-notes') ||
+    url.match(/\.(mp3|wav|ogg|webm|m4a|aac)(\?.*)?$/i)
+  );
+};
+
+const AudioPlayer = ({ url }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef(null);
+
+  const togglePlay = (e) => {
+    e.stopPropagation(); // Prevent row click/navigation
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  return (
+    <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] ${isPlaying
+        ? 'bg-indigo-50/80 border-indigo-200 shadow-sm'
+        : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xs'
+      }`}>
+      <button
+        onClick={togglePlay}
+        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
+            ? 'bg-gradient-to-r from-rose-500 to-pink-600'
+            : 'bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-110'
+          }`}
+      >
+        {isPlaying ? (
+          <Pause size={12} className="text-white fill-white" />
+        ) : (
+          <Play size={12} className="text-white fill-white ml-0.5" />
+        )}
+      </button>
+      <div className="flex flex-col">
+        <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-indigo-700' : 'text-gray-400'
+          }`}>
+          {isPlaying ? 'Playing...' : 'Voice Note'}
+        </span>
+        {isPlaying && (
+          <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
+            <div className="w-0.5 h-full bg-indigo-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
+            <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
+            <div className="w-0.5 h-full bg-indigo-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
+            <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
+          </div>
+        )}
+      </div>
+      <audio
+        ref={audioRef}
+        src={url}
+        onEnded={() => setIsPlaying(false)}
+        className="hidden"
+      />
+    </div>
+  );
+};
 
 export default function TaskNavigationTabs({
   dashboardType,
@@ -372,7 +438,9 @@ export default function TaskNavigationTabs({
                       <tr key={`${task.id}-${task.taskStartDate}`} className="hover:bg-purple-50/30 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-400">{index + 1}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-purple-700">{task.id}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate font-medium">{task.title}</td>
+                        <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate font-medium">
+                          {isAudioUrl(task.title) ? <AudioPlayer url={task.title} /> : task.title}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">{task.assignedTo}</td>
                         {dashboardType === "checklist" && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">{task.department}</td>
@@ -400,7 +468,13 @@ export default function TaskNavigationTabs({
                       {task.frequency}
                     </span>
                   </div>
-                  <h3 className="text-sm font-bold text-gray-800 line-clamp-2 mb-3 pr-4 leading-relaxed">{task.title}</h3>
+                  <div className="mb-3">
+                    {isAudioUrl(task.title) ? (
+                      <AudioPlayer url={task.title} />
+                    ) : (
+                      <h3 className="text-sm font-bold text-gray-800 line-clamp-2 leading-relaxed">{task.title}</h3>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-y-2 border-t border-gray-50 pt-3">
                     <div className="flex flex-col">
                       <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Assigned To</span>

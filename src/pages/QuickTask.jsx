@@ -41,14 +41,37 @@ const AudioPlayer = ({ url }) => {
   }, []);
 
   return (
-    <div className="flex items-center gap-2 py-1">
+    <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] ${isPlaying
+      ? 'bg-indigo-50/80 border-indigo-200 shadow-sm scale-[1.02]'
+      : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xs'
+      }`}>
       <button
         onClick={togglePlay}
-        className="p-1.5 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200 transition-colors shadow-sm"
+        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
+          ? 'bg-gradient-to-r from-rose-500 to-pink-600'
+          : 'bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-110'
+          }`}
       >
-        {isPlaying ? <Pause size={12} /> : <Play size={12} />}
+        {isPlaying ? (
+          <Pause size={12} className="text-white fill-white" />
+        ) : (
+          <Play size={12} className="text-white fill-white ml-0.5" />
+        )}
       </button>
-      <span className="text-[10px] font-bold text-purple-700 uppercase tracking-tight">Voice Note</span>
+      <div className="flex flex-col">
+        <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-indigo-700' : 'text-gray-400'
+          }`}>
+          {isPlaying ? 'Playing...' : 'Voice Note'}
+        </span>
+        {isPlaying && (
+          <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
+            <div className="w-0.5 h-full bg-indigo-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
+            <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
+            <div className="w-0.5 h-full bg-indigo-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
+            <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
+          </div>
+        )}
+      </div>
       <audio ref={audioRef} src={url} className="hidden" />
     </div>
   );
@@ -546,10 +569,11 @@ export default function QuickTask() {
                         />
                       </th>
                       {[
+                        { key: 'id', label: 'Task ID' },
+                        { key: 'task_description', label: 'Task Description', minWidth: 'min-w-[300px]' },
                         { key: 'department', label: 'Department' },
                         { key: 'given_by', label: 'Assign From' },
                         { key: 'name', label: 'Name' },
-                        { key: 'task_description', label: 'Task Description', minWidth: 'min-w-[300px]' },
                         { key: 'task_start_date', label: 'Start Date', bg: 'bg-yellow-50' },
                         { key: 'submission_date', label: 'End Date', bg: 'bg-yellow-50' },
                         { key: 'frequency', label: 'Frequency' },
@@ -586,6 +610,31 @@ export default function QuickTask() {
                               onChange={() => handleCheckboxChange(task)}
                               className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                             />
+                          </td>
+
+                          {/* Task ID */}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {task.id}
+                          </td>
+
+                          {/* Task Description */}
+                          <td className="px-6 py-4 text-sm text-gray-500 min-w-[300px] max-w-[400px]">
+                            {editingTaskId === task.id ? (
+                              <textarea
+                                value={editFormData.task_description}
+                                onChange={(e) => handleInputChange('task_description', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                rows="3"
+                              />
+                            ) : (
+                              <div className="whitespace-normal break-words">
+                                {isAudioUrl(task.task_description) ? (
+                                  <AudioPlayer url={task.task_description} />
+                                ) : (
+                                  task.task_description
+                                )}
+                              </div>
+                            )}
                           </td>
 
                           {/* Department */}
@@ -627,26 +676,6 @@ export default function QuickTask() {
                               />
                             ) : (
                               task.name
-                            )}
-                          </td>
-
-                          {/* Task Description */}
-                          <td className="px-6 py-4 text-sm text-gray-500 min-w-[300px] max-w-[400px]">
-                            {editingTaskId === task.id ? (
-                              <textarea
-                                value={editFormData.task_description}
-                                onChange={(e) => handleInputChange('task_description', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                rows="3"
-                              />
-                            ) : (
-                              <div className="whitespace-normal break-words">
-                                {isAudioUrl(task.task_description) ? (
-                                  <AudioPlayer url={task.task_description} />
-                                ) : (
-                                  task.task_description
-                                )}
-                              </div>
                             )}
                           </td>
 
@@ -804,12 +833,12 @@ export default function QuickTask() {
                       </th>
                       {[
                         { label: 'Task ID' },
+                        { label: 'Task Description', minWidth: 'min-w-[200px]' },
                         { label: 'Machine Name' },
                         { label: 'Part Name' },
                         { label: 'Part Area' },
                         { label: 'Assign From' },
                         { label: 'Name' },
-                        { label: 'Task Description', minWidth: 'min-w-[200px]' },
                         { label: 'Start Date', bg: 'bg-yellow-50' },
                         { label: 'End Date', bg: 'bg-yellow-50' },
                         { label: 'Frequency' },
@@ -838,11 +867,6 @@ export default function QuickTask() {
                             />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.id}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.machine_name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.part_name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.part_area}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.given_by}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.name}</td>
                           <td className="px-6 py-4 text-sm text-gray-500 min-w-[200px] max-w-[400px]">
                             {isAudioUrl(task.task_description) ? (
                               <AudioPlayer url={task.task_description} />
@@ -850,6 +874,11 @@ export default function QuickTask() {
                               <div className="whitespace-normal break-words">{task.task_description}</div>
                             )}
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.machine_name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.part_name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.part_area}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.given_by}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.name}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
                             {formatTimestampToDDMMYYYY(task.task_start_date)}
                           </td>

@@ -24,9 +24,10 @@ import TaskManagementTabs from "../../components/TaskManagementTabs";
 import { updateRepairData } from "../../redux/api/repairApi";
 
 const isAudioUrl = (url) => {
-  if (typeof url !== 'string') return false;
+  if (!url || typeof url !== 'string') return false;
   return url.startsWith('http') && (
     url.includes('audio-recordings') ||
+    url.includes('voice-notes') ||
     url.match(/\.(mp3|wav|ogg|webm|m4a|aac)(\?.*)?$/i)
   );
 };
@@ -35,7 +36,8 @@ const AudioPlayer = ({ url }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef(null);
 
-  const togglePlay = () => {
+  const togglePlay = (e) => {
+    if (e) e.stopPropagation();
     if (isPlaying) {
       audioRef.current.pause();
     } else {
@@ -54,14 +56,37 @@ const AudioPlayer = ({ url }) => {
   }, []);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] ${isPlaying
+      ? 'bg-indigo-50/80 border-indigo-200 shadow-sm scale-[1.02]'
+      : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xs'
+      }`}>
       <button
         onClick={togglePlay}
-        className="p-1.5 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200 transition-colors shadow-sm"
+        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
+          ? 'bg-gradient-to-r from-rose-500 to-pink-600'
+          : 'bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-110'
+          }`}
       >
-        {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+        {isPlaying ? (
+          <Pause size={12} className="text-white fill-white" />
+        ) : (
+          <Play size={12} className="text-white fill-white ml-0.5" />
+        )}
       </button>
-      <span className="text-xs font-medium text-purple-700">Voice Note</span>
+      <div className="flex flex-col">
+        <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-indigo-700' : 'text-gray-400'
+          }`}>
+          {isPlaying ? 'Playing...' : 'Voice Note'}
+        </span>
+        {isPlaying && (
+          <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
+            <div className="w-0.5 h-full bg-indigo-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
+            <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
+            <div className="w-0.5 h-full bg-indigo-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
+            <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
+          </div>
+        )}
+      </div>
       <audio ref={audioRef} src={url} className="hidden" />
     </div>
   );
@@ -298,6 +323,7 @@ const AllTasks = () => {
               { id: "part_replaced", label: "Part Replaced" },
               { id: "bill_amount", label: "Bill Amount" },
               { id: "remarks", label: "Remarks" },
+              { id: "work_photo_url", label: "Attachment" },
             ];
           } else {
             headers = [
@@ -691,18 +717,21 @@ const AllTasks = () => {
           const updates = {
             [completionField]: new Date().toISOString(),
             [remarksField]: remarksData[id] || null,
-            status: statusData[id] || (activeTab === "checklist" ? "yes" : "Done")
+            status: statusData[id] || "Done"
           };
           if (imageUrl) {
             updates[imageField] = imageUrl;
           }
 
-          const { error: updateError } = await supabase.from(tableName).update(updates).eq("id", id);
+          // Checklist table uses `task_id`, all others use `id`
+          const idKey = activeTab === 'checklist' ? 'task_id' : 'id';
+
+          const { error: updateError } = await supabase.from(tableName).update(updates).eq(idKey, id);
           if (updateError) throw updateError;
         }
 
         // --- Handle Recurring Task Regeneration ---
-        const originalTask = tasks.find(t => t.id === id);
+        const originalTask = tasks.find(t => (t.task_id || t.id) === id);
         const frequency = (originalTask?.frequency || originalTask?.freq || "").toLowerCase();
 
         if (originalTask && frequency && frequency !== "one-time" && frequency !== "no") {
@@ -722,7 +751,7 @@ const AllTasks = () => {
                   frequency: originalTask.frequency, // Keep original casing or standardized
                   enable_reminder: originalTask.enable_reminder,
                   require_attachment: originalTask.require_attachment,
-                  status: 'no' // Reset status for new task (or null depending on schema default)
+                  status: 'Pending' // Reset status for new task (or null depending on schema default)
                 };
               } else if (activeTab === "maintenance") {
                 newTask = {
@@ -998,6 +1027,22 @@ const AllTasks = () => {
                                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.part_replaced || "—"}</td>
                                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.bill_amount ? `₹${task.bill_amount}` : "—"}</td>
                                 <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm text-gray-800 max-w-xs truncate">{task.remarks || "—"}</td>
+                                <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">
+                                  {task.work_photo_url || task.bill_copy_url ? (
+                                    <div className="flex flex-col gap-1">
+                                      {task.work_photo_url && (
+                                        <a href={task.work_photo_url} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline text-xs">
+                                          View Work Photo
+                                        </a>
+                                      )}
+                                      {task.bill_copy_url && (
+                                        <a href={task.bill_copy_url} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline text-xs">
+                                          View Bill
+                                        </a>
+                                      )}
+                                    </div>
+                                  ) : "—"}
+                                </td>
                               </>
                             )}
                           </>
@@ -1179,33 +1224,24 @@ const AllTasks = () => {
                   <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
 
                     {/* Part Replaced */}
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Part Replaced</label>
-                      <input
-                        className="w-full p-2 text-sm border border-gray-300 rounded outline-none focus:border-purple-500"
-                        value={updateForm.partReplaced}
-                        onChange={(e) => setUpdateForm({ ...updateForm, partReplaced: e.target.value })}
-                        placeholder="Enter part name..."
-                      />
-                    </div>
-
-                    {/* Work Done & Vendor */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Work Done</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Part Replaced</label>
                         <select
                           className="w-full p-2 text-sm border border-gray-300 rounded outline-none focus:border-purple-500"
-                          value={updateForm.workDone}
-                          onChange={(e) => setUpdateForm({ ...updateForm, workDone: e.target.value })}
+                          value={updateForm.partReplaced}
+                          onChange={(e) => setUpdateForm({ ...updateForm, partReplaced: e.target.value })}
                         >
-                          <option value="">Select work done...</option>
+                          <option value="">Select part...</option>
+                          <option value="Part Replaced">Part Replaced</option>
                           <option value="Repairing">Repairing</option>
-                          <option value="Replacement">Replacement</option>
                           <option value="Service/Maintenance">Service/Maintenance</option>
                           <option value="Installation">Installation</option>
                           <option value="Other">Other</option>
                         </select>
                       </div>
+
+                      {/* Vendor Name */}
                       <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Vendor Name</label>
                         <input
@@ -1229,7 +1265,7 @@ const AllTasks = () => {
                       />
                     </div>
 
-                    {/* Remarks (Conditional for Completed, but user asked for it in general list. Placing here for Completed flow) */}
+                    {/* Remarks (For Completed Status) */}
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Remarks</label>
                       <textarea

@@ -33,8 +33,8 @@ export const fetchDashboardDataApi = async (
       query = query.eq('name', username);
     }
 
-    // Apply department filter if provided (only for checklist)
-    if (departmentFilter && departmentFilter !== 'all' && dashboardType === 'checklist') {
+    // Apply department filter if provided (for checklist and delegation)
+    if (departmentFilter && departmentFilter !== 'all' && (dashboardType === 'checklist' || dashboardType === 'delegation')) {
       query = query.eq('department', departmentFilter);
     }
 
@@ -134,8 +134,8 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = null, t
       query = query.eq('name', staffFilter);
     }
 
-    // Apply department filter (only for checklist)
-    if (departmentFilter && departmentFilter !== 'all' && dashboardType === 'checklist') {
+    // Apply department filter (for checklist and delegation)
+    if (departmentFilter && departmentFilter !== 'all' && (dashboardType === 'checklist' || dashboardType === 'delegation')) {
       query = query.eq('department', departmentFilter);
     }
 

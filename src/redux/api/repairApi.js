@@ -54,11 +54,9 @@ export const fetchAllRepairTasks = async (page = 1, limit = 1000) => {
 // --- CREATE NEW REPAIR REQUEST ---
 export const postRepairTaskApi = async (formData) => {
     try {
-        const taskId = `REPAIR-${Date.now()}`;
         const { data, error } = await supabase
             .from('repair_tasks')
             .insert({
-                task_id: taskId,                        // Added unique task_id
                 filled_by: formData.filledBy,           // Matches "Form Filled By"
                 assigned_person: formData.assignedPerson, // Matches "To Assign Person"
                 machine_name: formData.machineName,     // Matches "Machine Name"

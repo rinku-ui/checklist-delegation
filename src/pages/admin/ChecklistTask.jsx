@@ -228,7 +228,7 @@ export default function ChecklistTask() {
 
             const result = await dispatch(assignTaskInTable({
                 tasks: tasksToSubmit,
-                table: "checklist"
+                table: null // Let API decide: 'checklist' for recurring, 'delegation' for one-time
             }));
 
             // Check if the submission was successful

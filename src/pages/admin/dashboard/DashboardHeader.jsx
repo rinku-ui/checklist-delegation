@@ -166,8 +166,8 @@ export default function DashboardHeader({
                                 </div>
                             </div>
 
-                            {/* Department Filter - Only show for checklist */}
-                            {dashboardType === "checklist" && isAdmin && (
+                            {/* Department Filter - Show for checklist and delegation */}
+                            {(dashboardType === "checklist" || dashboardType === "delegation") && isAdmin && (
                                 <div className="relative">
                                     <select
                                         value={departmentFilter}
@@ -291,8 +291,8 @@ export default function DashboardHeader({
                             <option value="delegation">Delegation</option>
                         </select>
 
-                        {/* Department Filter - Only show for checklist */}
-                        {dashboardType === "checklist" && isAdmin && (
+                        {/* Department Filter - Show for checklist and delegation */}
+                        {(dashboardType === "checklist" || dashboardType === "delegation") && isAdmin && (
                             <select
                                 value={departmentFilter}
                                 onChange={(e) => setDepartmentFilter(e.target.value)}

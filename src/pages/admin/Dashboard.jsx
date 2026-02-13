@@ -783,7 +783,7 @@ export default function AdminDashboard() {
   }
 
   const fetchDepartments = async () => {
-    if (dashboardType === 'checklist') {
+    if (dashboardType === 'checklist' || dashboardType === 'delegation') {
       try {
         const departments = await getUniqueDepartmentsApi();
         console.log('All departments from API:', departments);
@@ -822,7 +822,7 @@ export default function AdminDashboard() {
 
   // Reset staff filter when department filter changes
   useEffect(() => {
-    if (dashboardType === 'checklist') {
+    if (dashboardType === 'checklist' || dashboardType === 'delegation') {
       setDashboardStaffFilter("all");
     }
   }, [departmentFilter, dashboardType]);
@@ -890,9 +890,10 @@ export default function AdminDashboard() {
     } else if (departmentFilter === "Repair") {
       setMainTab("repair")
     } else if (departmentFilter === "all") {
-      setMainTab("default")
-    } else {
-      setMainTab("custom") // or just leave it
+      // Only reset to default if we are not on a special tab
+      if (mainTab !== "ea" && mainTab !== "maintenance" && mainTab !== "repair") {
+        setMainTab("default")
+      }
     }
   }, [departmentFilter])
 
@@ -917,7 +918,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     setDashboardStaffFilter("all")
     setDepartmentFilter("all")
-    setMainTab("default")
+    // Only reset mainTab to default if we are not on EA/Maintenance/Repair
+    if (mainTab !== "ea" && mainTab !== "maintenance" && mainTab !== "repair") {
+      setMainTab("default")
+    }
     setCurrentPage(1)
     setHasMoreData(true)
     // Clear date range when dashboard type changes

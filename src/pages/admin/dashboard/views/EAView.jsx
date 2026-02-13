@@ -1,6 +1,75 @@
-import { useEffect, useState } from "react";
-import { Users, Phone, Calendar, FileText, CheckCircle, Clock, AlertCircle, ArrowUpRight, TrendingUp, UserCheck, PieChart } from "lucide-react";
+import { useRef, useEffect, useState } from "react";
+import { Users, Phone, Calendar, FileText, CheckCircle, Clock, AlertCircle, ArrowUpRight, TrendingUp, UserCheck, PieChart, Play, Pause } from "lucide-react";
 import supabase from "../../../../SupabaseClient";
+
+const isAudioUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    return url.startsWith('http') && (
+        url.includes('audio-recordings') ||
+        url.includes('voice-notes') ||
+        url.match(/\.(mp3|wav|ogg|webm|m4a|aac)(\?.*)?$/i)
+    );
+};
+
+const AudioPlayer = ({ url }) => {
+    const [isPlaying, setIsPlaying] = useState(false);
+    const audioRef = useRef(null);
+
+    const togglePlay = (e) => {
+        e.stopPropagation();
+        if (isPlaying) {
+            audioRef.current.pause();
+        } else {
+            audioRef.current.play();
+        }
+        setIsPlaying(!isPlaying);
+    };
+
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const handleEnded = () => setIsPlaying(false);
+        audio.addEventListener('ended', handleEnded);
+        return () => audio.removeEventListener('ended', handleEnded);
+    }, []);
+
+    return (
+        <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] ${isPlaying
+                ? 'bg-indigo-50/80 border-indigo-200 shadow-sm scale-[1.02]'
+                : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xs'
+            }`}>
+            <button
+                onClick={togglePlay}
+                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
+                        ? 'bg-gradient-to-r from-rose-500 to-pink-600'
+                        : 'bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-110'
+                    }`}
+            >
+                {isPlaying ? (
+                    <Pause size={12} className="text-white fill-white" />
+                ) : (
+                    <Play size={12} className="text-white fill-white ml-0.5" />
+                )}
+            </button>
+            <div className="flex flex-col">
+                <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-indigo-700' : 'text-gray-400'
+                    }`}>
+                    {isPlaying ? 'Playing...' : 'Voice Note'}
+                </span>
+                {isPlaying && (
+                    <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
+                        <div className="w-0.5 h-full bg-indigo-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
+                        <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
+                        <div className="w-0.5 h-full bg-indigo-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
+                        <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
+                    </div>
+                )}
+            </div>
+            <audio ref={audioRef} src={url} className="hidden" />
+        </div>
+    );
+};
 
 export default function EAView() {
     const [eaTasks, setEATasks] = useState([]);
@@ -272,11 +341,11 @@ export default function EAView() {
                     <table className="w-full text-left min-w-[700px]">
                         <thead>
                             <tr className="bg-gray-50/30">
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Stakeholder</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Mission Intelligence</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Target Date</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider text-center">Status Matrix</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Source</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Name</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Mobile</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Target Task</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Date</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -296,19 +365,23 @@ export default function EAView() {
                                                     <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center font-bold text-gray-600 text-[10px] uppercase border border-gray-200 shadow-sm group-hover:bg-white transition-colors">
                                                         {task.doer_name.slice(0, 2)}
                                                     </div>
-                                                    <div>
-                                                        <div className="text-xs font-black text-gray-800 uppercase leading-none">{task.doer_name}</div>
-                                                        <div className="text-[10px] text-gray-400 font-bold mt-1 flex items-center gap-1">
-                                                            <Phone size={10} /> {task.phone_number || 'HIDDEN'}
-                                                        </div>
-                                                    </div>
+                                                    <div className="text-xs font-black text-gray-800 uppercase leading-none">{task.doer_name}</div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-[10px] text-gray-600 font-bold flex items-center gap-1">
+                                                    <Phone size={10} className="text-indigo-400" /> {task.phone_number || 'HIDDEN'}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="max-w-xs group-hover:max-w-md transition-all duration-300">
-                                                    <p className="text-xs font-medium text-gray-600 line-clamp-2 leading-relaxed italic border-l-2 border-indigo-100 pl-3">
-                                                        "{task.task_description}"
-                                                    </p>
+                                                    {isAudioUrl(task.task_description) ? (
+                                                        <AudioPlayer url={task.task_description} />
+                                                    ) : (
+                                                        <p className="text-xs font-medium text-gray-600 line-clamp-2 leading-relaxed italic border-l-2 border-indigo-100 pl-3">
+                                                            "{task.task_description}"
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
@@ -323,11 +396,6 @@ export default function EAView() {
                                                 <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${styles.bg} ${styles.text} ${styles.border} shadow-sm group-hover:shadow transition-all`}>
                                                     {styles.label}
                                                 </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="text-[10px] font-bold text-gray-500 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-md inline-block uppercase">
-                                                    {task.given_by || 'SYSTEM'}
-                                                </div>
                                             </td>
                                         </tr>
                                     );

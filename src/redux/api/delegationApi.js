@@ -236,7 +236,7 @@ export const fetchDelegationDataSortByDate = async () => {
       .from('delegation')
       .select('*')
       .order('task_start_date', { ascending: true })
-      .or('status.is.null,status.eq.extend');
+      .or('status.is.null,status.eq.extend,status.eq.pending,status.eq.Pending');
 
     // Apply role-based filter
     if (role === 'user' && username) {
