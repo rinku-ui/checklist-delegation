@@ -39,6 +39,7 @@ const LoginPage = () => {
       localStorage.setItem('user-name', userData.user_name || userData.username || "");
       localStorage.setItem('role', userData.role || "");
       localStorage.setItem('email_id', userData.email_id || userData.email || "");
+      localStorage.setItem('user_access', userData.user_access || "");
 
       console.log("Stored email:", userData.email_id || userData.email); // Debug log
 

@@ -278,7 +278,6 @@ const AllTasks = () => {
             headers = [
               { id: "id", label: "Task ID" },
               { id: "task_description", label: "Task Description" },
-              { id: "department", label: "Department" },
               { id: "machine_name", label: "Machine Name" },
               { id: "part_name", label: "Part Name" },
               { id: "part_area", label: "Part Area" },
@@ -292,7 +291,6 @@ const AllTasks = () => {
             headers = [
               { id: "id", label: "Task ID" },
               { id: "task_description", label: "Task Description" },
-              { id: "department", label: "Department" },
               { id: "machine_name", label: "Machine Name" },
               { id: "part_name", label: "Part Name" },
               { id: "part_area", label: "Part Area" },
@@ -341,14 +339,15 @@ const AllTasks = () => {
           break;
         case "ea":
           tableName = "ea_tasks";
-          dateColumn = "planned_date";
+          dateColumn = "task_start_date"; // Sort by original start date
           completionField = "status";
           nameField = "doer_name";
           headers = [
-            { id: "id", label: "Task ID" },
+            { id: "task_id", label: "Task ID" },
             { id: "task_description", label: "Task Description" },
             { id: "doer_name", label: "Doer Name" },
             { id: "phone_number", label: "Phone Number" },
+            { id: "task_start_date", label: "Task Start Date" },
             { id: "planned_date", label: "Planned Date" },
             { id: "status", label: "Status" },
           ];
@@ -360,7 +359,6 @@ const AllTasks = () => {
           headers = [
             { id: "id", label: "Task ID" },
             { id: "task_description", label: "Task Description" },
-            { id: "department", label: "Department Name" },
             { id: "given_by", label: "Given By" },
             { id: "name", label: "Name" },
             { id: "task_start_date", label: "Task Start Date & Time" },
@@ -383,7 +381,7 @@ const AllTasks = () => {
         if (activeTab === "repair") {
           query = query.neq("status", "Pending").order("submission_date", { ascending: false });
         } else if (activeTab === "ea") {
-          query = query.in("status", ["done", "extended"]).order("created_at", { ascending: false });
+          query = query.eq("status", "done").order("created_at", { ascending: false });
         } else {
           query = query.not(completionField, "is", null).order(completionField, { ascending: false });
         }
@@ -391,7 +389,7 @@ const AllTasks = () => {
         if (activeTab === "repair") {
           query = query.eq("status", "Pending").order(dateColumn, { ascending: false });
         } else if (activeTab === "ea") {
-          query = query.eq("status", "pending").order(dateColumn, { ascending: true });
+          query = query.in("status", ["pending", "extended"]).order(dateColumn, { ascending: true });
         } else {
           query = query.is(completionField, null).order(dateColumn, { ascending: false });
         }
@@ -407,6 +405,13 @@ const AllTasks = () => {
           ...item,
           id: item.id || item.task_id
         }));
+
+        // Debug logging for EA tasks
+        if (activeTab === "ea" && !showHistory) {
+          console.log("EA Pending Tasks - Raw data:", data);
+          console.log("EA Pending Tasks - Mapped data:", mappedData);
+          console.log("EA Pending Tasks - Status values:", mappedData.map(t => ({ id: t.id, status: t.status })));
+        }
 
         if (showHistory) {
           setHistoryData(mappedData);
@@ -451,12 +456,18 @@ const AllTasks = () => {
       // Filter to only show tasks for today or overdue (past)
       // This addresses the user request to NOT show tomorrow's tasks
       if (activeTab === "checklist" || activeTab === "maintenance" || activeTab === "ea") {
-        const today = new Date();
-        today.setHours(23, 59, 59, 999); // Allow all tasks for today
-        const taskDate = task[dateColumn] ? new Date(task[dateColumn]) : null;
-        if (taskDate) {
-          // If the task date is in the future (beyond today), hide it
-          if (taskDate > today) return false;
+        // For EA tasks, if status is 'extended', we want to keep showing it until it's done
+        // regardless of the date filter.
+        if (activeTab === "ea" && task.status === "extended") {
+          // Keep showing extended tasks
+        } else {
+          const today = new Date();
+          today.setHours(23, 59, 59, 999); // Allow all tasks for today
+          const taskDate = task[dateColumn] ? new Date(task[dateColumn]) : null;
+          if (taskDate) {
+            // If the task date is in the future (beyond today), hide it
+            if (taskDate > today) return false;
+          }
         }
       }
 
@@ -586,6 +597,13 @@ const AllTasks = () => {
   const handleRepairUpdateSubmit = async (e) => {
     e.preventDefault();
     if (!updateForm.status) return alert("Please select a status");
+
+    // If status is Pending, just close modal and return (don't save/submit)
+    if (updateForm.status === "Pending") {
+      setIsModalOpen(false);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       let workPhotoUrl = null;
@@ -643,12 +661,19 @@ const AllTasks = () => {
     }
 
     // Validate EA tasks with extended status must have extended date
+    // Validate EA tasks with extended status must have extended date AND remarks
     if (activeTab === "ea") {
       const selectedArray = Array.from(selectedItems);
       for (const id of selectedArray) {
-        if (statusData[id] === "extended" && !extendedDateData[id]) {
-          alert("Please provide an Extended Date for tasks with 'Extend' status");
-          return;
+        if (statusData[id] === "extended") {
+          if (!extendedDateData[id]) {
+            alert("Please provide an extended date for tasks with 'Extend' status");
+            return;
+          }
+          if (!remarksData[id] || remarksData[id].trim() === "") {
+            alert("Please provide remarks for tasks with 'Extend' status");
+            return;
+          }
         }
       }
     }
@@ -676,40 +701,46 @@ const AllTasks = () => {
 
         // Handle EA tasks differently
         if (activeTab === "ea") {
-          const originalTask = tasks.find(t => t.id === id);
+          const originalTask = tasks.find(t => (t.task_id || t.id) === id);
+          if (!originalTask) {
+            console.warn(`Task with ID ${id} not found in current state.`);
+            return;
+          }
           const taskStatus = statusData[id] || "done";
 
-          // Insert into ea_tasks_done for history
-          const { error: doneError } = await supabase.from("ea_tasks_done").insert([{
-            task_id: id,
-            doer_name: originalTask.doer_name,
-            phone_number: originalTask.phone_number,
-            planned_date: originalTask.planned_date,
-            task_description: originalTask.task_description,
-            status: taskStatus,
-            remarks: remarksData[id] || null,
-            given_by: originalTask.given_by,
-            extended_date: taskStatus === "extended" ? extendedDateData[id] : null
-          }]);
+          // ONLY insert into ea_tasks_done if status is 'done'
+          if (taskStatus === "done") {
+            const { error: doneError } = await supabase.from("ea_tasks_done").insert([{
+              task_id: id,
+              doer_name: originalTask.doer_name,
+              phone_number: originalTask.phone_number,
+              task_start_date: originalTask.task_start_date,
+              planned_date: originalTask.planned_date,
+              task_description: originalTask.task_description,
+              status: taskStatus,
+              remarks: remarksData[id] || null,
+              given_by: originalTask.given_by,
+              extended_date: null
+            }]);
+            if (doneError) throw doneError;
+          }
 
-          if (doneError) throw doneError;
-
-          // Update main task
+          // Update main task for both 'done' and 'extended'
           if (taskStatus === "extended" && extendedDateData[id]) {
-            // If extended, update planned_date and keep status as pending
             const { error: updateError } = await supabase.from(tableName).update({
               planned_date: new Date(extendedDateData[id]).toISOString(),
               extended_date: new Date(extendedDateData[id]).toISOString(),
-              status: "pending",
+              status: "extended",
+              remarks: remarksData[id] || null,
               updated_at: new Date().toISOString()
-            }).eq("id", id);
+            }).eq("task_id", id);
             if (updateError) throw updateError;
-          } else {
-            // If done, mark as done
+          } else if (taskStatus === "done") {
             const { error: updateError } = await supabase.from(tableName).update({
               status: "done",
+              remarks: remarksData[id] || null,
               updated_at: new Date().toISOString()
-            }).eq("id", id);
+            }).eq("task_id", id);
             if (updateError) throw updateError;
           }
         } else {
@@ -953,7 +984,10 @@ const AllTasks = () => {
                       </th>
                     ))}
                     {!showHistory && activeTab === "ea" && (
-                      <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Extended Date</th>
+                      <>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Extended Date</th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Remarks</th>
+                      </>
                     )}
                     {!showHistory && activeTab !== "repair" && activeTab !== "ea" && (
                       <>
@@ -961,11 +995,14 @@ const AllTasks = () => {
                         <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Image</th>
                       </>
                     )}
-                    {showHistory && activeTab !== "repair" && (
+                    {showHistory && activeTab !== "repair" && activeTab !== "ea" && (
                       <>
                         <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Remarks</th>
                         <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Attachment</th>
                       </>
+                    )}
+                    {showHistory && activeTab === "ea" && (
+                      <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Remarks</th>
                     )}
                   </tr>
                 </thead>
@@ -1103,16 +1140,28 @@ const AllTasks = () => {
                               </td>
                             ))}
                             {!showHistory && activeTab === "ea" && (
-                              <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">
-                                <input
-                                  type="date"
-                                  placeholder="Extended Date"
-                                  value={extendedDateData[task.id] || ""}
-                                  onChange={(e) => setExtendedDateData((prev) => ({ ...prev, [task.id]: e.target.value }))}
-                                  className="w-full min-w-[140px] px-3 py-2 bg-gray-50 border border-gray-200 rounded-md focus:border-purple-400 outline-none text-xs text-gray-700 disabled:opacity-50"
-                                  disabled={!selectedItems.has(task.id) || statusData[task.id] !== 'extended'}
-                                />
-                              </td>
+                              <>
+                                <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">
+                                  <input
+                                    type="date"
+                                    placeholder="Extended Date"
+                                    value={extendedDateData[task.id] || ""}
+                                    onChange={(e) => setExtendedDateData((prev) => ({ ...prev, [task.id]: e.target.value }))}
+                                    className="w-full min-w-[140px] px-3 py-2 bg-gray-50 border border-gray-200 rounded-md focus:border-purple-400 outline-none text-xs text-gray-700 disabled:opacity-50"
+                                    disabled={!selectedItems.has(task.id) || statusData[task.id] !== 'extended'}
+                                  />
+                                </td>
+                                <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">
+                                  <input
+                                    type="text"
+                                    placeholder="Enter remarks"
+                                    value={remarksData[task.id] || ""}
+                                    onChange={(e) => setRemarksData((prev) => ({ ...prev, [task.id]: e.target.value }))}
+                                    className="w-full min-w-[140px] px-3 py-2 bg-gray-50 border border-gray-200 rounded-md focus:border-purple-400 outline-none text-xs text-gray-700 disabled:opacity-50"
+                                    disabled={!selectedItems.has(task.id)}
+                                  />
+                                </td>
+                              </>
                             )}
                             {!showHistory && activeTab !== "ea" && (
                               <>
@@ -1153,7 +1202,7 @@ const AllTasks = () => {
                                 </td>
                               </>
                             )}
-                            {showHistory && (
+                            {showHistory && activeTab !== "ea" && (
                               <>
                                 <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm text-gray-800 max-w-xs truncate">
                                   {isAudioUrl(task.remark || task.remarks) ? <AudioPlayer url={task.remark || task.remarks} /> : (task.remark || task.remarks || "—")}
@@ -1164,6 +1213,11 @@ const AllTasks = () => {
                                   ) : "—"}
                                 </td>
                               </>
+                            )}
+                            {showHistory && activeTab === "ea" && (
+                              <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm text-gray-800 max-w-xs truncate">
+                                {isAudioUrl(task.remarks) ? <AudioPlayer url={task.remarks} /> : (task.remarks || "—")}
+                              </td>
                             )}
                           </>
                         )}

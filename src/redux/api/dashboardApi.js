@@ -615,9 +615,10 @@ export const getUniqueDepartmentsApi = async () => {
       throw error;
     }
 
-    // Get unique departments, handle case-insensitive comparison, and sort them
+    // Get unique departments, splitting comma-separated values
     const uniqueDepartments = [...new Set(
-      data.map(item => item.department.trim()) // Remove extra spaces
+      data.flatMap(item => item.department.split(',')) // Split by comma
+        .map(dept => dept.trim()) // Remove extra spaces
         .filter(dept => dept.length > 0) // Remove empty strings
     )].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())); // Case-insensitive sort
 

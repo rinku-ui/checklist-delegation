@@ -799,7 +799,7 @@ export default function AdminDashboard() {
 
         // Filter departments based on user access for admin users
         let filteredDepartments = departments;
-        if (userRole === "admin" && userDepartments.length > 0) {
+        if (userRole === "admin" && userDepartments.length > 0 && !userDepartments.includes('all')) {
           filteredDepartments = departments.filter(dept =>
             userDepartments.includes(dept.toLowerCase())
           );

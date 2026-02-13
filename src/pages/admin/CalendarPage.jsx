@@ -1,7 +1,76 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2, AlertCircle, X, Edit, Save, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2, AlertCircle, X, Edit, Save, Loader2, Play, Pause } from 'lucide-react';
 import supabase from '../../SupabaseClient';
+import { useRef } from 'react';
+
+const isAudioUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    return url.startsWith('http') && (
+        url.includes('audio-recordings') ||
+        url.includes('voice-notes') ||
+        url.match(/\.(mp3|wav|ogg|webm|m4a|aac)(\?.*)?$/i)
+    );
+};
+
+const AudioPlayer = ({ url }) => {
+    const [isPlaying, setIsPlaying] = useState(false);
+    const audioRef = useRef(null);
+
+    const togglePlay = (e) => {
+        if (e) e.stopPropagation();
+        if (isPlaying) {
+            audioRef.current.pause();
+        } else {
+            audioRef.current.play();
+        }
+        setIsPlaying(!isPlaying);
+    };
+
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const handleEnded = () => setIsPlaying(false);
+        audio.addEventListener('ended', handleEnded);
+        return () => audio.removeEventListener('ended', handleEnded);
+    }, []);
+
+    return (
+        <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] mt-2 ${isPlaying
+            ? 'bg-blue-50 border-blue-200 shadow-sm scale-[1.02]'
+            : 'bg-white border-gray-100 hover:border-blue-100 hover:shadow-xs'
+            }`}>
+            <button
+                onClick={togglePlay}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-700'
+                    : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:scale-110'
+                    }`}
+            >
+                {isPlaying ? (
+                    <Pause size={14} className="text-white fill-white" />
+                ) : (
+                    <Play size={14} className="text-white fill-white ml-0.5" />
+                )}
+            </button>
+            <div className="flex flex-col">
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isPlaying ? 'text-blue-700' : 'text-gray-400'}`}>
+                    {isPlaying ? 'Playing...' : 'Voice Note'}
+                </span>
+                {isPlaying && (
+                    <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
+                        <div className="w-0.5 h-full bg-blue-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
+                        <div className="w-0.5 h-2/3 bg-blue-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
+                        <div className="w-0.5 h-full bg-blue-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
+                        <div className="w-0.5 h-2/3 bg-blue-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
+                    </div>
+                )}
+            </div>
+            <audio ref={audioRef} src={url} className="hidden" />
+        </div>
+    );
+};
 
 const CalendarPage = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -167,7 +236,7 @@ const CalendarPage = () => {
                         {dayTasks.slice(0, 3).map((task, idx) => (
                             <div key={idx} className="bg-white border-l-4 border-gray-200 pl-1 py-0.5 shadow-sm mb-0.5">
                                 <p className="text-[9px] font-bold text-gray-700 truncate uppercase">
-                                    {task.title}
+                                    {isAudioUrl(task.title) ? "Voice Note" : task.title}
                                 </p>
                             </div>
                         ))}
@@ -284,7 +353,14 @@ const CalendarPage = () => {
                                                         {task.status || 'Pending'}
                                                     </span>
                                                 </div>
-                                                <h4 className="text-sm font-bold text-gray-900 uppercase mb-3 leading-tight">{task.title}</h4>
+                                                {isAudioUrl(task.title) ? (
+                                                    <div className="mb-3">
+                                                        <h4 className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1">Description Recording:</h4>
+                                                        <AudioPlayer url={task.title} />
+                                                    </div>
+                                                ) : (
+                                                    <h4 className="text-sm font-bold text-gray-900 uppercase mb-3 leading-tight">{task.title}</h4>
+                                                )}
 
                                                 <div className="grid grid-cols-2 gap-4 text-[10px] font-medium text-gray-500 uppercase mb-4">
                                                     <div>Assigned: <span className="text-gray-900 font-bold">{task.name || '-'}</span></div>

@@ -5,7 +5,7 @@ import { Search, ChevronDown, Filter, Trash2, Edit, Save, X, Play, Pause } from 
 import AdminLayout from "../components/layout/AdminLayout";
 import DelegationPage from "./delegation-data";
 import { useDispatch, useSelector } from "react-redux";
-import { deleteChecklistTask, uniqueChecklistTaskData, uniqueDelegationTaskData, updateChecklistTask, fetchUsers, resetChecklistPagination, resetDelegationPagination } from "../redux/slice/quickTaskSlice";
+import { deleteChecklistTask, deleteDelegationTask, uniqueChecklistTaskData, uniqueDelegationTaskData, updateChecklistTask, fetchUsers, resetChecklistPagination, resetDelegationPagination } from "../redux/slice/quickTaskSlice";
 import { maintenanceData, deleteMaintenanceTask } from "../redux/slice/maintenanceSlice";
 
 const isAudioUrl = (url) => {
@@ -707,15 +707,15 @@ export default function QuickTask() {
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               >
                                 <option value="">Select Frequency</option>
-                                <option value="Daily">Daily</option>
-                                <option value="Weekly">Weekly</option>
-                                <option value="Monthly">Monthly</option>
-                                <option value="Yearly">Yearly</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="yearly">Yearly</option>
                               </select>
                             ) : (
-                              <span className={`px-2 py-1 rounded-full text-xs ${task.frequency === 'Daily' ? 'bg-blue-100 text-blue-800' :
-                                task.frequency === 'Weekly' ? 'bg-green-100 text-green-800' :
-                                  task.frequency === 'Monthly' ? 'bg-purple-100 text-purple-800' :
+                              <span className={`px-2 py-1 rounded-full text-xs ${task.frequency?.toLowerCase() === 'daily' ? 'bg-blue-100 text-blue-800' :
+                                task.frequency?.toLowerCase() === 'weekly' ? 'bg-green-100 text-green-800' :
+                                  task.frequency?.toLowerCase() === 'monthly' ? 'bg-purple-100 text-purple-800' :
                                     'bg-gray-100 text-gray-800'
                                 }`}>
                                 {task.frequency}
@@ -732,11 +732,11 @@ export default function QuickTask() {
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               >
                                 <option value="">Select</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
                               </select>
                             ) : (
-                              task.enable_reminder || "—"
+                              <span className="capitalize">{task.enable_reminder || "—"}</span>
                             )}
                           </td>
 
@@ -749,11 +749,11 @@ export default function QuickTask() {
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               >
                                 <option value="">Select</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
                               </select>
                             ) : (
-                              task.require_attachment || "—"
+                              <span className="capitalize">{task.require_attachment || "—"}</span>
                             )}
                           </td>
 

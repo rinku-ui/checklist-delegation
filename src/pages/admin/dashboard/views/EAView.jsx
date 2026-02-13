@@ -36,14 +36,14 @@ const AudioPlayer = ({ url }) => {
 
     return (
         <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] ${isPlaying
-                ? 'bg-indigo-50/80 border-indigo-200 shadow-sm scale-[1.02]'
-                : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xs'
+            ? 'bg-indigo-50/80 border-indigo-200 shadow-sm scale-[1.02]'
+            : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xs'
             }`}>
             <button
                 onClick={togglePlay}
                 className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
-                        ? 'bg-gradient-to-r from-rose-500 to-pink-600'
-                        : 'bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-110'
+                    ? 'bg-gradient-to-r from-rose-500 to-pink-600'
+                    : 'bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-110'
                     }`}
             >
                 {isPlaying ? (
@@ -345,6 +345,7 @@ export default function EAView() {
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Mobile</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Target Task</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Date</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Remarks Data</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider text-center">Status</th>
                             </tr>
                         </thead>
@@ -390,6 +391,11 @@ export default function EAView() {
                                                     <span className={`text-[11px] font-black uppercase tracking-tight ${styles.label === 'Overdue' ? 'text-rose-600 animate-pulse' : 'text-gray-600'}`}>
                                                         {formatDate(task.planned_date)}
                                                     </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-xs text-gray-600 font-medium">
+                                                    {task.remarks || '—'}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
