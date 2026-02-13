@@ -65,8 +65,8 @@ export default function DashboardHeader({
 
     return (
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-4">
-                <h1 className="text-2xl font-bold tracking-tight text-purple-500">Dashboard</h1>
+            <div className="flex items-center gap-3">
+                <h1 className="text-xl font-bold tracking-tight text-purple-500">Dashboard</h1>
                 {isAdmin && mainTab === "default" && (
                     <div className="flex items-center gap-2 ml-auto mr-5">
                         <div className="text-sm text-gray-600">

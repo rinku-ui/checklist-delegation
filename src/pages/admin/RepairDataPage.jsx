@@ -1,9 +1,76 @@
 "use client"
-import { useState, useEffect, useMemo } from "react"
-import { Search, Edit, X, Loader2, Save, Wrench, Calendar, Filter, History, ArrowLeft } from "lucide-react"
+import { useState, useEffect, useMemo, useRef } from "react"
+import { Search, Edit, X, Loader2, Save, Wrench, Calendar, Filter, History, ArrowLeft, Play, Pause } from "lucide-react"
 import { useDispatch, useSelector } from "react-redux"
 import { repairData, repairHistoryData, updateRepair } from "../../redux/slice/repairSlice"
 import AdminLayout from "../../components/layout/AdminLayout"
+
+// --- AUDIO UTILITIES ---
+const isAudioUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    return url.startsWith('http') && (
+        url.includes('audio-recordings') ||
+        url.includes('voice-notes') ||
+        url.match(/\.(mp3|wav|ogg|webm|m4a|aac)(\?.*)?$/i)
+    );
+};
+
+const AudioPlayer = ({ url }) => {
+    const [isPlaying, setIsPlaying] = useState(false);
+    const audioRef = useRef(null);
+
+    const togglePlay = (e) => {
+        e.stopPropagation();
+        if (isPlaying) {
+            audioRef.current.pause();
+        } else {
+            audioRef.current.play();
+        }
+        setIsPlaying(!isPlaying);
+    };
+
+    return (
+        <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] ${isPlaying
+            ? 'bg-purple-50/80 border-purple-200 shadow-sm'
+            : 'bg-white border-gray-100 hover:border-purple-100 hover:shadow-xs'
+            }`}>
+            <button
+                type="button"
+                onClick={togglePlay}
+                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
+                    ? 'bg-gradient-to-r from-rose-500 to-pink-600'
+                    : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:scale-110'
+                    }`}
+            >
+                {isPlaying ? (
+                    <Pause size={12} className="text-white fill-white" />
+                ) : (
+                    <Play size={12} className="text-white fill-white ml-0.5" />
+                )}
+            </button>
+            <div className="flex flex-col">
+                <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-purple-700' : 'text-gray-400'
+                    }`}>
+                    {isPlaying ? 'Playing...' : 'Voice Note'}
+                </span>
+                {isPlaying && (
+                    <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
+                        <div className="w-0.5 h-full bg-purple-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
+                        <div className="w-0.5 h-2/3 bg-purple-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
+                        <div className="w-0.5 h-full bg-purple-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
+                        <div className="w-0.5 h-2/3 bg-purple-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
+                    </div>
+                )}
+            </div>
+            <audio
+                ref={audioRef}
+                src={url}
+                onEnded={() => setIsPlaying(false)}
+                className="hidden"
+            />
+        </div>
+    );
+};
 
 export default function RepairPendingPage({ showLayout = true }) {
     const [searchPerson, setSearchPerson] = useState("")
@@ -181,7 +248,11 @@ export default function RepairPendingPage({ showLayout = true }) {
                                         {item.assigned_person || <span className="italic text-gray-400">Unassigned</span>}
                                     </td>
                                     <td className="py-4 px-4 align-top text-sm text-gray-600">
-                                        {item.issue_description}
+                                        {isAudioUrl(item.issue_description) ? (
+                                            <AudioPlayer url={item.issue_description} />
+                                        ) : (
+                                            item.issue_description
+                                        )}
                                         {item.part_replaced && (
                                             <div className="mt-1 text-xs text-gray-500 flex items-center gap-1">
                                                 <Wrench className="w-3 h-3" /> Replaced: {item.part_replaced}
@@ -246,7 +317,11 @@ export default function RepairPendingPage({ showLayout = true }) {
                                 </div>
                                 <div className="flex-[2]">
                                     <span className="block text-xs font-bold text-purple-500 uppercase mb-1">Issue</span>
-                                    <span className="text-gray-600">{selectedTask.issue_description}</span>
+                                    {isAudioUrl(selectedTask.issue_description) ? (
+                                        <AudioPlayer url={selectedTask.issue_description} />
+                                    ) : (
+                                        <span className="text-gray-600">{selectedTask.issue_description}</span>
+                                    )}
                                 </div>
                             </div>
                             <div className="space-y-4">

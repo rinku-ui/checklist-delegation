@@ -36,14 +36,14 @@ const AudioPlayer = ({ url }) => {
 
   return (
     <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] ${isPlaying
-      ? 'bg-indigo-50/80 border-indigo-200 shadow-sm'
-      : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xs'
+      ? 'bg-purple-50/80 border-purple-200 shadow-sm'
+      : 'bg-white border-gray-100 hover:border-purple-100 hover:shadow-xs'
       }`}>
       <button
         onClick={togglePlay}
         className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
           ? 'bg-gradient-to-r from-rose-500 to-pink-600'
-          : 'bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-110'
+          : 'bg-gradient-to-r from-purple-500 to-violet-600 hover:scale-110'
           }`}
       >
         {isPlaying ? (
@@ -53,16 +53,16 @@ const AudioPlayer = ({ url }) => {
         )}
       </button>
       <div className="flex flex-col">
-        <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-indigo-700' : 'text-gray-400'
+        <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-purple-700' : 'text-gray-400'
           }`}>
           {isPlaying ? 'Playing...' : 'Voice Note'}
         </span>
         {isPlaying && (
           <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
-            <div className="w-0.5 h-full bg-indigo-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
-            <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
-            <div className="w-0.5 h-full bg-indigo-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
-            <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
+            <div className="w-0.5 h-full bg-purple-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
+            <div className="w-0.5 h-2/3 bg-purple-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
+            <div className="w-0.5 h-full bg-purple-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
+            <div className="w-0.5 h-2/3 bg-purple-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
           </div>
         )}
       </div>
@@ -466,14 +466,14 @@ export default function TaskNavigationTabs({
 
   return (
     <div className="w-full overflow-hidden rounded-lg border border-gray-200 bg-white">
-      <div className="bg-gray-50/50 p-3 border-b border-gray-100">
+      <div className="bg-gray-50/50 p-2 border-b border-gray-100">
         <div className="flex bg-white rounded-xl border border-purple-100 p-1 shadow-sm overflow-x-auto no-scrollbar">
           {["recent", "upcoming", "overdue"].map((view) => (
             <button
               key={view}
               onClick={() => setTaskView(view)}
-              className={`flex-1 min-w-[120px] py-2.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-300 uppercase tracking-wider ${taskView === view
-                ? "bg-purple-600 text-white shadow-md transform scale-[1.02]"
+              className={`flex-1 min-w-[100px] py-2 rounded-lg text-xs font-bold transition-all duration-300 uppercase tracking-wider ${taskView === view
+                ? "bg-purple-600 text-white shadow-md transform scale-[1.01]"
                 : "text-purple-600 hover:bg-purple-50"
                 }`}
             >
@@ -488,7 +488,7 @@ export default function TaskNavigationTabs({
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-2">
         {/* Accordion Filter Section */}
         {dashboardType !== 'checklist' && dashboardType !== 'delegation' && (
           <div className="mb-4 border border-gray-200 rounded-lg">
@@ -580,29 +580,27 @@ export default function TaskNavigationTabs({
             <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div
                 className="task-table-container overflow-x-auto"
-                style={{ maxHeight: "500px", overflowY: "auto" }}
+                style={{ maxHeight: "calc(100vh - 380px)", minHeight: "300px", overflowY: "auto" }}
               >
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50 sticky top-0 z-10 transition-all">
                     <tr>
-                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Seq</th>
-                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">ID</th>
-                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Description</th>
-                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Staff</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">ID</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Description</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Staff</th>
                       {dashboardType === "checklist" && (
-                        <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Department</th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Dept</th>
                       )}
-                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Date</th>
-                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Freq</th>
-                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Actions</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Date</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Freq</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
                     {displayedTasks.map((task, index) => (
-                      <tr key={`${task.id}-${task.taskStartDate}`} className="hover:bg-purple-50/30 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-400">{index + 1}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-purple-700">{task.id}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700 min-w-[300px] max-w-xs font-medium">
+                      <tr key={`${task.id}-${task.taskStartDate}`} className="hover:bg-purple-50/30 transition-colors border-b last:border-0">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs font-bold text-purple-700">{task.id}</td>
+                        <td className="px-3 py-2 text-xs text-gray-700 min-w-[300px] max-w-sm font-medium">
                           {editingTaskId === task.id ? (
                             <ReactMediaRecorder
                               audio
@@ -708,7 +706,7 @@ export default function TaskNavigationTabs({
                               <div className="whitespace-normal break-words">{task.title}</div>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600 font-medium">
                           {editingTaskId === task.id ? (
                             <select
                               value={editFormData.name}
@@ -725,7 +723,7 @@ export default function TaskNavigationTabs({
                           )}
                         </td>
                         {dashboardType === "checklist" && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500 font-medium">
                             {editingTaskId === task.id ? (
                               <select
                                 value={editFormData.department}
@@ -742,7 +740,7 @@ export default function TaskNavigationTabs({
                             )}
                           </td>
                         )}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500 font-medium">
                           {editingTaskId === task.id ? (
                             <input
                               type="datetime-local"
@@ -755,7 +753,7 @@ export default function TaskNavigationTabs({
                             task.taskStartDate
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-2 whitespace-nowrap">
                           {editingTaskId === task.id ? (
                             <select
                               value={editFormData.frequency}
@@ -775,7 +773,7 @@ export default function TaskNavigationTabs({
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
                           {editingTaskId === task.id ? (
                             <div className="flex gap-2">
                               <button
@@ -796,7 +794,7 @@ export default function TaskNavigationTabs({
                           ) : (
                             <button
                               onClick={() => handleEditClick(task)}
-                              className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-bold transition-all shadow-sm active:scale-95"
                             >
                               <Edit size={12} />
                               Edit

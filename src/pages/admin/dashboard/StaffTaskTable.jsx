@@ -211,43 +211,43 @@ export default function StaffTasksTable({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Seq No.
+                <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight">
+                  Seq
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight">
                   Name
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Department
+                <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight">
+                  Dept
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total Tasks
+                <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight">
+                  Total
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Completed Tasks
+                <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight">
+                  Done
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Done On Time
+                <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight">
+                  On-Time
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ontime Score
+                <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight">
+                  Score
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {staffMembers.map((staff, index) => (
                 <tr key={`${staff.name}-${index}-${selectedMonth}`} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">{index + 1}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{staff.name}</div>
+                      <div className="text-xs font-medium text-gray-900">{staff.name}</div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{staff.department}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{staff.total_tasks}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{staff.total_completed_tasks}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{staff.total_done_on_time}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">{staff.department}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">{staff.total_tasks}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">{staff.total_completed_tasks}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">{staff.total_done_on_time}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
                     <span className={staff.ontime_score >= 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
                       {staff.ontime_score}%
                     </span>

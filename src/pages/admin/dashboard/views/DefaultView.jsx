@@ -25,7 +25,7 @@ export default function DefaultView({
     parseTaskStartDate
 }) {
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <StatisticsCards
                 totalTask={displayStats.totalTasks}
                 completeTask={displayStats.completedTasks}

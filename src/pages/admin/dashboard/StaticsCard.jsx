@@ -44,8 +44,8 @@ export default function StatisticsCards({
               <h3 className="text-[10px] xs:text-xs font-bold text-blue-700 uppercase tracking-wider line-clamp-1">Total</h3>
               <ListTodo className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
             </div>
-            <div className="p-3 sm:p-4">
-              <div className="text-xl xs:text-2xl font-bold text-blue-700">{totalTask}</div>
+            <div className="p-2 sm:p-3">
+              <div className="text-lg xs:text-xl font-bold text-blue-700">{totalTask}</div>
               <p className="text-[10px] text-blue-600 mt-0.5 line-clamp-1">
                 {dateRange ? "Filtered" : "Monthly"}
               </p>
@@ -58,8 +58,8 @@ export default function StatisticsCards({
               <h3 className="text-[10px] xs:text-xs font-bold text-green-700 uppercase tracking-wider line-clamp-1">Done</h3>
               <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
             </div>
-            <div className="p-3 sm:p-4">
-              <div className="text-xl xs:text-2xl font-bold text-green-700">{completeTask}</div>
+            <div className="p-2 sm:p-3">
+              <div className="text-lg xs:text-xl font-bold text-green-700">{completeTask}</div>
               <p className="text-[10px] text-green-600 mt-0.5 line-clamp-1">
                 Completed
               </p>
@@ -72,8 +72,8 @@ export default function StatisticsCards({
               <h3 className="text-[10px] xs:text-xs font-bold text-amber-700 uppercase tracking-wider line-clamp-1">Pending</h3>
               <Clock className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
             </div>
-            <div className="p-3 sm:p-4">
-              <div className="text-xl xs:text-2xl font-bold text-amber-700">{pendingTask}</div>
+            <div className="p-2 sm:p-3">
+              <div className="text-lg xs:text-xl font-bold text-amber-700">{pendingTask}</div>
               <p className="text-[10px] text-amber-600 mt-0.5 line-clamp-1">
                 To be done
               </p>
@@ -86,8 +86,8 @@ export default function StatisticsCards({
               <h3 className="text-[10px] xs:text-xs font-bold text-red-700 uppercase tracking-wider line-clamp-1">Overdue</h3>
               <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
             </div>
-            <div className="p-3 sm:p-4">
-              <div className="text-xl xs:text-2xl font-bold text-red-700">{overdueTask}</div>
+            <div className="p-2 sm:p-3">
+              <div className="text-lg xs:text-xl font-bold text-red-700">{overdueTask}</div>
               <p className="text-[10px] text-red-600 mt-0.5 line-clamp-1">
                 Past due date
               </p>
@@ -106,11 +106,11 @@ export default function StatisticsCards({
             </h3>
             <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-500" />
           </div>
-          <div className="p-4 sm:p-6">
+          <div className="p-3 sm:p-4">
             {/* Single layout for all screen sizes - Circle left, Legend right */}
             <div className="flex flex-row items-center justify-between">
               {/* Circular Progress - Left */}
-              <div className="relative w-32 h-32 xs:w-36 xs:h-36 sm:w-40 sm:h-40 md:w-44 md:h-44 lg:w-48 lg:h-48 xl:w-52 xl:h-52">
+              <div className="relative w-24 h-24 xs:w-28 xs:h-28 sm:w-32 sm:h-32 md:w-36 md:h-36">
                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                   {/* Background circle */}
                   <circle
@@ -172,7 +172,7 @@ export default function StatisticsCards({
                 {/* Percentage text in center */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="text-lg xs:text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-indigo-700">
+                    <div className="text-sm xs:text-lg sm:text-xl font-bold text-indigo-700">
                       {completionRate.toFixed(1)}%
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
@@ -183,7 +183,7 @@ export default function StatisticsCards({
               </div>
 
               {/* Legend - Right */}
-              <div className="grid grid-cols-1 gap-1 xs:gap-2 sm:gap-3 text-xs xs:text-sm sm:text-base md:text-lg flex-1 max-w-[200px]">
+              <div className="grid grid-cols-1 gap-1 text-[10px] xs:text-xs sm:text-sm flex-1 max-w-[150px]">
                 <div className="flex items-center space-x-1 xs:space-x-2">
                   <div className="w-2 h-2 xs:w-3 xs:h-3 sm:w-4 sm:h-4 rounded-full bg-green-500 flex-shrink-0"></div>
                   <span className="font-medium">Completed:</span>
