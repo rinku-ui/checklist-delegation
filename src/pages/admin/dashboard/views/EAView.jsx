@@ -196,7 +196,7 @@ export default function EAView() {
                     <div className="relative h-16 w-16 mx-auto">
                         <div className="absolute inset-0 rounded-full border-4 border-blue-50 border-t-blue-600 animate-spin"></div>
                     </div>
-                    <p className="mt-4 text-gray-500 font-bold tracking-tight uppercase text-xs">Syncing EA Intelligence...</p>
+                    <p className="mt-4 text-gray-500 font-bold tracking-tight uppercase text-xs">Loading your tasks...</p>
                 </div>
             </div>
         );
@@ -273,59 +273,86 @@ export default function EAView() {
                     </div>
                 </div>
 
-                {/* Performance Visuals / Doer Leaderboard */}
+
+                {/* Your Task Progress */}
                 <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-6 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <TrendingUp size={16} className="text-indigo-600" />
-                            Top Performing Doers
-                        </div>
-                        <span className="text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-1 rounded">Total Active: {stats.doersCount}</span>
+                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-6 flex items-center gap-2">
+                        <TrendingUp size={16} className="text-indigo-600" />
+                        Your Task Progress
                     </h3>
 
-                    <div className="space-y-5 flex-1 flex flex-col justify-center">
-                        {doerStats.length === 0 ? (
-                            <div className="text-center py-10 text-gray-400 italic">No doer data available</div>
-                        ) : (
-                            doerStats.map((doer, idx) => (
-                                <div key={idx} className="group">
-                                    <div className="flex justify-between items-center mb-1.5 px-1">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-7 h-7 bg-blue-50 text-blue-700 rounded-full flex items-center justify-center text-[10px] font-black uppercase border border-blue-100">
-                                                {doer.name.slice(0, 2)}
-                                            </div>
-                                            <span className="text-xs font-bold text-gray-700 group-hover:text-blue-700 transition-colors uppercase truncate max-w-[120px]">{doer.name}</span>
-                                        </div>
-                                        <div className="text-[10px] font-black tracking-tighter">
-                                            <span className="text-emerald-500">{doer.completed}</span>
-                                            <span className="text-gray-300 mx-1">/</span>
-                                            <span className="text-gray-700">{doer.total} Tasks</span>
-                                        </div>
-                                    </div>
-                                    <div className="h-2 w-full bg-gray-50 rounded-full overflow-hidden border border-gray-100 p-[1px]">
-                                        <div
-                                            className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(79,70,229,0.3)]"
-                                            style={{ width: `${calculatePercentage(doer.completed, doer.total)}%`, transitionDelay: `${idx * 100}ms` }}
-                                        ></div>
-                                    </div>
+                    <div className="space-y-4 flex-1">
+                        {/* Progress Overview */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase">Overall Completion</span>
+                                <span className="text-lg font-black text-indigo-600">
+                                    {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
+                                </span>
+                            </div>
+                            <div className="h-3 w-full bg-white rounded-full overflow-hidden border border-indigo-200">
+                                <div
+                                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-1000"
+                                    style={{ width: `${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%` }}
+                                ></div>
+                            </div>
+                        </div>
+
+                        {/* Task Breakdown */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <CheckCircle size={14} className="text-emerald-600" />
+                                    <span className="text-[10px] font-bold text-emerald-700 uppercase">Completed</span>
                                 </div>
-                            ))
+                                <p className="text-2xl font-black text-emerald-600">{stats.completed}</p>
+                            </div>
+                            <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Clock size={14} className="text-amber-600" />
+                                    <span className="text-[10px] font-bold text-amber-700 uppercase">Pending</span>
+                                </div>
+                                <p className="text-2xl font-black text-amber-600">{stats.pending}</p>
+                            </div>
+                            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <AlertCircle size={14} className="text-blue-600" />
+                                    <span className="text-[10px] font-bold text-blue-700 uppercase">Extended</span>
+                                </div>
+                                <p className="text-2xl font-black text-blue-600">{stats.extended}</p>
+                            </div>
+                            <div className="bg-rose-50 rounded-lg p-3 border border-rose-100">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <AlertCircle size={14} className="text-rose-600" />
+                                    <span className="text-[10px] font-bold text-rose-700 uppercase">Overdue</span>
+                                </div>
+                                <p className="text-2xl font-black text-rose-600">{stats.overdue}</p>
+                            </div>
+                        </div>
+
+                        {/* Motivational Message */}
+                        {stats.total > 0 && (
+                            <div className="text-center pt-2">
+                                {stats.completed === stats.total ? (
+                                    <p className="text-sm font-bold text-emerald-600">🎉 Amazing! All tasks completed!</p>
+                                ) : stats.overdue > 0 ? (
+                                    <p className="text-sm font-bold text-rose-600">⚠️ You have {stats.overdue} overdue task{stats.overdue > 1 ? 's' : ''}</p>
+                                ) : (
+                                    <p className="text-sm font-bold text-indigo-600">💪 Keep going! {stats.pending} task{stats.pending > 1 ? 's' : ''} remaining</p>
+                                )}
+                            </div>
                         )}
                     </div>
-
-                    <button className="mt-6 text-[10px] font-bold text-blue-600 uppercase flex items-center gap-1 hover:gap-2 transition-all self-end">
-                        View Detailed Analytics <ArrowUpRight size={12} />
-                    </button>
                 </div>
             </div>
 
             {/* Premium Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { label: 'Total Syncs', value: stats.total, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { label: 'Active Queue', value: stats.pending, icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                    { label: 'Done Properly', value: stats.completed, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: 'Critical Delay', value: stats.overdue, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' }
+                    { label: 'Total Tasks', value: stats.total, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
+                    { label: 'In Progress', value: stats.pending, icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    { label: 'Completed', value: stats.completed, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { label: 'Need Attention', value: stats.overdue, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' }
                 ].map((stat, i) => (
                     <div key={i} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
                         <div className="flex items-start justify-between">
@@ -346,7 +373,7 @@ export default function EAView() {
                 <div className="px-6 py-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
                     <h3 className="text-xs font-black text-gray-700 uppercase tracking-widest flex items-center gap-2">
                         <Users size={14} className="text-indigo-600" />
-                        Executive Intelligence Console
+                        Your Tasks
                     </h3>
                     <div className="flex gap-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse"></div>
