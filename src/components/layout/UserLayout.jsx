@@ -1,4 +1,5 @@
 "use client"
+import aceLogo from "../assets/Ace_Logoo.jpg";
 
 import { useState, useEffect } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
@@ -71,8 +72,8 @@ const UserLayout = ({ children }) => {
             to={isAdmin ? "/admin/dashboard" : "/user/dashboard"}
             className="flex items-center gap-2 font-semibold text-green-700 dark:text-green-300"
           >
-            <i className="fas fa-clipboard-list h-5 w-5 text-green-600 dark:text-green-400"></i>
-            <span>Task Management System</span>
+            <img src={aceLogo} alt="TaskDesk Logo" className="h-8 w-8 rounded-full object-cover border border-green-200" />
+            <span>TaskDesk</span>
           </Link>
         </div>
         <nav className="flex-1 overflow-y-auto p-2">
@@ -82,8 +83,8 @@ const UserLayout = ({ children }) => {
                 <Link
                   to={route.href}
                   className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${location.pathname === route.href
-                      ? "bg-gradient-to-r from-green-100 to-teal-100 text-green-700 dark:from-green-900 dark:to-teal-900 dark:text-green-300"
-                      : "text-gray-700 hover:bg-green-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                    ? "bg-gradient-to-r from-green-100 to-teal-100 text-green-700 dark:from-green-900 dark:to-teal-900 dark:text-green-300"
+                    : "text-gray-700 hover:bg-green-50 dark:text-gray-300 dark:hover:bg-gray-800"
                     }`}
                 >
                   {getIcon(route.icon)}
@@ -137,8 +138,8 @@ const UserLayout = ({ children }) => {
             className="flex items-center gap-2 font-semibold text-green-700 dark:text-green-300"
             onClick={() => setIsMobileMenuOpen(false)}
           >
-            <i className="fas fa-clipboard-list h-5 w-5 text-green-600 dark:text-green-400"></i>
-            <span>Task Management System</span>
+            <img src={aceLogo} alt="TaskDesk Logo" className="h-8 w-8 rounded-full object-cover border border-green-200" />
+            <span>TaskDesk</span>
           </Link>
         </div>
         <nav className="flex-1 overflow-y-auto p-2 bg-white dark:bg-gray-950">
@@ -148,8 +149,8 @@ const UserLayout = ({ children }) => {
                 <Link
                   to={route.href}
                   className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${location.pathname === route.href
-                      ? "bg-gradient-to-r from-green-100 to-teal-100 text-green-700 dark:from-green-900 dark:to-teal-900 dark:text-green-300"
-                      : "text-gray-700 hover:bg-green-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                    ? "bg-gradient-to-r from-green-100 to-teal-100 text-green-700 dark:from-green-900 dark:to-teal-900 dark:text-green-300"
+                    : "text-gray-700 hover:bg-green-50 dark:text-gray-300 dark:hover:bg-gray-800"
                     }`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >

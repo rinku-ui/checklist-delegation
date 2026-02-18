@@ -1,4 +1,5 @@
 "use client";
+import aceLogo from "../../assets/Ace_Logoo.jpg";
 
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -207,8 +208,8 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
             to="/dashboard/admin"
             className="flex items-center gap-2 font-semibold text-blue-700"
           >
-            <ClipboardList className="h-5 w-5 text-blue-600" />
-            <span>Task Management System </span>
+            <img src={aceLogo} alt="TaskDesk Logo" className="h-8 w-8 rounded-full object-cover border border-blue-200" />
+            <span>TaskDesk</span>
           </Link>
         </div>
         <nav className="flex-1 overflow-y-auto p-2">
@@ -379,8 +380,8 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
                 className="flex items-center gap-2 font-semibold text-blue-700"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <ClipboardList className="h-5 w-5 text-blue-600" />
-                <span>Task Management System</span>
+                <img src={aceLogo} alt="TaskDesk Logo" className="h-8 w-8 rounded-full object-cover border border-blue-200" />
+                <span>TaskDesk</span>
               </Link>
             </div>
             <nav className="flex-1 overflow-y-auto p-2 bg-white">
@@ -534,10 +535,10 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
           <div className="flex md:hidden w-8"></div>
           <div className="flex flex-col items-center">
             <h1 className="text-lg font-bold bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent">
-              TMS Dashboard
+              TaskDesk
             </h1>
             <p className="text-[10px] text-gray-400 font-medium uppercase tracking-[0.2em] -mt-1 hidden xs:block">
-              Task Management System
+              TaskDesk
             </p>
           </div>
           <div className="flex items-center gap-3">

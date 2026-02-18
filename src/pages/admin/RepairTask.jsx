@@ -68,7 +68,7 @@ function RepairTaskCard({ task, index, total, givenBy, userData, machineOptions,
             if (u.role !== 'user') return false;
 
             // If they are on leave, check the dates
-            if (u.status === 'on leave' && u.leave_date && u.leave_end_date) {
+            if ((u.status === 'on leave' || u.status === 'on_leave') && u.leave_date && u.leave_end_date) {
                 const leaveS = new Date(u.leave_date);
                 const leaveE = new Date(u.leave_end_date);
                 leaveS.setHours(0, 0, 0, 0);

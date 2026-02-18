@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { BellRing, FileCheck, Calendar, Wrench, X, Mic, Square, Trash2, Plus, Save, Loader2, CheckCircle2, Clock } from "lucide-react";
+import { BellRing, FileCheck, Calendar, Wrench, X, Mic, Square, Trash2, Plus, Save, Loader2, CheckCircle2, Clock, Play, Pause } from "lucide-react";
 import { ReactMediaRecorder } from "react-media-recorder";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { useDispatch, useSelector } from "react-redux";
@@ -20,7 +20,76 @@ const formatDateISO = (date) => {
     return `${year}-${month}-${day}`;
 };
 
+// --- AUDIO UTILITIES ---
+const isAudioUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    return url.startsWith('http') && (
+        url.includes('audio-recordings') ||
+        url.includes('voice-notes') ||
+        url.match(/\.(mp3|wav|ogg|webm|m4a|aac)(\?.*)?$/i)
+    );
+};
 
+const AudioPlayer = ({ url }) => {
+    const [isPlaying, setIsPlaying] = useState(false);
+    const audioRef = useRef(null);
+
+    const togglePlay = (e) => {
+        e.stopPropagation();
+        if (isPlaying) {
+            audioRef.current.pause();
+        } else {
+            audioRef.current.play();
+        }
+        setIsPlaying(!isPlaying);
+    };
+
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const handleEnded = () => setIsPlaying(false);
+        audio.addEventListener('ended', handleEnded);
+        return () => audio.removeEventListener('ended', handleEnded);
+    }, []);
+
+    return (
+        <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] ${isPlaying
+            ? 'bg-purple-50/80 border-purple-200 shadow-sm scale-[1.02]'
+            : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xs'
+            }`}>
+            <button
+                type="button"
+                onClick={togglePlay}
+                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
+                    ? 'bg-gradient-to-r from-rose-500 to-pink-600'
+                    : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:scale-110'
+                    }`}
+            >
+                {isPlaying ? (
+                    <Pause size={12} className="text-white fill-white" />
+                ) : (
+                    <Play size={12} className="text-white fill-white ml-0.5" />
+                )}
+            </button>
+            <div className="flex flex-col">
+                <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-purple-700' : 'text-gray-400'
+                    }`}>
+                    {isPlaying ? 'Playing...' : 'Voice Note'}
+                </span>
+                {isPlaying && (
+                    <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
+                        <div className="w-0.5 h-full bg-purple-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
+                        <div className="w-0.5 h-2/3 bg-purple-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
+                        <div className="w-0.5 h-full bg-purple-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
+                        <div className="w-0.5 h-2/3 bg-purple-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
+                    </div>
+                )}
+            </div>
+            <audio ref={audioRef} src={url} className="hidden" />
+        </div>
+    );
+};
 
 const defaultTask = () => ({
     id: Date.now() + Math.random(),
@@ -73,7 +142,7 @@ function MaintenanceTaskCard({
 
             if (user.status === 'inactive') return false;
 
-            if (user.status === 'on leave' && user.leave_date && user.leave_end_date) {
+            if ((user.status === 'on leave' || user.status === 'on_leave') && user.leave_date && user.leave_end_date) {
                 const leaveS = new Date(user.leave_date);
                 const leaveE = new Date(user.leave_end_date);
                 leaveS.setHours(0, 0, 0, 0);
@@ -292,7 +361,7 @@ function MaintenanceTaskCard({
                                                 <Trash2 className="w-3 h-3" /> Remove
                                             </button>
                                         </div>
-                                        <audio src={task.recordedAudio.blobUrl} controls className="w-full h-8" />
+                                        <AudioPlayer url={task.recordedAudio.blobUrl} />
                                     </div>
                                 )}
                             </div>

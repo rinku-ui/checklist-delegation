@@ -411,7 +411,7 @@ const AllTasks = () => {
 
       if (showHistory) {
         if (activeTab === "repair") {
-          query = query.neq("status", "Pending").order("submission_date", { ascending: false });
+          query = query.not("submission_date", "is", null).order("submission_date", { ascending: false });
         } else if (activeTab === "ea") {
           query = query.in("status", ["done", "approved"]).order("updated_at", { ascending: false });
         } else {
@@ -419,7 +419,7 @@ const AllTasks = () => {
         }
       } else {
         if (activeTab === "repair") {
-          query = query.eq("status", "Pending").order(dateColumn, { ascending: false });
+          query = query.is("submission_date", null).order(dateColumn, { ascending: false });
         } else if (activeTab === "ea") {
           query = query.in("status", ["pending", "extend", "extended"]).order("planned_date", { ascending: true });
         } else {
@@ -439,12 +439,6 @@ const AllTasks = () => {
           department: item.department || (activeTab === "ea" ? "EA" : "-")
         }));
 
-        // Debug logging for EA tasks
-        if (activeTab === "ea" && !showHistory) {
-          console.log("EA Pending Tasks - Raw data:", data);
-          console.log("EA Pending Tasks - Mapped data:", mappedData);
-          console.log("EA Pending Tasks - Status values:", mappedData.map(t => ({ id: t.id, status: t.status })));
-        }
 
         if (showHistory) {
           setHistoryData(mappedData);
@@ -524,7 +518,7 @@ const AllTasks = () => {
 
       return true;
     });
-  }, [tasks, searchTerm, activeTab, holidaysList]);
+  }, [tasks, searchTerm, activeTab, dateFilter]);
 
   const filteredHistoryTasks = useMemo(() => {
     const completionField = "submission_date";

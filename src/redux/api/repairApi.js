@@ -180,11 +180,10 @@ export const rejectRepairTask = async (id, reason) => {
             .from('repair_tasks')
             .update({
                 status: 'Pending',
-                // Clear submission details?
                 work_done: null,
                 work_photo_url: null,
                 bill_copy_url: null,
-                // remarks: reason // Maybe append reason to remarks?
+                remarks: reason
             })
             .eq('id', id)
             .select()

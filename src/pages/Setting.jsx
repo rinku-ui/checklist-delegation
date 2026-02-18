@@ -31,14 +31,19 @@ const Setting = () => {
 
   const [activeDeptSubTab, setActiveDeptSubTab] = useState('departments');
   // Leave Management State
-  const [leavePerson, setLeavePerson] = useState('');
+  const [leavePersonId, setLeavePersonId] = useState('');
+  const [leavePersonName, setLeavePersonName] = useState('');
+  const [leaveRemark, setLeaveRemark] = useState('');
   const [leaveStartDate, setLeaveStartDate] = useState('');
   const [leaveEndDate, setLeaveEndDate] = useState('');
   const [leaveTasks, setLeaveTasks] = useState([]);
   const [leaveTasksLoading, setLeaveTasksLoading] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
   const [shiftToPerson, setShiftToPerson] = useState('');
   const [leaveSubmitting, setLeaveSubmitting] = useState(false);
   const [leaveSuccess, setLeaveSuccess] = useState(false);
+  const [leaveUsernameFilter, setLeaveUsernameFilter] = useState('');
+  const [selectedUsers, setSelectedUsers] = useState([]);
   const [showStartCalendar, setShowStartCalendar] = useState(false);
   const [showEndCalendar, setShowEndCalendar] = useState(false);
   const [startCalendarPos, setStartCalendarPos] = useState({ top: 0, left: 0 });
@@ -48,213 +53,6 @@ const Setting = () => {
 
   const { userData, department, departmentsOnly, givenBy, customDropdowns, loading, error } = useSelector((state) => state.setting);
   const dispatch = useDispatch();
-  // Add this function to fetch device logs and update user status
-  // Add this function to fetch device logs from both APIs and update user status
-  // Fix the fetchDeviceLogsAndUpdateStatus function
-  // const fetchDeviceLogsAndUpdateStatus = async () => {
-  //   try {
-  //     setIsRefreshing(true);
-  //     const today = new Date().toISOString().split('T')[0];
-
-  //     const IN_API_URL = `http://139.167.179.193:90/api/v2/WebAPI/GetDeviceLogs?APIKey=205511032522&SerialNumber=E03C1CB34D83AA02&FromDate=${today}&ToDate=${today}`;
-  //     const OUT_API_URL = `http://139.167.179.193:90/api/v2/WebAPI/GetDeviceLogs?APIKey=205511032522&SerialNumber=E03C1CB36042AA02&FromDate=${today}&ToDate=${today}`;
-
-  //     const [inResponse, outResponse] = await Promise.all([
-  //       fetch(IN_API_URL),
-  //       fetch(OUT_API_URL)
-  //     ]);
-
-  //     const inLogs = await inResponse.json();
-  //     const outLogs = await outResponse.json();
-
-  //     const allLogs = [...inLogs, ...outLogs];
-
-  //     // Sort logs by date
-  //     allLogs.sort((a, b) => new Date(a.LogDate) - new Date(b.LogDate));
-
-  //     // Process logs to calculate status based on 8-hour rule
-  //     const employeeStatus = {};
-
-  //     allLogs.forEach(log => {
-  //       const employeeCode = log.EmployeeCode;
-  //       const punchDirection = log.PunchDirection?.toLowerCase();
-  //       const logDate = new Date(log.LogDate);
-
-  //       if (!employeeStatus[employeeCode]) {
-  //         employeeStatus[employeeCode] = {
-  //           lastInTime: null,
-  //           lastOutTime: null,
-  //           status: 'inactive',
-  //           logDate: log.LogDate,
-  //           serialNumber: log.SerialNumber
-  //         };
-  //       }
-
-  //       if (punchDirection === 'in') {
-  //         employeeStatus[employeeCode].lastInTime = logDate;
-  //         employeeStatus[employeeCode].status = 'active';
-  //         employeeStatus[employeeCode].logDate = log.LogDate;
-  //         employeeStatus[employeeCode].serialNumber = log.SerialNumber;
-  //       } else if (punchDirection === 'out') {
-  //         employeeStatus[employeeCode].lastOutTime = logDate;
-  //         employeeStatus[employeeCode].logDate = log.LogDate;
-  //         employeeStatus[employeeCode].serialNumber = log.SerialNumber;
-
-  //         // Check if there was a previous "in" punch
-  //         if (employeeStatus[employeeCode].lastInTime) {
-  //           const timeDiffMs = logDate - employeeStatus[employeeCode].lastInTime;
-  //           const timeDiffHours = timeDiffMs / (1000 * 60 * 60);
-
-  //           // Only mark as inactive if time difference is greater than 8 hours
-  //           if (timeDiffHours > 8) {
-  //             employeeStatus[employeeCode].status = 'inactive';
-  //           } else {
-  //             // If less than 8 hours, keep as active
-  //             employeeStatus[employeeCode].status = 'active';
-  //           }
-  //         } else {
-  //           // If no "in" punch found before "out", mark as inactive
-  //           employeeStatus[employeeCode].status = 'inactive';
-  //         }
-  //       }
-  //     });
-
-  //     // Update users in database
-  //     const updatePromises = Object.entries(employeeStatus).map(async ([employeeCode, statusInfo]) => {
-  //       try {
-  //         const { data: users, error: userError } = await supabase
-  //           .from('users')
-  //           .select('*')
-  //           .eq('employee_id', employeeCode);
-
-  //         if (userError) {
-  //           console.error('Error finding user:', userError);
-  //           return;
-  //         }
-
-  //         if (users && users.length > 0) {
-  //           const user = users[0];
-
-  //           // Only update if status changed
-  //           if (user.status !== statusInfo.status) {
-  //             const updateData = {
-  //               status: statusInfo.status
-  //             };
-
-  //             const { data, error } = await supabase
-  //               .from('users')
-  //               .update(updateData)
-  //               .eq('id', user.id);
-
-  //             if (error) {
-  //               console.error(`Error updating user ${user.user_name}:`, error);
-  //             }
-  //           }
-  //         }
-  //       } catch (error) {
-  //         console.error(`Error processing employee ${employeeCode}:`, error);
-  //       }
-  //     });
-
-  //     await Promise.all(updatePromises);
-  //     dispatch(userDetails());
-
-  //   } catch (error) {
-  //     console.error('Error fetching device logs:', error);
-  //   } finally {
-  //     setIsRefreshing(false);
-  //   }
-  // };
-
-
-
-  // Simplified status logic: IN = active, OUT = inactive (today's date only)
-  // const fetchDeviceLogsAndUpdateStatus = async () => {
-  //   try {
-  //     setIsRefreshing(true);
-  //     const today = new Date().toISOString().split('T')[0];
-
-  //     const IN_API_URL = `http://139.167.179.193:90/api/v2/WebAPI/GetDeviceLogs?APIKey=205511032522&SerialNumber=E03C1CB34D83AA02&FromDate=${today}&ToDate=${today}`;
-  //     const OUT_API_URL = `http://139.167.179.193:90/api/v2/WebAPI/GetDeviceLogs?APIKey=205511032522&SerialNumber=E03C1CB36042AA02&FromDate=${today}&ToDate=${today}`;
-
-  //     const [inResponse, outResponse] = await Promise.all([
-  //       fetch(IN_API_URL),
-  //       fetch(OUT_API_URL)
-  //     ]);
-
-  //     const inLogs = await inResponse.json();
-  //     const outLogs = await outResponse.json();
-
-  //     const allLogs = [...inLogs, ...outLogs];
-
-  //     // Sort logs by date (latest first)
-  //     allLogs.sort((a, b) => new Date(b.LogDate) - new Date(a.LogDate));
-
-  //     // Simple logic: Check latest punch for each employee
-  //     const employeeStatus = {};
-
-  //     allLogs.forEach(log => {
-  //       const employeeCode = log.EmployeeCode;
-  //       const punchDirection = log.PunchDirection?.toLowerCase();
-
-  //       // Only process if this employee hasn't been processed yet (we want the latest punch)
-  //       if (!employeeStatus[employeeCode]) {
-  //         // Simple rule: IN = active, OUT = inactive
-  //         employeeStatus[employeeCode] = {
-  //           status: punchDirection === 'in' ? 'active' : 'inactive',
-  //           logDate: log.LogDate,
-  //           serialNumber: log.SerialNumber
-  //         };
-  //       }
-  //     });
-
-  //     // Update users in database
-  //     const updatePromises = Object.entries(employeeStatus).map(async ([employeeCode, statusInfo]) => {
-  //       try {
-  //         const { data: users, error: userError } = await supabase
-  //           .from('users')
-  //           .select('*')
-  //           .eq('employee_id', employeeCode);
-
-  //         if (userError) {
-  //           console.error('Error finding user:', userError);
-  //           return;
-  //         }
-
-  //         if (users && users.length > 0) {
-  //           const user = users[0];
-
-  //           // Only update if status changed
-  //           if (user.status !== statusInfo.status) {
-  //             const updateData = {
-  //               status: statusInfo.status
-  //             };
-
-  //             const { data, error } = await supabase
-  //               .from('users')
-  //               .update(updateData)
-  //               .eq('id', user.id);
-
-  //             if (error) {
-  //               console.error(`Error updating user ${user.user_name}:`, error);
-  //             }
-  //           }
-  //         }
-  //       } catch (error) {
-  //         console.error(`Error processing employee ${employeeCode}:`, error);
-  //       }
-  //     });
-
-  //     await Promise.all(updatePromises);
-  //     dispatch(userDetails());
-
-  //   } catch (error) {
-  //     console.error('Error fetching device logs:', error);
-  //   } finally {
-  //     setIsRefreshing(false);
-  //   }
-  // };
-
 
 
   const fetchDeviceLogsAndUpdateStatus = async () => {
@@ -329,7 +127,7 @@ const Setting = () => {
       const updatePromises = Object.entries(employeeStatus).map(async ([employeeCode, statusInfo]) => {
         if (!userData || !Array.isArray(userData)) return;
         const user = userData.find(u => u.employee_id === employeeCode);
-        if (user && user.status !== statusInfo.status && user.status !== 'on leave') {
+        if (user && user.status !== statusInfo.status && user.status !== 'on leave' && user.status !== 'on_leave') {
           const { error } = await supabase
             .from('users')
             .update({ status: statusInfo.status })
@@ -385,52 +183,10 @@ const Setting = () => {
     };
   }, [dispatch]);
 
-  // Add this function to debug a specific user
-  const debugUserStatus = async () => {
-    try {
-      const { data: users, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('user_name', 'Hem Kumar Jagat');
-
-      if (error) {
-        console.error('Error fetching user:', error);
-        return;
-      }
-
-      if (users && users.length > 0) {
-        const user = users[0];
-        // console.log('🔍 DEBUG - Hem Kumar Jagat:', {
-        //   id: user.id,
-        //   username: user.user_name,
-        //   employee_id: user.employee_id,
-        //   current_status: user.status,
-        //   last_punch_time: user.last_punch_time,
-        //   last_punch_device: user.last_punch_device
-        // });
-      } else {
-        console.log('User "Hem Kumar Jagat" not found');
-      }
-    } catch (error) {
-      console.error('Error in debug:', error);
-    }
-  };
-
-  // Call this to check the current status
-  // debugUserStatus();
 
   // Add manual refresh button handler
   const handleManualRefresh = () => {
     fetchDeviceLogsAndUpdateStatus();
-  };
-
-  // Your existing functions remain the same...
-  const handleLeaveUsernameFilter = (username) => {
-    setLeaveUsernameFilter(username);
-  };
-
-  const clearLeaveUsernameFilter = () => {
-    setLeaveUsernameFilter('');
   };
 
   const handleUsernameFilterSelect = (username) => {
@@ -447,7 +203,6 @@ const Setting = () => {
     setUsernameDropdownOpen(!usernameDropdownOpen);
   };
 
-
   const handleAddButtonClick = () => {
     if (activeTab === 'users') {
       resetUserForm();
@@ -459,27 +214,9 @@ const Setting = () => {
     // No action for leave tab
   };
 
-
-
-  const handleUserSelection = (userId, isSelected) => {
-    if (isSelected) {
-      setSelectedUsers(prev => [...prev, userId]);
-    } else {
-      setSelectedUsers(prev => prev.filter(id => id !== userId));
-    }
-  };
-
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedUsers(filteredLeaveUsers.map(user => user.id));
-    } else {
-      setSelectedUsers([]);
-    }
-  };
-
   // Fetch tasks for the person on leave within the date range
   const handleFetchLeaveTasks = async () => {
-    if (!leavePerson || !leaveStartDate || !leaveEndDate) {
+    if (!leavePersonName || !leaveStartDate || !leaveEndDate) {
       alert('Please select a person and both start and end dates');
       return;
     }
@@ -489,15 +226,16 @@ const Setting = () => {
     }
     setLeaveTasksLoading(true);
     setLeaveTasks([]);
+    setHasFetched(false);
     setLeaveSuccess(false);
     try {
       const startISO = `${leaveStartDate}T00:00:00`;
       const endISO = `${leaveEndDate}T23:59:59`;
 
       const [{ data: checklistTasks }, { data: delegationTasks }] = await Promise.all([
-        supabase.from('checklist').select('*').eq('name', leavePerson)
+        supabase.from('checklist').select('*').eq('name', leavePersonName)
           .gte('task_start_date', startISO).lte('task_start_date', endISO).is('submission_date', null),
-        supabase.from('delegation').select('*').eq('name', leavePerson)
+        supabase.from('delegation').select('*').eq('name', leavePersonName)
           .gte('task_start_date', startISO).lte('task_start_date', endISO).is('submission_date', null)
       ]);
 
@@ -506,6 +244,7 @@ const Setting = () => {
         ...(delegationTasks || []).map(t => ({ ...t, _table: 'delegation', id: t.task_id }))
       ];
       setLeaveTasks(combined);
+      setHasFetched(true);
     } catch (err) {
       console.error('Error fetching leave tasks:', err);
     } finally {
@@ -522,8 +261,8 @@ const Setting = () => {
     }
 
     const confirmMsg = leaveTasks.length > 0
-      ? `Shift ${leaveTasks.length} task(s) from "${leavePerson}" to "${shiftToPerson}" and mark "${leavePerson}" as On Leave?`
-      : `Mark "${leavePerson}" as On Leave? (No tasks found to shift)`;
+      ? `Shift ${leaveTasks.length} task(s) from "${leavePersonName}" to "${shiftToPerson}" and mark "${leavePersonName}" as On Leave?`
+      : `Mark "${leavePersonName}" as On Leave? (No tasks found to shift)`;
 
     if (!window.confirm(confirmMsg)) return;
 
@@ -532,35 +271,35 @@ const Setting = () => {
       const checklistIds = leaveTasks.filter(t => t._table === 'checklist').map(t => t.task_id);
       const delegationIds = leaveTasks.filter(t => t._table === 'delegation').map(t => t.task_id);
 
-      const updates = [];
-
       // Update User Status and Leave Dates
-      updates.push(supabase
+      const { error: userUpdateError } = await supabase
         .from('users')
         .update({
-          status: 'on leave',
+          status: 'on_leave',
           leave_date: leaveStartDate,
-          leave_end_date: leaveEndDate
+          leave_end_date: leaveEndDate,
+          remark: leaveRemark || 'Shifted tasks'
         })
-        .eq('user_name', leavePerson)
-      );
+        .eq('id', leavePersonId);
+
+      if (userUpdateError) throw userUpdateError;
 
       // Update Tasks (If any)
       if (checklistIds.length > 0) {
-        updates.push(supabase.from('checklist').update({ name: shiftToPerson }).in('task_id', checklistIds));
+        const { error: checklistError } = await supabase.from('checklist').update({ name: shiftToPerson }).in('task_id', checklistIds);
+        if (checklistError) console.error('Error updating checklist tasks:', checklistError);
       }
       if (delegationIds.length > 0) {
-        updates.push(supabase.from('delegation').update({ name: shiftToPerson }).in('task_id', delegationIds));
+        const { error: delegationError } = await supabase.from('delegation').update({ name: shiftToPerson }).in('task_id', delegationIds);
+        if (delegationError) console.error('Error updating delegation tasks:', delegationError);
       }
-
-      await Promise.all(updates);
 
       // Send WhatsApp Notifications for shifted tasks
       if (leaveTasks.length > 0) {
         for (const task of leaveTasks) {
           await sendTaskReassignmentNotification({
             newDoerName: shiftToPerson,
-            originalDoerName: leavePerson,
+            originalDoerName: leavePersonName,
             taskId: task.task_id,
             description: task.task_description,
             startDate: task.task_start_date ? new Date(task.task_start_date).toLocaleDateString('en-IN') : 'N/A',
@@ -574,6 +313,7 @@ const Setting = () => {
       setLeaveSuccess(true);
       setLeaveTasks([]);
       setShiftToPerson('');
+      setLeaveRemark('');
       // Re-fetch user details to reflect the "on leave" status immediately
       dispatch(userDetails());
     } catch (err) {
@@ -585,12 +325,15 @@ const Setting = () => {
   };
 
   const handleResetLeave = () => {
-    setLeavePerson('');
+    setLeavePersonId('');
+    setLeavePersonName('');
+    setLeaveRemark('');
     setLeaveStartDate('');
     setLeaveEndDate('');
     setLeaveTasks([]);
     setShiftToPerson('');
     setLeaveSuccess(false);
+    setHasFetched(false);
   };
 
   // Add to your existing handleTabChange function
@@ -710,7 +453,7 @@ const Setting = () => {
       await dispatch(createUser(newUser)).unwrap();
       resetUserForm();
       setShowUserModal(false);
-      // setTimeout(() => window.location.reload(), 1000);
+      dispatch(userDetails()); // Explicitly refresh user details
     } catch (error) {
       console.error('Error adding user:', error);
     }
@@ -737,7 +480,7 @@ const Setting = () => {
       await dispatch(updateUser({ id: currentUserId, updatedUser })).unwrap();
       resetUserForm();
       setShowUserModal(false);
-      // setTimeout(() => window.location.reload(), 1000);
+      dispatch(userDetails()); // Explicitly refresh user details
     } catch (error) {
       console.error('Error updating user:', error);
     }
@@ -755,6 +498,7 @@ const Setting = () => {
         })).unwrap();
         resetDeptForm();
         setShowDeptModal(false);
+        dispatch(customDropdownDetails()); // Explicitly refresh custom dropdowns
       } catch (error) {
         console.error('Error updating category:', error);
       }
@@ -770,6 +514,7 @@ const Setting = () => {
           await dispatch(updateDepartment({ id: currentDeptId, updatedDept })).unwrap();
           resetDeptForm();
           setShowDeptModal(false);
+          dispatch(departmentDetails()); // Explicitly refresh department details
         } catch (error) {
           console.error('Error updating department:', error);
         }
@@ -781,6 +526,7 @@ const Setting = () => {
           })).unwrap();
           resetDeptForm();
           setShowDeptModal(false);
+          dispatch(givenByDetails()); // Explicitly refresh givenBy details
         } catch (error) {
           console.error('Error updating assign_from:', error);
         }
@@ -823,6 +569,7 @@ const Setting = () => {
 
         resetDeptForm();
         setShowDeptModal(false);
+        dispatch(customDropdownDetails()); // Explicitly refresh custom dropdowns
       } catch (error) {
         console.error('Error adding category option:', error);
       }
@@ -835,6 +582,7 @@ const Setting = () => {
           await dispatch(createAssignFrom({ given_by: deptForm.name })).unwrap(); // Changed to createAssignFrom
           resetDeptForm();
           setShowDeptModal(false);
+          dispatch(givenByDetails()); // Explicitly refresh givenBy details
         } catch (error) {
           console.error('Error adding assign_from:', error);
         }
@@ -843,6 +591,7 @@ const Setting = () => {
           await dispatch(createDepartment({ department: deptForm.name })).unwrap(); // Pass department only
           resetDeptForm();
           setShowDeptModal(false);
+          dispatch(departmentDetails()); // Explicitly refresh department details
         } catch (error) {
           console.error('Error adding department:', error);
         }
@@ -855,6 +604,7 @@ const Setting = () => {
     if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       try {
         await dispatch(deleteUser(userId)).unwrap();
+        dispatch(userDetails()); // Explicitly refresh user details
       } catch (error) {
         console.error('Error deleting user:', error);
       }
@@ -1010,10 +760,9 @@ const Setting = () => {
 
   const getStatusColor = (status) => {
     if (status === 'active') return 'bg-green-100 text-green-800';
-    if (status === 'on leave') return 'bg-amber-100 text-amber-800';
+    if (status === 'on leave' || status === 'on_leave') return 'bg-amber-100 text-amber-800';
     return 'bg-red-100 text-red-800';
   };
-
   const getRoleColor = (role) => {
     switch (role) {
       case 'admin': return 'bg-blue-100 text-blue-800';
@@ -1138,13 +887,33 @@ const Setting = () => {
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Person on Leave</label>
                     <select
-                      value={leavePerson}
-                      onChange={e => { setLeavePerson(e.target.value); setLeaveTasks([]); setLeaveSuccess(false); }}
+                      value={leavePersonId}
+                      onChange={e => {
+                        const id = e.target.value;
+                        const user = userData.find(u => u.id.toString() === id.toString());
+                        setLeavePersonId(id);
+                        setLeavePersonName(user ? user.user_name : '');
+                        setLeaveTasks([]);
+                      }}
                       className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-gray-50"
                     >
                       <option value="">Select person...</option>
-                      {userNames.map(name => <option key={name} value={name}>{name}</option>)}
+                      {userData && [...userData].sort((a, b) => a.user_name.localeCompare(b.user_name)).map(user => (
+                        <option key={user.id} value={user.id}>{user.user_name}</option>
+                      ))}
                     </select>
+                  </div>
+
+                  {/* Remark Field */}
+                  <div className="md:col-span-2 relative">
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Leave Remark / Reason</label>
+                    <input
+                      type="text"
+                      value={leaveRemark}
+                      onChange={e => setLeaveRemark(e.target.value)}
+                      placeholder="e.g. Family function, Sick leave..."
+                      className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-gray-50"
+                    />
                   </div>
 
                   {/* Leave Start Date */}
@@ -1213,7 +982,7 @@ const Setting = () => {
                   <div className="flex items-end">
                     <button
                       onClick={handleFetchLeaveTasks}
-                      disabled={leaveTasksLoading || !leavePerson || !leaveStartDate || !leaveEndDate}
+                      disabled={leaveTasksLoading || !leavePersonName || !leaveStartDate || !leaveEndDate}
                       className="w-full py-2.5 px-4 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {leaveTasksLoading ? (
@@ -1243,7 +1012,7 @@ const Setting = () => {
                   <div>
                     <h3 className="text-base font-bold text-blue-800">Tasks During Leave Period</h3>
                     <p className="text-xs text-blue-500 mt-0.5">
-                      {leaveTasks.length} task(s) found for <strong>{leavePerson}</strong> between {leaveStartDate} and {leaveEndDate}
+                      {leaveTasks.length} task(s) found for <strong>{leavePersonName}</strong> between {leaveStartDate} and {leaveEndDate}
                     </p>
                   </div>
 
@@ -1256,7 +1025,7 @@ const Setting = () => {
                         className="border border-blue-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white min-w-[180px]"
                       >
                         <option value="">Shift to person...</option>
-                        {userNames.filter(n => n !== leavePerson).map(name => (
+                        {userNames.filter(n => n !== leavePersonName).map(name => (
                           <option key={name} value={name}>{name}</option>
                         ))}
                       </select>
@@ -1312,11 +1081,11 @@ const Setting = () => {
             )}
 
             {/* Empty state after fetch */}
-            {!leaveTasksLoading && leavePerson && leaveStartDate && leaveEndDate && leaveTasks.length === 0 && !leaveSuccess && (
+            {!leaveTasksLoading && hasFetched && leavePersonName && leaveStartDate && leaveEndDate && leaveTasks.length === 0 && !leaveSuccess && (
               <div className="bg-white border border-gray-200 rounded-xl px-6 py-10 text-center">
                 <Calendar size={36} className="mx-auto text-gray-300 mb-3" />
                 <p className="text-gray-500 font-medium">No pending tasks found</p>
-                <p className="text-gray-400 text-sm mt-1">There are no pending tasks for <strong>{leavePerson}</strong> between the selected dates.</p>
+                <p className="text-gray-400 text-sm mt-1">There are no pending tasks for <strong>{leavePersonName}</strong> between the selected dates.</p>
                 <button
                   onClick={handleShiftTasks}
                   disabled={leaveSubmitting}
@@ -1420,18 +1189,26 @@ const Setting = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col">
                               <div className="flex items-center">
-                                <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(user?.status)}`}>
-                                  {user?.status}
+                                <span className={`px-2 py-1 inline-flex text-[10px] leading-4 font-bold rounded-full uppercase tracking-wider ${getStatusColor(user?.status)}`}>
+                                  {user?.status === 'on_leave' ? 'On Leave' : user?.status}
                                 </span>
                                 {user?.status === 'active' && (
-                                  <span className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live Status"></span>
+                                  <span className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-sm shadow-green-200" title="Live Status"></span>
                                 )}
                               </div>
-                              {user?.status === 'on leave' && user?.leave_date && (
-                                <span className="text-[10px] text-amber-600 font-medium mt-1">
-                                  {new Date(user.leave_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                  {user.leave_end_date ? ` to ${new Date(user.leave_end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
-                                </span>
+                              {(user?.status === 'on leave' || user?.status === 'on_leave') && user?.leave_date && (
+                                <div className="flex flex-col mt-1 space-y-0.5">
+                                  <span className="text-[10px] text-amber-700 font-bold flex items-center gap-1">
+                                    <Calendar size={10} />
+                                    {new Date(user.leave_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                    {user.leave_end_date ? ` - ${new Date(user.leave_end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+                                  </span>
+                                  {user.remark && (
+                                    <span className="text-[9px] text-gray-400 italic font-medium truncate max-w-[120px]" title={user.remark}>
+                                      {user.remark}
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </td>
@@ -1894,7 +1671,7 @@ const Setting = () => {
                           >
                             <option value="active">Active</option>
                             <option value="inactive">Inactive</option>
-                            <option value="on leave">On Leave</option>
+                            <option value="on_leave">On Leave</option>
                           </select>
                         </div>
 

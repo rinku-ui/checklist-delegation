@@ -13,12 +13,6 @@ const WHATSAPP_PHONE_NUMBER_ID = import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_ACCESS_TOKEN = import.meta.env.VITE_WHATSAPP_ACCESS_TOKEN;
 const WHATSAPP_PRODUCT_ID = import.meta.env.VITE_WHATSAPP_PRODUCT_ID;
 
-console.log('WhatsApp Service Config (Maytapi):', {
-    hasToken: !!WHATSAPP_ACCESS_TOKEN,
-    hasPhoneId: !!WHATSAPP_PHONE_NUMBER_ID,
-    hasProductId: !!WHATSAPP_PRODUCT_ID,
-    apiUrl: WHATSAPP_API_URL
-});
 
 /**
  * Format phone number to international format
@@ -79,12 +73,6 @@ const getUserPhoneNumber = async (username) => {
 const sendWhatsAppMessage = async (phoneNumber, message) => {
     try {
         const formattedPhone = formatPhoneNumber(phoneNumber);
-        console.log('WhatsApp Service Config (Sending):', {
-            token: !!WHATSAPP_ACCESS_TOKEN,
-            phoneId: !!WHATSAPP_PHONE_NUMBER_ID,
-            product: !!WHATSAPP_PRODUCT_ID
-        });
-
         if (!formattedPhone) {
             console.error('Invalid phone number:', phoneNumber);
             return false;
@@ -100,7 +88,6 @@ const sendWhatsAppMessage = async (phoneNumber, message) => {
         }
 
         const url = `${WHATSAPP_API_URL}/${WHATSAPP_PRODUCT_ID}/${WHATSAPP_PHONE_NUMBER_ID}/sendMessage`;
-        console.log(`Posting to Maytapi: ${url}`);
 
         const response = await fetch(url, {
             method: 'POST',
@@ -155,7 +142,6 @@ const sendWhatsAppVoiceMessage = async (phoneNumber, audioUrl) => {
         }
 
         const url = `${WHATSAPP_API_URL}/${WHATSAPP_PRODUCT_ID}/${WHATSAPP_PHONE_NUMBER_ID}/sendMessage`;
-        console.log(`Posting Voice Note to Maytapi: ${url}`);
 
         const response = await fetch(url, {
             method: 'POST',
@@ -616,7 +602,7 @@ export const sendTaskReminderNotification = async (taskDetails) => {
             `📝 ${description}\n` +
             `📅 Due: ${formattedDate}\n\n` +
             `Please complete it as soon as possible.\n\n` +
-            `_Task Management System_`;
+            `_Acemark Stationers_`;
 
         return await sendWhatsAppMessage(phoneNumber, message);
     } catch (error) {
@@ -650,7 +636,7 @@ export const sendTaskCompletionNotification = async (taskDetails) => {
             `${doerName} has completed the task:\n\n` +
             `📝 ${description}\n` +
             `⏱️ Completed at: ${formattedDate}\n\n` +
-            `_Task Management System_`;
+            `_Acemark Stationers_`;
 
         return await sendWhatsAppMessage(phoneNumber, message);
     } catch (error) {
@@ -752,7 +738,6 @@ export default {
     sendEATaskNotification,
     sendDelegationTaskNotification,
     sendTaskReminderNotification,
-    sendTaskCompletionNotification,
     sendTaskCompletionNotification,
     sendTaskRejectionNotification,
     sendTaskReassignmentNotification

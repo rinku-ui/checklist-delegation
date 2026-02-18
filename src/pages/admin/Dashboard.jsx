@@ -673,10 +673,15 @@ export default function AdminDashboard() {
             // For repair/maintenance, use the explicit status if available, fallback to calculated
             if (task.status) {
               const taskStatus = task.status.toLowerCase();
-              if (taskStatus === 'done' || taskStatus === 'yes' || taskStatus === 'completed') {
+              if (taskStatus.includes('done') || taskStatus.includes('yes') || taskStatus.includes('completed') || taskStatus.includes('approved')) {
+                // If it's finalized (Approved) or completed by user but we want to show it as completed in dashboard
                 status = 'completed';
+              } else if (taskStatus.includes('pending') && !taskStatus.includes('approval')) {
+                status = 'pending';
+              } else if (taskStatus.includes('overdue')) {
+                status = 'overdue';
               } else {
-                status = taskStatus;
+                status = taskStatus; // e.g. 'pending approval', 'observation', etc.
               }
             }
           }

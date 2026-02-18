@@ -80,6 +80,27 @@ const AudioPlayer = ({ url }) => {
   );
 };
 
+const RenderDescription = ({ text }) => {
+  if (!text) return "—";
+
+  const urlRegex = /(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|wav|ogg|webm|m4a|aac)(\?.*)?)/i;
+  const match = text && text.match(urlRegex);
+
+  if (match) {
+    const url = match[0];
+    const cleanText = text.replace(url, '').replace(/Voice Note Link:/i, '').replace(/Voice Note:/i, '').trim();
+
+    return (
+      <div className="flex flex-col gap-2 min-w-[200px]">
+        {cleanText && <span className="whitespace-pre-wrap text-[11px] font-bold text-gray-700">{cleanText}</span>}
+        <AudioPlayer url={url} />
+      </div>
+    );
+  }
+
+  return <span className="whitespace-pre-wrap text-[11px] font-bold text-gray-700" title={text}>{text}</span>;
+};
+
 export default function QuickTask() {
   const [tasks, setTasks] = useState([]);
   const [delegationLoading, setDelegationLoading] = useState(false);
@@ -718,6 +739,7 @@ export default function QuickTask() {
                         { key: 'frequency', label: 'Frequency' },
                         { key: 'enable_reminder', label: 'Reminders' },
                         { key: 'require_attachment', label: 'Attachment' },
+                        { key: 'remarks', label: 'Remarks' },
                         { key: 'actions', label: 'Actions' },
                       ].map((column) => (
                         <th
@@ -769,7 +791,13 @@ export default function QuickTask() {
                                         {isAudioUrl(editFormData.task_description) ? (
                                           <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-2">
                                             <div className="flex items-center justify-between mb-2">
-                                              <span className="text-[10px] font-bold text-indigo-600 uppercase">Existing Audio</span>
+                                              {isAudioUrl(task.task_description) ? (
+                                                <AudioPlayer url={task.task_description} />
+                                              ) : (
+                                                <span className="text-[11px] font-bold text-gray-700 block py-1 line-clamp-2" title={task.task_description}>
+                                                  {task.task_description}
+                                                </span>
+                                              )}
                                               <button
                                                 type="button"
                                                 onClick={() => handleInputChange('task_description', '')}
@@ -837,7 +865,7 @@ export default function QuickTask() {
                                             <Trash2 size={10} /> Remove
                                           </button>
                                         </div>
-                                        <audio src={recordedAudio.blobUrl} controls className="w-full h-8 mt-1" />
+                                        <AudioPlayer url={recordedAudio.blobUrl} />
                                       </div>
                                     )}
                                   </div>
@@ -845,11 +873,7 @@ export default function QuickTask() {
                               />
                             ) : (
                               <div className="whitespace-normal break-words">
-                                {isAudioUrl(task.task_description) ? (
-                                  <AudioPlayer url={task.task_description} />
-                                ) : (
-                                  task.task_description
-                                )}
+                                <RenderDescription text={task.task_description} />
                               </div>
                             )}
                           </td>
@@ -985,6 +1009,20 @@ export default function QuickTask() {
                             )}
                           </td>
 
+                          {/* Remarks */}
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {editingTaskId === task.id ? (
+                              <input
+                                type="text"
+                                value={editFormData.remark || ''}
+                                onChange={(e) => handleInputChange('remark', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              />
+                            ) : (
+                              task.remark || "—"
+                            )}
+                          </td>
+
                           {/* Actions */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
@@ -1103,11 +1141,7 @@ export default function QuickTask() {
                                 rows="3"
                               />
                             ) : (
-                              isAudioUrl(task.task_description) ? (
-                                <AudioPlayer url={task.task_description} />
-                              ) : (
-                                <div className="whitespace-normal break-words">{task.task_description}</div>
-                              )
+                              <RenderDescription text={task.task_description || task.work_description} />
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

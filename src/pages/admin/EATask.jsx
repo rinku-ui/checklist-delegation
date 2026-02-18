@@ -61,7 +61,7 @@ function TaskCard({ task, index, total, allDoers, onUpdate, onRemove }) {
             if (d.status === 'inactive') return false;
 
             // Leave filter
-            if (d.status === 'on leave' && d.leave_date && d.leave_end_date) {
+            if ((d.status === 'on leave' || d.status === 'on_leave') && d.leave_date && d.leave_end_date) {
                 const leaveS = new Date(d.leave_date);
                 const leaveE = new Date(d.leave_end_date);
                 leaveS.setHours(0, 0, 0, 0);

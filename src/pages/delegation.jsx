@@ -209,6 +209,21 @@ function DelegationDataPage() {
     setUsername(user || "");
   }, []);
 
+  // Initialize remarksData from delegation tasks (e.g., to show rejection reasons)
+  useEffect(() => {
+    if (delegation && delegation.length > 0) {
+      setRemarksData(prev => {
+        const newRemarks = { ...prev };
+        delegation.forEach(task => {
+          if (task.remarks && !newRemarks[task.id]) {
+            newRemarks[task.id] = task.remarks;
+          }
+        });
+        return newRemarks;
+      });
+    }
+  }, [delegation]);
+
   const parseGoogleSheetsDateTime = useCallback(
     (dateTimeStr) => {
       if (!dateTimeStr) return "";
@@ -832,7 +847,7 @@ function DelegationDataPage() {
                   <button
                     onClick={handleSendUrgentWhatsApp}
                     disabled={selectedItems.size === 0 || isSubmitting}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm sm:text-base font-medium text-white bg-amber-500 rounded-md hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all h-10"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm sm:text-base font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all h-10"
                     title="Send Urgent WhatsApp"
                   >
                     <BellRing className="h-4 w-4" />

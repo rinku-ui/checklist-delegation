@@ -118,7 +118,6 @@ export default function AdminApprovalPage() {
         }
 
         try {
-            console.log("Approving task:", task);
             if (activeTab === "delegation") {
                 await dispatch(updateDelegationDoneStatus({
                     id: task.id,
@@ -155,7 +154,6 @@ export default function AdminApprovalPage() {
 
         setProcessingId(task.id);
         try {
-            console.log("Rejecting task:", task);
             if (activeTab === "delegation") {
                 await rejectDelegationTask(task.id, task.task_id, reason);
             } else if (activeTab === "maintenance") {
@@ -279,8 +277,8 @@ export default function AdminApprovalPage() {
                             <button
                                 onClick={() => setViewMode("pending")}
                                 className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${viewMode === "pending"
-                                        ? "bg-white text-gray-800 shadow-sm"
-                                        : "text-gray-500 hover:text-gray-700"
+                                    ? "bg-white text-gray-800 shadow-sm"
+                                    : "text-gray-500 hover:text-gray-700"
                                     }`}
                             >
                                 <Clock size={14} />
@@ -289,8 +287,8 @@ export default function AdminApprovalPage() {
                             <button
                                 onClick={() => setViewMode("history")}
                                 className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${viewMode === "history"
-                                        ? "bg-white text-gray-800 shadow-sm"
-                                        : "text-gray-500 hover:text-gray-700"
+                                    ? "bg-white text-gray-800 shadow-sm"
+                                    : "text-gray-500 hover:text-gray-700"
                                     }`}
                             >
                                 <History size={14} />
@@ -428,9 +426,15 @@ export default function AdminApprovalPage() {
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                        Approved
-                                                    </span>
+                                                    task.rejection_reason ? (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800" title={task.rejection_reason}>
+                                                            Rejected
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                            Approved
+                                                        </span>
+                                                    )
                                                 )}
                                             </td>
                                         </tr>

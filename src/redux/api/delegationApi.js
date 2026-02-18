@@ -442,7 +442,7 @@ export const rejectDelegationTask = async (id, taskId, reason) => {
     // 1. Mark delegation_done as rejected
     const { error: doneError } = await supabase
       .from('delegation_done')
-      .update({ status: 'rejected', remarks: reason })
+      .update({ status: 'rejected' })
       .eq('id', id);
 
     if (doneError) throw doneError;
@@ -453,7 +453,8 @@ export const rejectDelegationTask = async (id, taskId, reason) => {
       .update({
         status: 'pending',
         submission_date: null,
-        admin_done: false
+        admin_done: false,
+        remarks: reason
       })
       .eq('task_id', taskId);
 

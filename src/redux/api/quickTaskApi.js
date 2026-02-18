@@ -482,12 +482,7 @@ export const rejectChecklistTask = async (id, reason) => {
       .update({
         admin_done: false,
         submission_date: null,
-        // Reset confirmation fields?
-        // Note: We keep the task but reset submission status
-        // Optionally clear image_url if needed, but maybe keep it for reference?
-        // If we want it "pending", submission_date must be null.
-        // It's better to clear proof if it was rejected?
-        // Let's assume we reset it completely so they can submit again.
+        remark: reason,
       })
       .eq('task_id', id)
       .select()

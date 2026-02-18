@@ -128,11 +128,15 @@ export default function RepairView({ tasks = [] }) {
 
     const getStatusColor = (status, admin_done) => {
         if (!status) return "bg-gray-100 text-gray-700 border-gray-200";
-        if (status.includes("Completed") || status === 'Done' || status.includes("Complete")) {
-            return admin_done ? "bg-green-50 text-green-700 border-green-200" : "bg-orange-50 text-orange-700 border-orange-200";
+        const s = status.toLowerCase();
+        if (s.includes("approved") || (s.includes("complete") && admin_done) || (s === "done" && admin_done)) {
+            return "bg-green-50 text-green-700 border-green-200";
         }
-        if (status.includes("Cancelled")) return "bg-red-50 text-red-700 border-red-200";
-        if (status.includes("Observation")) return "bg-blue-50 text-blue-700 border-blue-200";
+        if (s.includes("complete") || s === "done" || s.includes("pending approval")) {
+            return "bg-orange-50 text-orange-700 border-orange-200";
+        }
+        if (s.includes("cancelled")) return "bg-red-50 text-red-700 border-red-200";
+        if (s.includes("observation")) return "bg-blue-50 text-blue-700 border-blue-200";
         return "bg-yellow-50 text-yellow-700 border-yellow-200";
     }
 
@@ -173,9 +177,12 @@ export default function RepairView({ tasks = [] }) {
             // Normalize Status
             const rawStatus = (task.status || "Pending").toLowerCase();
             let statusKey = "Pending";
-            if ((rawStatus.includes("complete") || rawStatus === "done") && task.admin_done) {
+
+            if (rawStatus.includes("approved") || ((rawStatus.includes("complete") || rawStatus === "done") && task.admin_done)) {
                 statusKey = "Completed";
                 completedTasksCount++;
+            } else if (rawStatus.includes("complete") || rawStatus === "done" || rawStatus.includes("approval")) {
+                statusKey = "InProgress"; // Show as In Progress if completed by user but not approved
             } else if (rawStatus.includes("observation")) {
                 statusKey = "Observation";
             } else if (rawStatus.includes("cancel")) {
