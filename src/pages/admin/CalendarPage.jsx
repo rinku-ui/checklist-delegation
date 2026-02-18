@@ -4,6 +4,13 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle
 import supabase from '../../SupabaseClient';
 import { useRef } from 'react';
 
+const extractAudioUrl = (text) => {
+    if (!text || typeof text !== 'string') return null;
+    const match = text.match(/(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|wav|ogg|webm|m4a|aac)(\?.*)?)/i) ||
+        text.match(/(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*)/i);
+    return match ? match[0] : null;
+};
+
 const isAudioUrl = (url) => {
     if (!url || typeof url !== 'string') return false;
     return url.startsWith('http') && (
@@ -353,84 +360,48 @@ const CalendarPage = () => {
                                                         {task.status || 'Pending'}
                                                     </span>
                                                 </div>
-                                                {isAudioUrl(task.title) ? (
-                                                    <div className="mb-3">
-                                                        <h4 className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1">Description Recording:</h4>
-                                                        <AudioPlayer url={task.title} />
-                                                    </div>
-                                                ) : (
-                                                    <h4 className="text-sm font-bold text-gray-900 uppercase mb-3 leading-tight">{task.title}</h4>
-                                                )}
+                                                {(() => {
+                                                    const audioUrl = extractAudioUrl(task.title);
+                                                    return (
+                                                        <div className="mb-3">
+                                                            {audioUrl && (
+                                                                <div className="mb-2">
+                                                                    <h4 className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1">Description Recording:</h4>
+                                                                    <AudioPlayer url={audioUrl} />
+                                                                </div>
+                                                            )}
+                                                            {(!audioUrl || task.title.replace(audioUrl, '').trim().length > 0) && (
+                                                                <h4 className="text-sm font-bold text-gray-900 uppercase mb-1 leading-tight">
+                                                                    {task.title.replace(/Voice Note Link:?\s*/i, '').replace(audioUrl || '', '').trim() || (audioUrl ? '' : '—')}
+                                                                </h4>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
 
                                                 <div className="grid grid-cols-2 gap-4 text-[10px] font-medium text-gray-500 uppercase mb-4">
                                                     <div>Assigned: <span className="text-gray-900 font-bold">{task.name || '-'}</span></div>
                                                     <div>Type: <span className="text-gray-900 font-bold">{task.type}</span></div>
                                                 </div>
 
-                                                {editingTaskId === task.id ? (
-                                                    <div className="mt-4 p-4 bg-gray-50 border border-gray-200 space-y-4">
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                            <div>
-                                                                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Status</label>
-                                                                <select
-                                                                    value={editForm.status}
-                                                                    onChange={(e) => setEditForm(prev => ({ ...prev, status: e.target.value }))}
-                                                                    className="w-full text-xs font-bold p-2 bg-white border border-gray-300 rounded outline-none"
-                                                                >
-                                                                    {task.type === 'checklist' ? (
-                                                                        <>
-                                                                            <option value="pending">Pending</option>
-                                                                            <option value="yes">Yes (Done)</option>
-                                                                            <option value="no">No (Absent)</option>
-                                                                        </>
-                                                                    ) : task.type === 'maintenance' ? (
-                                                                        <>
-                                                                            <option value="pending">Pending</option>
-                                                                            <option value="completed">Completed</option>
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <option value="Pending">Pending</option>
-                                                                            <option value="Done">Done</option>
-                                                                        </>
+                                                {(task.remark || task.remarks) && (
+                                                    <div className="mt-2 pt-2 border-t border-gray-100 mb-4">
+                                                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Remarks:</h4>
+                                                        {(() => {
+                                                            const remarkText = task.remark || task.remarks;
+                                                            const audioUrl = extractAudioUrl(remarkText);
+                                                            return (
+                                                                <>
+                                                                    {audioUrl && <AudioPlayer url={audioUrl} />}
+                                                                    {(!audioUrl || remarkText.replace(audioUrl, '').trim().length > 0) && (
+                                                                        <p className="text-xs font-medium text-gray-600 italic">
+                                                                            {remarkText.replace(/Voice Note Link:?\s*/i, '').replace(audioUrl || '', '').trim()}
+                                                                        </p>
                                                                     )}
-                                                                </select>
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Remarks</label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={editForm.remark}
-                                                                    onChange={(e) => setEditForm(prev => ({ ...prev, remark: e.target.value }))}
-                                                                    className="w-full text-xs font-bold p-2 bg-white border border-gray-300 rounded outline-none"
-                                                                    placeholder="Enter status notes..."
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex gap-2 justify-end pt-2">
-                                                            <button
-                                                                onClick={() => setEditingTaskId(null)}
-                                                                className="px-4 py-2 text-xs font-bold text-gray-500 uppercase hover:bg-white transition-colors"
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleUpdateTask(task)}
-                                                                disabled={isUpdating}
-                                                                className="bg-blue-700 text-white px-6 py-2 text-xs font-bold uppercase rounded shadow hover:bg-blue-800 flex items-center gap-2"
-                                                            >
-                                                                {isUpdating ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                                                                Save Changes
-                                                            </button>
-                                                        </div>
+                                                                </>
+                                                            );
+                                                        })()}
                                                     </div>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handleEditClick(task)}
-                                                        className="flex items-center gap-2 text-[10px] font-bold text-blue-700 uppercase hover:text-blue-900 border border-blue-200 px-3 py-1.5 rounded bg-blue-50/50"
-                                                    >
-                                                        <Edit size={12} /> Modify Status
-                                                    </button>
                                                 )}
                                             </div>
                                         </div>
