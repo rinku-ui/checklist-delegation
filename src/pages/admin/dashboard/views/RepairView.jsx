@@ -129,10 +129,10 @@ export default function RepairView({ tasks = [] }) {
     const getStatusColor = (status, admin_done) => {
         if (!status) return "bg-gray-100 text-gray-700 border-gray-200";
         const s = status.toLowerCase();
-        if (s.includes("approved") || (s.includes("complete") && admin_done) || (s === "done" && admin_done)) {
+        if (s.includes("approved") || s.includes("complete") || s === "done") {
             return "bg-green-50 text-green-700 border-green-200";
         }
-        if (s.includes("complete") || s === "done" || s.includes("pending approval")) {
+        if (s.includes("pending approval") || s.includes("approval")) {
             return "bg-orange-50 text-orange-700 border-orange-200";
         }
         if (s.includes("cancelled")) return "bg-red-50 text-red-700 border-red-200";
@@ -163,7 +163,7 @@ export default function RepairView({ tasks = [] }) {
             };
         }
 
-        const deptCounts = {};
+        const deptStats = {};
         const statusCounts = { Pending: 0, Completed: 0, InProgress: 0, Observation: 0, Cancelled: 0 };
         const vendorCosts = {};
         let totalCost = 0;
@@ -172,17 +172,19 @@ export default function RepairView({ tasks = [] }) {
         tasks.forEach(task => {
             // Department / Machine Name grouping
             const dept = task.machine_name || "General";
-            deptCounts[dept] = (deptCounts[dept] || 0) + 1;
+            if (!deptStats[dept]) deptStats[dept] = { total: 0, completed: 0 };
+            deptStats[dept].total++;
 
             // Normalize Status
             const rawStatus = (task.status || "Pending").toLowerCase();
             let statusKey = "Pending";
 
-            if (rawStatus.includes("approved") || ((rawStatus.includes("complete") || rawStatus === "done") && task.admin_done)) {
+            if (rawStatus.includes("approved") || rawStatus.includes("complete") || rawStatus === "done") {
                 statusKey = "Completed";
                 completedTasksCount++;
-            } else if (rawStatus.includes("complete") || rawStatus === "done" || rawStatus.includes("approval")) {
-                statusKey = "InProgress"; // Show as In Progress if completed by user but not approved
+                deptStats[dept].completed++;
+            } else if (rawStatus.includes("approval")) {
+                statusKey = "InProgress"; // Show as In Progress if it's explicitly pending approval
             } else if (rawStatus.includes("observation")) {
                 statusKey = "Observation";
             } else if (rawStatus.includes("cancel")) {
@@ -205,20 +207,23 @@ export default function RepairView({ tasks = [] }) {
             }
         });
 
-        // Format Department Data
-        const deptData = Object.keys(deptCounts)
-            .map(name => ({ name, value: deptCounts[name] }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 5); // Top 5
+        // Format Department Data (Top 10 sorted by total tasks)
+        const deptData = Object.keys(deptStats)
+            .map(name => ({
+                name,
+                total: deptStats[name].total,
+                completed: deptStats[name].completed,
+                rate: Math.round((deptStats[name].completed / deptStats[name].total) * 100)
+            }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 10);
 
         // Format Vendor Data
         const vendorData = Object.keys(vendorCosts)
             .map(name => ({ name, cost: vendorCosts[name] }))
             .sort((a, b) => b.cost - a.cost);
-        // .slice(0, 5); // Top 5 vendors
 
-        // Payment Data (Mocking logic based on completed vs pure cost)
-        // Assuming Completed tasks are "Full" payment
+        // Payment Data
         const paymentData = [
             { name: "Full", value: completedTasksCount, color: "#3B82F6" },
             { name: "Partial", value: statusCounts.InProgress + statusCounts.Pending, color: "#10B981" },
@@ -230,9 +235,9 @@ export default function RepairView({ tasks = [] }) {
     const { deptData, statusCounts, vendorData, totalCost, completedTasksCount, paymentData } = processedData;
 
     const taskOverviewData = [
-        { name: "Pending", value: statusCounts.Pending },
+        { name: "Total Tasks", value: tasks.length },
         { name: "Completed", value: statusCounts.Completed },
-        { name: "In Progress", value: statusCounts.InProgress },
+        { name: "Pending", value: statusCounts.InProgress + statusCounts.Pending },
         { name: "Observation", value: statusCounts.Observation },
     ];
 
@@ -258,12 +263,12 @@ export default function RepairView({ tasks = [] }) {
                             <div key={i} className="space-y-1">
                                 <div className="flex justify-between text-[11px] font-semibold">
                                     <span className="text-gray-500 truncate max-w-[70%]">{item.name}</span>
-                                    <span className="text-gray-900">{item.value}</span>
+                                    <span className="text-gray-900">{item.completed}/{item.total} ({item.rate}%)</span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                     <div
-                                        className="h-full bg-blue-500 rounded-full transition-all duration-1000"
-                                        style={{ width: `${(item.value / (tasks.length || 1)) * 100}%` }}
+                                        className="h-full bg-green-500 rounded-full transition-all duration-1000"
+                                        style={{ width: `${item.rate}%` }}
                                     ></div>
                                 </div>
                             </div>

@@ -232,16 +232,31 @@ const Setting = () => {
       const startISO = `${leaveStartDate}T00:00:00`;
       const endISO = `${leaveEndDate}T23:59:59`;
 
-      const [{ data: checklistTasks }, { data: delegationTasks }] = await Promise.all([
+      const [
+        { data: checklistTasks },
+        { data: delegationTasks },
+        { data: maintenanceTasks },
+        { data: repairTasks },
+        { data: eaTasks }
+      ] = await Promise.all([
         supabase.from('checklist').select('*').eq('name', leavePersonName)
           .gte('task_start_date', startISO).lte('task_start_date', endISO).is('submission_date', null),
         supabase.from('delegation').select('*').eq('name', leavePersonName)
-          .gte('task_start_date', startISO).lte('task_start_date', endISO).is('submission_date', null)
+          .gte('task_start_date', startISO).lte('task_start_date', endISO).is('submission_date', null),
+        supabase.from('maintenance_tasks').select('*').eq('name', leavePersonName)
+          .gte('task_start_date', startISO).lte('task_start_date', endISO).is('submission_date', null),
+        supabase.from('repair_tasks').select('*').eq('assigned_person', leavePersonName)
+          .gte('created_at', startISO).lte('created_at', endISO).eq('status', 'Pending'),
+        supabase.from('ea_tasks').select('*').eq('doer_name', leavePersonName)
+          .gte('planned_date', startISO).lte('planned_date', endISO).eq('status', 'pending')
       ]);
 
       const combined = [
         ...(checklistTasks || []).map(t => ({ ...t, _table: 'checklist', id: t.task_id })),
-        ...(delegationTasks || []).map(t => ({ ...t, _table: 'delegation', id: t.task_id }))
+        ...(delegationTasks || []).map(t => ({ ...t, _table: 'delegation', id: t.task_id })),
+        ...(maintenanceTasks || []).map(t => ({ ...t, _table: 'maintenance_tasks', id: t.id })),
+        ...(repairTasks || []).map(t => ({ ...t, _table: 'repair_tasks', id: t.id, task_description: t.issue_description, task_start_date: t.created_at })),
+        ...(eaTasks || []).map(t => ({ ...t, _table: 'ea_tasks', id: t.id, task_description: t.task_description, task_start_date: t.planned_date }))
       ];
       setLeaveTasks(combined);
       setHasFetched(true);
@@ -270,6 +285,9 @@ const Setting = () => {
     try {
       const checklistIds = leaveTasks.filter(t => t._table === 'checklist').map(t => t.task_id);
       const delegationIds = leaveTasks.filter(t => t._table === 'delegation').map(t => t.task_id);
+      const maintenanceIds = leaveTasks.filter(t => t._table === 'maintenance_tasks').map(t => t.id);
+      const repairIds = leaveTasks.filter(t => t._table === 'repair_tasks').map(t => t.id);
+      const eaIds = leaveTasks.filter(t => t._table === 'ea_tasks').map(t => t.id);
 
       // Update User Status and Leave Dates
       const { error: userUpdateError } = await supabase
@@ -293,6 +311,18 @@ const Setting = () => {
         const { error: delegationError } = await supabase.from('delegation').update({ name: shiftToPerson }).in('task_id', delegationIds);
         if (delegationError) console.error('Error updating delegation tasks:', delegationError);
       }
+      if (maintenanceIds.length > 0) {
+        const { error: maintenanceError } = await supabase.from('maintenance_tasks').update({ name: shiftToPerson }).in('id', maintenanceIds);
+        if (maintenanceError) console.error('Error updating maintenance tasks:', maintenanceError);
+      }
+      if (repairIds.length > 0) {
+        const { error: repairError } = await supabase.from('repair_tasks').update({ assigned_person: shiftToPerson }).in('id', repairIds);
+        if (repairError) console.error('Error updating repair tasks:', repairError);
+      }
+      if (eaIds.length > 0) {
+        const { error: eaError } = await supabase.from('ea_tasks').update({ doer_name: shiftToPerson }).in('id', eaIds);
+        if (eaError) console.error('Error updating EA tasks:', eaError);
+      }
 
       // Send WhatsApp Notifications for shifted tasks
       if (leaveTasks.length > 0) {
@@ -300,10 +330,10 @@ const Setting = () => {
           await sendTaskReassignmentNotification({
             newDoerName: shiftToPerson,
             originalDoerName: leavePersonName,
-            taskId: task.task_id,
-            description: task.task_description,
-            startDate: task.task_start_date ? new Date(task.task_start_date).toLocaleDateString('en-IN') : 'N/A',
-            givenBy: task.given_by,
+            taskId: task.task_id || task.id,
+            description: task.task_description || task.tasks || task.title || task.issue_description,
+            startDate: (task.task_start_date || task.planned_date || task.created_at) ? new Date(task.task_start_date || task.planned_date || task.created_at).toLocaleDateString('en-IN') : 'N/A',
+            givenBy: task.given_by || task.filled_by || 'Admin',
             department: task.department,
             taskType: task._table
           });

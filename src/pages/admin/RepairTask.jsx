@@ -144,10 +144,11 @@ function RepairTaskCard({ task, index, total, givenBy, userData, machineOptions,
                         <Clock className="w-3 h-3" /> Duration
                     </label>
                     <input
-                        type="time"
+                        type="text"
                         name="duration"
                         value={task.duration}
                         onChange={handleChange}
+                        placeholder="e.g. 2 hours"
                         className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-gray-50 focus:bg-white transition-all text-sm"
                     />
                 </div>
@@ -277,11 +278,9 @@ export default function RepairTask() {
 
             // Send WhatsApp notifications (one per unique assignee)
             try {
-                const notified = new Set();
                 for (const insertedTask of allResults) {
                     const assignee = insertedTask.assigned_person;
-                    if (assignee && !notified.has(assignee)) {
-                        notified.add(assignee);
+                    if (assignee) {
                         await sendTaskAssignmentNotification({
                             doerName: assignee,
                             taskId: insertedTask.id,

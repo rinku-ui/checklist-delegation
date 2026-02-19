@@ -135,7 +135,7 @@ const AllTasks = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [dateFilter, setDateFilter] = useState("today"); // today, overdue, upcoming
+  const [dateFilter, setDateFilter] = useState("all"); // all, today, overdue, upcoming
   const [dropdownOpen, setDropdownOpen] = useState({ dateFilter: false });
 
   // Repair Modal State
@@ -157,19 +157,24 @@ const AllTasks = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [holidaysList, setHolidaysList] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
 
-  // Fetch holidays on mount
+  // Fetch holidays and users on mount
   useEffect(() => {
-    const fetchHolidays = async () => {
+    const fetchInitialData = async () => {
       try {
-        const { data, error } = await supabase.from('holidays').select('holiday_date');
-        if (error) throw error;
-        if (data) setHolidaysList(data.map(h => h.holiday_date));
+        const [holidaysRes, usersRes] = await Promise.all([
+          supabase.from('holidays').select('holiday_date'),
+          supabase.from('users').select('user_name').eq('status', 'active').order('user_name', { ascending: true })
+        ]);
+
+        if (holidaysRes.data) setHolidaysList(holidaysRes.data.map(h => h.holiday_date));
+        if (usersRes.data) setAllUsers(usersRes.data.map(u => u.user_name));
       } catch (err) {
-        console.error("Error fetching holidays:", err);
+        console.error("Error fetching initial data:", err);
       }
     };
-    fetchHolidays();
+    fetchInitialData();
   }, []);
 
 
@@ -223,13 +228,31 @@ const AllTasks = () => {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return "";
-      const hours = date.getHours().toString().padStart(2, "0");
+      let hours = date.getHours();
       const minutes = date.getMinutes().toString().padStart(2, "0");
-      const seconds = date.getSeconds().toString().padStart(2, "0");
-      return `${hours}:${minutes}:${seconds}`;
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12; // the hour '0' should be '12'
+      return `${hours}:${minutes} ${ampm}`;
     } catch (error) {
       return "";
     }
+  }, []);
+
+  const getTimeStatus = useCallback((dateString) => {
+    if (!dateString) return "—";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "—";
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const taskDate = new Date(date);
+    taskDate.setHours(0, 0, 0, 0);
+
+    if (taskDate < today) return "Overdue";
+    if (taskDate.getTime() === today.getTime()) return "Today";
+    return "Upcoming";
   }, []);
 
   const calculateNextDueDate = (currentDateStr, frequency) => {
@@ -303,6 +326,7 @@ const AllTasks = () => {
           if (showHistory) {
             headers = [
               { id: "id", label: "Task ID" },
+              { id: "time_status", label: "Time Status" },
               { id: "task_description", label: "Task Description" },
               { id: "department", label: "Department" },
               { id: "machine_name", label: "Machine Name" },
@@ -317,6 +341,7 @@ const AllTasks = () => {
           } else {
             headers = [
               { id: "id", label: "Task ID" },
+              { id: "time_status", label: "Time Status" },
               { id: "task_description", label: "Task Description" },
               { id: "department", label: "Department" },
               { id: "machine_name", label: "Machine Name" },
@@ -340,6 +365,7 @@ const AllTasks = () => {
           if (showHistory) {
             headers = [
               { id: "id", label: "Task ID" },
+              { id: "time_status", label: "Time Status" },
               { id: "issue_description", label: "Issue Detail" },
               { id: "submission_date", label: "Submission Date" },
               { id: "filled_by", label: "Form Filled By" },
@@ -355,6 +381,7 @@ const AllTasks = () => {
             headers = [
               { id: "action", label: "Action" },
               { id: "id", label: "Task ID" },
+              { id: "time_status", label: "Time Status" },
               { id: "issue_description", label: "Issue Detail" },
               { id: "filled_by", label: "Form Filled By" },
               { id: "assigned_person", label: "Assigned To" },
@@ -372,6 +399,7 @@ const AllTasks = () => {
           nameField = "doer_name";
           headers = [
             { id: "task_id", label: "Task ID" },
+            { id: "time_status", label: "Time Status" },
             { id: "task_description", label: "Task Description" },
             { id: "department", label: "Department" },
             { id: "doer_name", label: "Doer Name" },
@@ -380,15 +408,17 @@ const AllTasks = () => {
             { id: "status", label: "Status" },
           ];
           if (showHistory) {
-            headers.push({ id: "updated_at", label: "Completed At" });
+            headers.push({ id: "updated_at", label: "Submission Date and Time" });
           }
           break;
-        default: // checklist
+        case "checklist":
+        default:
           tableName = "checklist";
           dateColumn = "task_start_date";
           completionField = "submission_date";
           headers = [
             { id: "id", label: "Task ID" },
+            { id: "time_status", label: "Time Status" },
             { id: "task_description", label: "Task Description" },
             { id: "department", label: "Department" },
             { id: "given_by", label: "Given By" },
@@ -399,9 +429,10 @@ const AllTasks = () => {
             { id: "require_attachment", label: "Require Attachment" },
             { id: "status", label: "Status" },
           ];
+          break;
       }
 
-      setTableHeaders(headers);
+      setTableHeaders(showHistory ? headers.filter(h => h.id !== "time_status") : headers);
 
       let query = supabase.from(tableName).select("*");
 
@@ -428,17 +459,17 @@ const AllTasks = () => {
       }
 
       const { data, error: fetchError } = await query;
-
       if (fetchError) throw fetchError;
+
 
       if (data) {
         // Map task_id to id for consistency if id doesn't exist
         const mappedData = data.map(item => ({
           ...item,
           id: item.id || item.task_id,
+          _table: item._table || tableName,
           department: item.department || (activeTab === "ea" ? "EA" : "-")
         }));
-
 
         if (showHistory) {
           setHistoryData(mappedData);
@@ -495,7 +526,9 @@ const AllTasks = () => {
       if (taskDateValue) {
         const taskDate = new Date(taskDateValue);
 
-        if (dateFilter === "today") {
+        if (dateFilter === "all") {
+          // Show all tasks, no date filtering
+        } else if (dateFilter === "today") {
           // Show only tasks for today
           if (taskDate < todayStart || taskDate > todayEnd) return false;
         } else if (dateFilter === "overdue") {
@@ -582,7 +615,6 @@ const AllTasks = () => {
   const handleSelectAll = useCallback(
     (e) => {
       if (e.target.checked) {
-        if (dateFilter === "upcoming") return; // Cannot select upcoming tasks
         setSelectedItems(new Set(filteredPendingTasks.map((t) => t.id)));
       } else {
         setSelectedItems(new Set());
@@ -689,8 +721,6 @@ const AllTasks = () => {
     }
   };
 
-
-  // Submit Logic
   const handleSubmit = async () => {
     if (selectedItems.size === 0) {
       alert("Please select at least one task to submit");
@@ -720,9 +750,10 @@ const AllTasks = () => {
 
     try {
       const tableName = activeTab === "checklist" ? "checklist" :
-        activeTab === "maintenance" ? "maintenance_tasks" :
-          activeTab === "ea" ? "ea_tasks" :
-            "repair_tasks";
+        activeTab === "delegation" ? "delegation" :
+          activeTab === "maintenance" ? "maintenance_tasks" :
+            activeTab === "ea" ? "ea_tasks" :
+              "repair_tasks";
       const completionField = "submission_date";
 
       const selectedArray = Array.from(selectedItems);
@@ -733,8 +764,8 @@ const AllTasks = () => {
           imageUrl = await uploadFile(id, uploadedImages[id]);
         }
 
-        const remarksField = activeTab === "checklist" ? "remark" : "remarks";
-        const imageField = activeTab === "checklist" ? "image" : (activeTab === "maintenance" ? "uploaded_image_url" : "image_url");
+        const remarksField = (activeTab === "checklist") ? "remark" : "remarks";
+        const imageField = (activeTab === "checklist" || activeTab === "delegation") ? "image" : (activeTab === "maintenance" ? "uploaded_image_url" : "image_url");
 
         // Handle EA tasks differently - consolidate into ea_tasks
         if (activeTab === "ea") {
@@ -781,15 +812,15 @@ const AllTasks = () => {
           const updates = {
             [completionField]: new Date().toISOString(),
             [remarksField]: remarksData[id] || null,
-            status: statusData[id] || (activeTab === "checklist" ? "yes" : "Done"),
+            status: statusData[id] || ((activeTab === "checklist" || activeTab === "delegation") ? "yes" : "Done"),
             admin_done: false
           };
           if (imageUrl) {
             updates[imageField] = imageUrl;
           }
 
-          // Checklist table uses `task_id`, all others use `id`
-          const idKey = activeTab === 'checklist' ? 'task_id' : 'id';
+          // Checklist and Delegation tables use `task_id`, all others use `id`
+          const idKey = (activeTab === 'checklist' || activeTab === 'delegation') ? 'task_id' : 'id';
 
           const { error: updateError } = await supabase.from(tableName).update(updates).eq(idKey, id);
           if (updateError) throw updateError;
@@ -899,6 +930,7 @@ const AllTasks = () => {
     }
   };
 
+  const dateColumn = activeTab === "repair" ? "created_at" : (activeTab === "ea" ? (showHistory ? "updated_at" : "planned_date") : "task_start_date");
 
   return (
     <AdminLayout>
@@ -971,6 +1003,7 @@ const AllTasks = () => {
                     {dropdownOpen?.dateFilter && (
                       <div className="absolute z-50 mt-1 w-40 right-0 rounded-md bg-white shadow-lg border border-gray-200 py-1">
                         {[
+                          { id: 'all', label: 'All Tasks' },
                           { id: 'overdue', label: 'Overdue' },
                           { id: 'today', label: 'Today' },
                           { id: 'upcoming', label: 'Upcoming' }
@@ -1098,7 +1131,7 @@ const AllTasks = () => {
                           type="checkbox"
                           checked={selectedItems.size === filteredPendingTasks.length && filteredPendingTasks.length > 0}
                           onChange={handleSelectAll}
-                          disabled={dateFilter === "upcoming"}
+                          disabled={showHistory}
                           className="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 disabled:opacity-30 disabled:cursor-not-allowed"
                         />
                       </th>
@@ -1150,11 +1183,18 @@ const AllTasks = () => {
                                   </button>
                                 </td>
                                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800 font-bold">{task.id}</td>
+                                <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm">
+                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getTimeStatus(task.created_at) === 'Overdue' ? 'bg-red-100 text-red-800' : getTimeStatus(task.created_at) === 'Today' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                                    {getTimeStatus(task.created_at)}
+                                  </span>
+                                </td>
                                 <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm text-gray-800 min-w-[200px]">
                                   <RenderDescription text={task.issue_description} />
                                 </td>
                                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.filled_by}</td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.assigned_person}</td>
+                                <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">
+                                  <span className="font-bold text-gray-900">{task.assigned_person || "—"}</span>
+                                </td>
                                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.machine_name}</td>
                                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm">
                                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${task.status === "Pending" ? "bg-yellow-100 text-yellow-800" :
@@ -1213,74 +1253,81 @@ const AllTasks = () => {
                           <>
                             {tableHeaders.map((header) => (
                               <td key={header.id} className={`px-3 sm:px-6 py-3 sm:py-4 text-sm text-gray-800 ${header.id === 'task_description' || header.id === 'issue_description' ? 'min-w-[200px] whitespace-normal' : 'whitespace-nowrap'} ${header.id === 'task_start_date' ? 'bg-yellow-50' : ''}`}>
-                                {header.id === "task_start_date" || header.id === "created_at" || header.id === "planned_date"
+                                {header.id === "time_status"
                                   ? (
-                                    <div className="flex flex-col">
-                                      <span className="font-bold text-gray-900">{formatDate(task[header.id])}</span>
-                                      <span className="text-[11px] text-gray-400">{formatTimeOnly(task[header.id])}</span>
-                                    </div>
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getTimeStatus(task[dateColumn]) === 'Overdue' ? 'bg-red-100 text-red-800' : getTimeStatus(task[dateColumn]) === 'Today' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                                      {getTimeStatus(task[dateColumn])}
+                                    </span>
                                   )
-                                  : header.id === "submission_date"
-                                    ? (activeTab === "maintenance" && showHistory)
-                                      ? (
-                                        <div className="flex flex-col">
-                                          <span className="font-bold text-gray-900">{formatDate(task[header.id])}</span>
-                                          <span className="text-[11px] text-gray-400">{formatTimeOnly(task[header.id])}</span>
-                                        </div>
-                                      )
-                                      : formatDateWithTime(task[header.id])
-                                    : header.id === "status"
-                                      ? !showHistory && (activeTab === "maintenance" || activeTab === "checklist" || activeTab === "ea")
+                                  : header.id === "task_start_date" || header.id === "created_at" || header.id === "planned_date" || header.id === "updated_at"
+                                    ? (
+                                      <div className="flex flex-col">
+                                        <span className="font-bold text-gray-900">{formatDate(task[header.id])}</span>
+                                        <span className="text-[11px] text-gray-400">{formatTimeOnly(task[header.id])}</span>
+                                      </div>
+                                    )
+                                    : header.id === "submission_date"
+                                      ? (activeTab === "maintenance" && showHistory)
                                         ? (
-                                          <select
-                                            value={statusData[task.id] || ""}
-                                            onChange={(e) => setStatusData(prev => ({ ...prev, [task.id]: e.target.value }))}
-                                            disabled={!selectedItems.has(task.id)}
-                                            className="block w-full py-1.5 pl-3 pr-8 text-xs sm:text-sm text-gray-700 bg-white border border-gray-200 rounded-md focus:border-purple-500 focus:outline-none disabled:bg-gray-50/50 disabled:text-gray-400 appearance-none shadow-sm cursor-pointer hover:border-gray-300 transition-colors"
-                                            style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: `right 0.5rem center`, backgroundRepeat: `no-repeat`, backgroundSize: `1.5em 1.5em` }}
-                                          >
-                                            <option value="">Select Status</option>
-                                            {activeTab === "ea" ? (
-                                              <>
-                                                <option value="done">Done</option>
-                                                <option value="extended">Extend</option>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <option value={activeTab === 'checklist' ? 'yes' : 'Done'}>Done</option>
-                                                <option value={activeTab === 'checklist' ? 'no' : 'Not Done'}>Not Done</option>
-                                              </>
-                                            )}
-                                          </select>
+                                          <div className="flex flex-col">
+                                            <span className="font-bold text-gray-900">{formatDate(task[header.id])}</span>
+                                            <span className="text-[11px] text-gray-400">{formatTimeOnly(task[header.id])}</span>
+                                          </div>
                                         )
-                                        : (
-                                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${activeTab === "ea"
-                                            ? (task[header.id]?.toLowerCase() === "approved" ? "bg-green-100 text-green-800" : task[header.id]?.toLowerCase() === "done" ? "bg-orange-100 text-orange-800" : (task[header.id]?.toLowerCase() === "pending" || task[header.id]?.toLowerCase() === "extend" || task[header.id]?.toLowerCase() === "extended") ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-800")
-                                            : (task[header.id] === "Done" || task[header.id] === "yes" || task[header.id] === "done" || task[header.id] === "approved" || task[header.id] === "Completed")
-                                              ? (task.admin_done ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800")
-                                              : (task[header.id] === "extend" || task[header.id] === "pending" || task[header.id] === "extended")
-                                                ? "bg-yellow-100 text-yellow-800"
-                                                : "bg-gray-100 text-gray-800"
-                                            }`}>
-                                            {activeTab === "ea" && showHistory
-                                              ? (task[header.id]?.toLowerCase() === "approved" ? "Approved" : task[header.id]?.toLowerCase() === "done" ? "Pending Approval" : task[header.id])
-                                              : (showHistory && (task[header.id] === "Done" || task[header.id] === "yes" || task[header.id] === "done" || task[header.id] === "Completed") && !task.admin_done)
-                                                ? "Pending Approval"
-                                                : (showHistory && (task[header.id] === "Done" || task[header.id] === "yes" || task[header.id] === "done" || task[header.id] === "Completed") && task.admin_done)
-                                                  ? "Approved"
-                                                  : task[header.id]}
-                                          </span>
-                                        )
-                                      : (header.id === "enable_reminders" || header.id === "require_attachment" || header.id === "enable_reminder")
-                                        ? (task[header.id] ? "Yes" : "No")
-                                        : header.id === "machine_name"
-                                          ? (task.machine_name || (task.task_description ? task.task_description.split(' - ')[0] : "—"))
-                                          : (header.id === 'task_description' || header.id === 'issue_description' || header.id === 'remarks')
-                                            ? <RenderDescription text={task[header.id]} />
-                                            : isAudioUrl(task[header.id])
-                                              ? <AudioPlayer url={task[header.id]} />
-                                              : task[header.id] || "—"}
-                              </td>
+                                        : formatDateWithTime(task[header.id])
+                                      : header.id === "status"
+                                        ? !showHistory && (activeTab === "maintenance" || activeTab === "checklist" || activeTab === "ea" || activeTab === "delegation")
+                                          ? (
+                                            <select
+                                              value={statusData[task.id] || ""}
+                                              onChange={(e) => setStatusData(prev => ({ ...prev, [task.id]: e.target.value }))}
+                                              disabled={!selectedItems.has(task.id)}
+                                              className="block w-full py-1.5 pl-3 pr-8 text-xs sm:text-sm text-gray-700 bg-white border border-gray-200 rounded-md focus:border-purple-500 focus:outline-none disabled:bg-gray-50/50 disabled:text-gray-400 appearance-none shadow-sm cursor-pointer hover:border-gray-300 transition-colors"
+                                              style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: `right 0.5rem center`, backgroundRepeat: `no-repeat`, backgroundSize: `1.5em 1.5em` }}
+                                            >
+                                              <option value="">Select Status</option>
+                                              {activeTab === "ea" ? (
+                                                <>
+                                                  <option value="done">Done</option>
+                                                  <option value="extended">Extend</option>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <option value={(activeTab === 'checklist' || activeTab === 'delegation') ? 'yes' : 'Done'}>Done</option>
+                                                  <option value={(activeTab === 'checklist' || activeTab === 'delegation') ? 'no' : 'Not Done'}>Not Done</option>
+                                                </>
+                                              )}
+                                            </select>
+                                          )
+                                          : (
+                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${activeTab === "ea"
+                                              ? (task[header.id]?.toLowerCase() === "approved" ? "bg-green-100 text-green-800" : task[header.id]?.toLowerCase() === "done" ? "bg-orange-100 text-orange-800" : (task[header.id]?.toLowerCase() === "pending" || task[header.id]?.toLowerCase() === "extend" || task[header.id]?.toLowerCase() === "extended") ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-800")
+                                              : (task[header.id] === "Done" || task[header.id] === "yes" || task[header.id] === "done" || task[header.id] === "approved" || task[header.id] === "Completed")
+                                                ? (task.admin_done ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800")
+                                                : (task[header.id] === "extend" || task[header.id] === "pending" || task[header.id] === "extended")
+                                                  ? "bg-yellow-100 text-yellow-800"
+                                                  : "bg-gray-100 text-gray-800"
+                                              }`}>
+                                              {activeTab === "ea" && showHistory
+                                                ? (task[header.id]?.toLowerCase() === "approved" || (task[header.id]?.toLowerCase() === "done" && task.admin_done) ? "Completed" : task[header.id]?.toLowerCase() === "done" ? "Pending Approval" : task[header.id])
+                                                : (showHistory && (task[header.id] === "Done" || task[header.id] === "yes" || task[header.id] === "done" || task[header.id] === "Completed") && !task.admin_done)
+                                                  ? "Pending Approval"
+                                                  : (showHistory && (task[header.id] === "Done" || task[header.id] === "yes" || task[header.id] === "done" || task[header.id] === "Completed") && task.admin_done)
+                                                    ? "Approved"
+                                                    : task[header.id]}
+                                            </span>
+                                          )
+                                        : (header.id === "enable_reminders" || header.id === "require_attachment" || header.id === "enable_reminder")
+                                          ? (task[header.id] ? "Yes" : "No")
+                                          : (header.id === 'name' || header.id === 'assigned_person' || header.id === 'doer_name')
+                                            ? <span className="font-bold text-gray-900">{task[header.id] || "—"}</span>
+                                            : header.id === "machine_name"
+                                              ? (task.machine_name || (task.task_description ? task.task_description.split(' - ')[0] : "—"))
+                                              : (header.id === 'task_description' || header.id === 'issue_description' || header.id === 'remarks')
+                                                ? <RenderDescription text={task[header.id]} />
+                                                : isAudioUrl(task[header.id])
+                                                  ? <AudioPlayer url={task[header.id]} />
+                                                  : task[header.id] || "—"}</td>
                             ))}
                             {!showHistory && activeTab === "ea" && (
                               <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">
@@ -1364,146 +1411,131 @@ const AllTasks = () => {
             )}
           </div>
         </div>
-      </div >
 
-      {/* Repair Update Modal */}
-      {isModalOpen && selectedUpdateTask && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden animate-fade-in border border-purple-100">
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-6 py-4 border-b border-purple-100 flex justify-between items-center">
-              <h3 className="text-sm font-bold text-purple-800 uppercase">Update Ticket #{selectedUpdateTask.id}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-purple-400 hover:text-purple-600"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={handleRepairUpdateSubmit} className="p-6">
-              <div className="bg-purple-50 rounded border border-purple-200 p-3 mb-6 flex gap-4 text-sm">
-                <div className="flex-1">
-                  <span className="block text-xs font-bold text-purple-500 uppercase mb-1">Machine</span>
-                  <span className="text-gray-800 font-medium">{selectedUpdateTask.machine_name}</span>
-                </div>
-                <div className="flex-[2]">
-                  <span className="block text-xs font-bold text-purple-500 uppercase mb-1">Issue</span>
-                  {isAudioUrl(selectedUpdateTask.issue_description) ? (
-                    <AudioPlayer url={selectedUpdateTask.issue_description} />
-                  ) : (
-                    <span className="text-gray-600">{selectedUpdateTask.issue_description}</span>
-                  )}
-                </div>
+        {/* Repair Update Modal */}
+        {isModalOpen && selectedUpdateTask && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden animate-fade-in border border-purple-100">
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-6 py-4 border-b border-purple-100 flex justify-between items-center">
+                <h3 className="text-sm font-bold text-purple-800 uppercase">Update Ticket #{selectedUpdateTask.id}</h3>
+                <button onClick={() => setIsModalOpen(false)} className="text-purple-400 hover:text-purple-600"><X className="w-5 h-5" /></button>
               </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Status <span className="text-red-500">*</span></label>
-                  <select className="w-full p-2 text-sm border border-gray-300 rounded focus:border-purple-500 outline-none" value={updateForm.status} onChange={(e) => setUpdateForm({ ...updateForm, status: e.target.value })}>
-                    <option value="">Select Status...</option>
-                    <option value="Completed">✅ Completed (कार्य पूर्ण)</option>
-                    <option value="Pending">⏳ Pending (लंबित कार्य)</option>
-                    <option value="Observation">🔍 Under Observation (निरीक्षण)</option>
-                    <option value="Temporary Fix">🔄 Temporary Fix (अस्थायी/जुगाड़)</option>
-                    <option value="Cancelled">🚫 Cancelled (रद्द)</option>
-                  </select>
+              <form onSubmit={handleRepairUpdateSubmit} className="p-6">
+                <div className="bg-purple-50 rounded border border-purple-200 p-3 mb-6 flex gap-4 text-sm">
+                  <div className="flex-1">
+                    <span className="block text-xs font-bold text-purple-500 uppercase mb-1">Machine</span>
+                    <span className="text-gray-800 font-medium">{selectedUpdateTask.machine_name}</span>
+                  </div>
+                  <div className="flex-[2]">
+                    <span className="block text-xs font-bold text-purple-500 uppercase mb-1">Issue</span>
+                    {isAudioUrl(selectedUpdateTask.issue_description) ? (
+                      <AudioPlayer url={selectedUpdateTask.issue_description} />
+                    ) : (
+                      <span className="text-gray-600">{selectedUpdateTask.issue_description}</span>
+                    )}
+                  </div>
                 </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Status <span className="text-red-500">*</span></label>
+                    <select className="w-full p-2 text-sm border border-gray-300 rounded focus:border-purple-500 outline-none" value={updateForm.status} onChange={(e) => setUpdateForm({ ...updateForm, status: e.target.value })}>
+                      <option value="">Select Status...</option>
+                      <option value="Completed">✅ Completed (कार्य पूर्ण)</option>
+                      <option value="Pending">⏳ Pending (लंबित कार्य)</option>
+                      <option value="Observation">🔍 Under Observation (निरीक्षण)</option>
+                      <option value="Temporary Fix">🔄 Temporary Fix (अस्थायी/जुगाड़)</option>
+                      <option value="Cancelled">🚫 Cancelled (रद्द)</option>
+                    </select>
+                  </div>
 
-                {/* Conditional Fields for Completed Status */}
-                {/* As per request: Part Replaced, Work Done, Vendor Name, Bill Amount, Remarks, Photos */}
-                {updateForm.status === 'Completed' && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-
-                    {/* Part Replaced */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Part Replaced</label>
-                        <select
-                          className="w-full p-2 text-sm border border-gray-300 rounded outline-none focus:border-purple-500"
-                          value={updateForm.partReplaced}
-                          onChange={(e) => setUpdateForm({ ...updateForm, partReplaced: e.target.value })}
-                        >
-                          <option value="">Select part...</option>
-                          <option value="Part Replaced">Part Replaced</option>
-                          <option value="Repairing">Repairing</option>
-                          <option value="Service/Maintenance">Service/Maintenance</option>
-                          <option value="Installation">Installation</option>
-                          <option value="Other">Other</option>
-                        </select>
+                  {/* Conditional Fields for Completed Status */}
+                  {updateForm.status === 'Completed' && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Part Replaced</label>
+                          <select
+                            className="w-full p-2 text-sm border border-gray-300 rounded outline-none focus:border-purple-500"
+                            value={updateForm.partReplaced}
+                            onChange={(e) => setUpdateForm({ ...updateForm, partReplaced: e.target.value })}
+                          >
+                            <option value="">Select part...</option>
+                            <option value="Part Replaced">Part Replaced</option>
+                            <option value="Repairing">Repairing</option>
+                            <option value="Service/Maintenance">Service/Maintenance</option>
+                            <option value="Installation">Installation</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Vendor Name</label>
+                          <input
+                            className="w-full p-2 text-sm border border-gray-300 rounded outline-none focus:border-purple-500"
+                            value={updateForm.vendorName}
+                            onChange={(e) => setUpdateForm({ ...updateForm, vendorName: e.target.value })}
+                            placeholder="Enter vendor name..."
+                          />
+                        </div>
                       </div>
-
-                      {/* Vendor Name */}
                       <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Vendor Name</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Bill Amount (₹)</label>
                         <input
+                          type="number"
                           className="w-full p-2 text-sm border border-gray-300 rounded outline-none focus:border-purple-500"
-                          value={updateForm.vendorName}
-                          onChange={(e) => setUpdateForm({ ...updateForm, vendorName: e.target.value })}
-                          placeholder="Enter vendor name..."
+                          value={updateForm.billAmount}
+                          onChange={(e) => setUpdateForm({ ...updateForm, billAmount: e.target.value })}
+                          placeholder="Enter bill amount..."
                         />
                       </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Remarks</label>
+                        <textarea
+                          className="w-full p-2 text-sm border border-gray-300 rounded outline-none focus:border-purple-500"
+                          rows="2"
+                          value={updateForm.remarks}
+                          onChange={(e) => setUpdateForm({ ...updateForm, remarks: e.target.value })}
+                          placeholder="Enter any additional remarks..."
+                        ></textarea>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                          <Upload className="h-6 w-6 text-gray-400 mb-2" />
+                          <span className="text-xs font-bold text-gray-500">Photo of Work Done</span>
+                          <span className="text-[10px] text-gray-400 mt-1">{updateForm.workPhoto ? updateForm.workPhoto.name : "Click to upload"}</span>
+                          <input type="file" className="hidden" accept="image/*" onChange={(e) => setUpdateForm({ ...updateForm, workPhoto: e.target.files[0] })} />
+                        </label>
+                        <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                          <Upload className="h-6 w-6 text-gray-400 mb-2" />
+                          <span className="text-xs font-bold text-gray-500">Bill Copy</span>
+                          <span className="text-[10px] text-gray-400 mt-1">{updateForm.billCopy ? updateForm.billCopy.name : "Click to upload"}</span>
+                          <input type="file" className="hidden" accept="image/*" onChange={(e) => setUpdateForm({ ...updateForm, billCopy: e.target.files[0] })} />
+                        </label>
+                      </div>
                     </div>
+                  )}
 
-                    {/* Bill Amount */}
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Bill Amount (₹)</label>
-                      <input
-                        type="number"
-                        className="w-full p-2 text-sm border border-gray-300 rounded outline-none focus:border-purple-500"
-                        value={updateForm.billAmount}
-                        onChange={(e) => setUpdateForm({ ...updateForm, billAmount: e.target.value })}
-                        placeholder="Enter bill amount..."
-                      />
-                    </div>
-
-                    {/* Remarks (For Completed Status) */}
+                  {updateForm.status && updateForm.status !== 'Completed' && (
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Remarks</label>
                       <textarea
                         className="w-full p-2 text-sm border border-gray-300 rounded outline-none focus:border-purple-500"
-                        rows="2"
+                        rows="3"
                         value={updateForm.remarks}
                         onChange={(e) => setUpdateForm({ ...updateForm, remarks: e.target.value })}
-                        placeholder="Enter any additional remarks..."
+                        placeholder="Add remarks..."
                       ></textarea>
                     </div>
-
-                    {/* File Uploads */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                        <Upload className="h-6 w-6 text-gray-400 mb-2" />
-                        <span className="text-xs font-bold text-gray-500">Photo of Work Done</span>
-                        <span className="text-[10px] text-gray-400 mt-1">{updateForm.workPhoto ? updateForm.workPhoto.name : "Click to upload"}</span>
-                        <input type="file" className="hidden" accept="image/*" onChange={(e) => setUpdateForm({ ...updateForm, workPhoto: e.target.files[0] })} />
-                      </label>
-
-                      <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                        <Upload className="h-6 w-6 text-gray-400 mb-2" />
-                        <span className="text-xs font-bold text-gray-500">Bill Copy</span>
-                        <span className="text-[10px] text-gray-400 mt-1">{updateForm.billCopy ? updateForm.billCopy.name : "Click to upload"}</span>
-                        <input type="file" className="hidden" accept="image/*" onChange={(e) => setUpdateForm({ ...updateForm, billCopy: e.target.files[0] })} />
-                      </label>
-                    </div>
-
-                  </div>
-                )}
-
-                {/* Remarks for Non-Completed Status */}
-                {updateForm.status && updateForm.status !== 'Completed' && (
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Remarks</label>
-                    <textarea
-                      className="w-full p-2 text-sm border border-gray-300 rounded outline-none focus:border-purple-500"
-                      rows="3"
-                      value={updateForm.remarks}
-                      onChange={(e) => setUpdateForm({ ...updateForm, remarks: e.target.value })}
-                      placeholder="Add remarks..."
-                    ></textarea>
-                  </div>
-                )}
-              </div>
-              <div className="flex justify-end gap-3 pt-6 mt-2 border-t border-gray-100">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded hover:bg-gray-50 text-sm">Cancel</button>
-                <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded text-sm flex items-center gap-2">{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save Changes</button>
-              </div>
-            </form>
+                  )}
+                </div>
+                <div className="flex justify-end gap-3 pt-6 mt-2 border-t border-gray-100">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded hover:bg-gray-50 text-sm">Cancel</button>
+                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded text-sm flex items-center gap-2">{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save Changes</button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-
+        )}
+      </div>
     </AdminLayout>
   );
 };

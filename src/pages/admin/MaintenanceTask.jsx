@@ -416,10 +416,11 @@ function MaintenanceTaskCard({
                             <Clock className="w-3 h-3" /> Duration
                         </label>
                         <input
-                            type="time"
+                            type="text"
                             name="duration"
                             value={task.duration}
                             onChange={handleChange}
+                            placeholder="e.g. 2 hours"
                             className="w-full p-2.5 border border-gray-200 rounded-lg bg-gray-50 focus:ring-2 focus:ring-purple-500 outline-none transition-all text-sm"
                         />
                     </div>
@@ -607,10 +608,13 @@ export default function MaintenanceTask() {
             // Send WhatsApp notifications (one per unique doer)
             try {
                 if (insertedData && insertedData.length > 0) {
-                    const notified = new Set();
-                    for (const task of insertedData) {
-                        if (!notified.has(task.name)) {
-                            notified.add(task.name);
+                    for (const uiTask of tasks) {
+                        const task = insertedData.find(it =>
+                            it.name === uiTask.assignedPerson &&
+                            it.task_description === uiTask.taskDescription &&
+                            it.freq === uiTask.frequency
+                        );
+                        if (task) {
                             const notificationData = {
                                 doerName: task.name,
                                 taskId: task.id,

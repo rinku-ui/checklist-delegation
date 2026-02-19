@@ -507,16 +507,13 @@ function DelegationPage({
                       {/* Duration Column */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-blue-50">
                         {editingTaskId === task.id ? (
-                          <select
+                          <input
+                            type="text"
                             value={editFormData.duration}
                             onChange={(e) => handleInputChange('duration', e.target.value)}
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          >
-                            <option value="">Select</option>
-                            {["15 min", "30 min", "45 min", "1 hour", "1.5 hours", "2 hours", "3 hours", "4 hours", "Half Day", "Full Day"].map(d => (
-                              <option key={d} value={d}>{d}</option>
-                            ))}
-                          </select>
+                            placeholder="e.g. 1 hour"
+                          />
                         ) : (
                           task.duration ? (
                             <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">

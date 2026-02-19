@@ -282,7 +282,7 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
                 {/* Date, Time, Frequency, Duration */}
                 <div className="grid grid-cols-2 gap-3">
                     <div className="relative">
-                        <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Start Date <span className="text-red-500">*</span></label>
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Planned Date <span className="text-red-500">*</span></label>
                         <button
                             type="button"
                             onClick={() => onUpdate(task.id, { showCalendar: !task.showCalendar })}
@@ -329,10 +329,11 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
                             <Clock className="w-3 h-3" /> Duration
                         </label>
                         <input
-                            type="time"
+                            type="text"
                             name="duration"
                             value={task.duration}
                             onChange={handleChange}
+                            placeholder="e.g. 30 mins"
                             className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm"
                         />
                     </div>
@@ -513,10 +514,17 @@ export default function ChecklistTask() {
             try {
                 const insertedTasks = result.payload;
                 if (insertedTasks && insertedTasks.length > 0) {
-                    const notified = new Set();
-                    for (const t of insertedTasks) {
-                        if (!notified.has(t.name)) {
-                            notified.add(t.name);
+                    for (const uiTask of tasks) {
+                        const t = insertedTasks.find(it =>
+                            it.name === uiTask.doer &&
+                            it.task_description === uiTask.description &&
+                            it.frequency === uiTask.frequency
+                        );
+                        if (t) {
+                            const isOneTime = t.frequency?.toLowerCase().includes('one time') ||
+                                t.frequency?.toLowerCase().includes('one-time') ||
+                                t.frequency?.toLowerCase().includes('no recurrence');
+
                             await sendTaskAssignmentNotification({
                                 doerName: t.name,
                                 taskId: t.task_id || t.id,
@@ -524,7 +532,7 @@ export default function ChecklistTask() {
                                 startDate: new Date(t.task_start_date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
                                 givenBy: t.given_by,
                                 department: t.department,
-                                taskType: 'checklist'
+                                taskType: isOneTime ? 'delegation' : 'checklist'
                             });
                         }
                     }

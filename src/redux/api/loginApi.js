@@ -34,8 +34,8 @@ export const LoginCredentialsApi = async (formData) => {
     return { error: 'Invalid username or password' };
   }
 
-  // 🔴 Add this check — if user is inactive, log them out immediately
-  if (data.status !== 'active') {
+  // 🔴 Change: Allow login for 'on_leave' users too. Only reject if status is specifically 'inactive'
+  if (data.status === 'inactive') {
     // Clear localStorage and reject login
     localStorage.clear();
     return { error: 'Your account is inactive. Please contact admin.' };

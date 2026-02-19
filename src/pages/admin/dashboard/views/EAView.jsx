@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import { Users, Phone, Calendar, FileText, CheckCircle, Clock, AlertCircle, ArrowUpRight, TrendingUp, UserCheck, PieChart, Play, Pause, Save, X } from "lucide-react";
 import supabase from "../../../../SupabaseClient";
 
@@ -151,6 +151,8 @@ export default function EAView() {
         }
     };
 
+    const [view, setView] = useState('active'); // 'active' or 'completed'
+
     useEffect(() => {
         fetchEATasks();
     }, []);
@@ -167,7 +169,6 @@ export default function EAView() {
                 .order('planned_date', { ascending: true });
 
             const { data, error } = await query;
-
             if (error) throw error;
 
             let tasks = data || [];
@@ -180,20 +181,6 @@ export default function EAView() {
                 );
             }
 
-            // FILTER: Show only Present or Past tasks (Hide Upcoming)
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); // Local midnight
-
-            tasks = tasks.filter(t => {
-                if (!t.planned_date) return true; // Keep tasks without date
-
-                // Parse planned date and normalize to local midnight for comparison
-                const planned = new Date(t.planned_date);
-                planned.setHours(0, 0, 0, 0);
-
-                return planned <= today;
-            });
-
             setEATasks(tasks);
             calculateStats(tasks);
         } catch (err) {
@@ -203,33 +190,74 @@ export default function EAView() {
         }
     };
 
+    const tableTasks = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (view === 'active') {
+            return eaTasks.filter(t => {
+                const isApproved = (t.status?.toLowerCase() === 'approved') || (t.status?.toLowerCase() === 'done' && t.admin_done);
+                if (isApproved) return false;
+
+                if (!t.planned_date) return true;
+                const planned = new Date(t.planned_date);
+                planned.setHours(0, 0, 0, 0);
+                return planned <= today;
+            });
+        } else {
+            // Completed view: show all approved/admin_done tasks
+            return eaTasks.filter(t => (t.status?.toLowerCase() === 'approved') || (t.status?.toLowerCase() === 'done' && t.admin_done));
+        }
+    }, [eaTasks, view]);
+
     const calculateStats = (tasks) => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const total = tasks.length;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStr = today.toISOString().split('T')[0];
 
-        // Pending includes: 'pending', 'extended', and 'done' (waiting approval)
-        // completed: 'done' with admin_done=true
-        // extended: 'extended'
+        // Filter out upcoming the tasks for stats calculation (except completed)
+        const activeOrDoneTasks = tasks.filter(t => {
+            const isCompleted = t.status?.toLowerCase() === 'done' && t.admin_done;
+            const isApproved = t.status?.toLowerCase() === 'approved';
+            if (isCompleted || isApproved) return true;
 
-        const pending = tasks.filter(t => (t.status?.toLowerCase() === 'pending' || (t.status?.toLowerCase() === 'done' && !t.admin_done))).length;
-        const completed = tasks.filter(t => t.status?.toLowerCase() === 'done' && t.admin_done).length;
-        const extended = tasks.filter(t => t.status?.toLowerCase() === 'extended').length;
+            if (!t.planned_date) return true;
+            const planned = new Date(t.planned_date);
+            planned.setHours(0, 0, 0, 0);
+            return planned <= today;
+        });
 
-        const overdue = tasks.filter(t => {
+        const total = activeOrDoneTasks.length;
+
+        const pending = activeOrDoneTasks.filter(t =>
+            (t.status?.toLowerCase() === 'pending' || (t.status?.toLowerCase() === 'done' && !t.admin_done))
+        ).length;
+
+        const completed = activeOrDoneTasks.filter(t =>
+            (t.status?.toLowerCase() === 'done' && t.admin_done) || t.status?.toLowerCase() === 'approved'
+        ).length;
+
+        const extended = activeOrDoneTasks.filter(t => t.status?.toLowerCase() === 'extended').length;
+
+        const overdue = activeOrDoneTasks.filter(t => {
             if (!t.planned_date) return false;
             const plannedStr = new Date(t.planned_date).toISOString().split('T')[0];
             return (t.status?.toLowerCase() === 'pending' || t.status?.toLowerCase() === 'extended') && plannedStr < todayStr;
         }).length;
 
-        // Calculate doer statistics
+        // Calculate doer statistics based on the same filtered set
         const doerMap = {};
-        tasks.forEach(t => {
-            if (!doerMap[t.doer_name]) {
-                doerMap[t.doer_name] = { total: 0, completed: 0, pending: 0 };
+        activeOrDoneTasks.forEach(t => {
+            const name = t.doer_name || 'Unknown';
+            if (!doerMap[name]) {
+                doerMap[name] = { total: 0, completed: 0, pending: 0 };
             }
-            doerMap[t.doer_name].total++;
-            if (t.status?.toLowerCase() === 'done' && t.admin_done) doerMap[t.doer_name].completed++;
-            else doerMap[t.doer_name].pending++;
+            doerMap[name].total++;
+            if ((t.status?.toLowerCase() === 'done' && t.admin_done) || t.status?.toLowerCase() === 'approved') {
+                doerMap[name].completed++;
+            } else {
+                doerMap[name].pending++;
+            }
         });
 
         const doerList = Object.entries(doerMap)
@@ -439,35 +467,27 @@ export default function EAView() {
                 </div>
             </div>
 
-            {/* Premium Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                    { label: 'Total Tasks', value: stats.total, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { label: 'In Progress', value: stats.pending, icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                    { label: 'Completed', value: stats.completed, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: 'Need Attention', value: stats.overdue, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' }
-                ].map((stat, i) => (
-                    <div key={i} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
-                                <p className={`text-2xl font-black mt-1 ${stat.color}`}>{stat.value}</p>
-                            </div>
-                            <div className={`p-2 ${stat.bg} ${stat.color} rounded-lg group-hover:scale-110 transition-transform`}>
-                                <stat.icon size={18} />
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            {/* Premium Stat Cards Removed as requested */}
 
             {/* Task Console */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-6 py-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
-                    <h3 className="text-xs font-black text-gray-700 uppercase tracking-widest flex items-center gap-2">
-                        <Users size={14} className="text-indigo-600" />
-                        Your Tasks
-                    </h3>
+                    <div className="flex items-center gap-6">
+                        <button
+                            onClick={() => setView('active')}
+                            className={`pb-4 pt-1 text-xs font-black uppercase tracking-widest relative transition-all ${view === 'active' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                            Active Console
+                            {view === 'active' && <div className="absolute bottom-0 left-0 w-full h-1 bg-indigo-600 rounded-t-full"></div>}
+                        </button>
+                        <button
+                            onClick={() => setView('completed')}
+                            className={`pb-4 pt-1 text-xs font-black uppercase tracking-widest relative transition-all ${view === 'completed' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                            Completed Archive
+                            {view === 'completed' && <div className="absolute bottom-0 left-0 w-full h-1 bg-indigo-600 rounded-t-full"></div>}
+                        </button>
+                    </div>
                     <div className="flex gap-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse"></div>
                         <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse delay-75"></div>
@@ -488,14 +508,14 @@ export default function EAView() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                            {eaTasks.length === 0 ? (
+                            {tableTasks.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="px-6 py-12 text-center text-gray-400 font-bold uppercase text-xs">
-                                        No intelligence data found in the console
+                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-400 font-bold uppercase text-xs">
+                                        No intelligence data found in this view
                                     </td>
                                 </tr>
                             ) : (
-                                eaTasks.slice(0, 8).map((task) => {
+                                tableTasks.map((task) => {
                                     const styles = getStatusStyles(task.status, task.planned_date, task.admin_done);
                                     return (
                                         <tr
@@ -621,13 +641,7 @@ export default function EAView() {
                     </table>
                 </div>
 
-                {eaTasks.length > 8 && (
-                    <div className="px-6 py-4 bg-gray-50/30 border-t border-gray-100">
-                        <button className="w-full py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-black text-gray-500 uppercase tracking-widest hover:bg-gray-50 hover:text-gray-900 transition-all shadow-sm">
-                            Access Full Intelligence Archive ({eaTasks.length - 8} more)
-                        </button>
-                    </div>
-                )}
+                {/* Full archive button removed as all tasks are shown */}
             </div>
         </div>
     );

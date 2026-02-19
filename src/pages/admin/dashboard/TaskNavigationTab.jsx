@@ -469,7 +469,7 @@ export default function TaskNavigationTabs({
     <div className="w-full overflow-hidden rounded-lg border border-gray-200 bg-white">
       <div className="bg-gray-50/50 p-2 border-b border-gray-100">
         <div className="flex bg-white rounded-xl border border-purple-100 p-1 shadow-sm overflow-x-auto no-scrollbar">
-          {["recent", "upcoming", "overdue"].map((view) => (
+          {["all", "recent", "upcoming", "overdue"].map((view) => (
             <button
               key={view}
               onClick={() => setTaskView(view)}
@@ -478,11 +478,12 @@ export default function TaskNavigationTabs({
                 : "text-purple-600 hover:bg-purple-50"
                 }`}
             >
-              {view === "overdue" ? "Overdue" :
-                (dashboardType === "delegation"
-                  ? (view === "recent" ? "Today Task" : "Future Task")
-                  : (view === "recent" ? "Recent" : "Upcoming")
-                )
+              {view === "all" ? "All Tasks" :
+                view === "overdue" ? "Overdue" :
+                  (dashboardType === "delegation"
+                    ? (view === "recent" ? "Today Task" : "Future Task")
+                    : (view === "recent" ? "Recent" : "Upcoming")
+                  )
               }
             </button>
           ))}

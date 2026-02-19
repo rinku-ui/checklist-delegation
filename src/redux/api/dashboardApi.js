@@ -58,12 +58,8 @@ export const fetchDashboardDataApi = async (
         break;
 
       case 'upcoming':
-        // Tomorrow's tasks only
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-        query = query.gte('task_start_date', `${tomorrowStr}T00:00:00`)
-          .lte('task_start_date', `${tomorrowStr}T23:59:59`);
+        // All future tasks (after today)
+        query = query.gt('task_start_date', `${today}T23:59:59`);
         break;
 
       case 'overdue':
@@ -76,9 +72,11 @@ export const fetchDashboardDataApi = async (
         }
         break;
 
+      case 'all':
+        // No date filters for all tasks
+        break;
       default:
-        // For 'all' or other views, don't add additional date filters
-        // but still limit to tasks up to today for statistics consistency
+        // Limit to tasks up to today for other views if not specified
         query = query.lte('task_start_date', `${today}T23:59:59`);
         break;
     }
@@ -148,11 +146,8 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = null, t
         break;
 
       case 'upcoming':
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-        query = query.gte('task_start_date', `${tomorrowStr}T00:00:00`)
-          .lte('task_start_date', `${tomorrowStr}T23:59:59`);
+        // All future tasks (after today)
+        query = query.gt('task_start_date', `${today}T23:59:59`);
         break;
 
       case 'overdue':
@@ -165,6 +160,9 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = null, t
         }
         break;
 
+      case 'all':
+        // No date filters
+        break;
       default:
         query = query.lte('task_start_date', `${today}T23:59:59`);
         break;

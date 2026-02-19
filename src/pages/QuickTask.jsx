@@ -110,8 +110,10 @@ export default function QuickTask() {
   const [activeTab, setActiveTab] = useState('checklist');
   const [freqFilter, setFreqFilter] = useState('');
   const tableContainerRef = useRef(null);
+  const [dateFilter, setDateFilter] = useState("all"); // all, today, overdue, upcoming
   const [dropdownOpen, setDropdownOpen] = useState({
-    frequency: false
+    frequency: false,
+    dateFilter: false
   });
   const [selectedTasks, setSelectedTasks] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -491,18 +493,27 @@ export default function QuickTask() {
       ?.toLowerCase()
       .includes(searchTerm.toLowerCase());
 
-    // Today and Overdue Filter (Hide Upcoming)
+    // Date Filtering Logic
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const taskDate = task.task_start_date ? new Date(task.task_start_date) : null;
-    let isUpcoming = false;
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const taskDateStr = task.task_start_date || task.planned_date;
+    const taskDate = taskDateStr ? new Date(taskDateStr) : null;
+
+    let matchesDate = true;
     if (taskDate) {
-      const taskDay = new Date(taskDate);
-      taskDay.setHours(0, 0, 0, 0);
-      if (taskDay > today) isUpcoming = true;
+      if (dateFilter === "today") {
+        matchesDate = (taskDate >= today && taskDate <= todayEnd);
+      } else if (dateFilter === "overdue") {
+        matchesDate = (taskDate < today);
+      } else if (dateFilter === "upcoming") {
+        matchesDate = (taskDate > todayEnd);
+      }
     }
 
-    return freqFilterPass && searchTermPass && !isUpcoming;
+    return freqFilterPass && searchTermPass && matchesDate;
   }).sort((a, b) => {
     if (!sortConfig.key) return 0;
     if (a[sortConfig.key] < b[sortConfig.key]) {
@@ -524,18 +535,26 @@ export default function QuickTask() {
       task.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Today and Overdue Filter (Hide Upcoming)
+    // Date Filtering Logic
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+
     const taskDate = task.task_start_date ? new Date(task.task_start_date) : null;
-    let isUpcoming = false;
+
+    let matchesDate = true;
     if (taskDate) {
-      const taskDay = new Date(taskDate);
-      taskDay.setHours(0, 0, 0, 0);
-      if (taskDay > today) isUpcoming = true;
+      if (dateFilter === "today") {
+        matchesDate = (taskDate >= today && taskDate <= todayEnd);
+      } else if (dateFilter === "overdue") {
+        matchesDate = (taskDate < today);
+      } else if (dateFilter === "upcoming") {
+        matchesDate = (taskDate > todayEnd);
+      }
     }
 
-    return freqFilterPass && searchTermPass && !isUpcoming;
+    return freqFilterPass && searchTermPass && matchesDate;
   });
 
   function formatTimestampToDDMMYYYY(timestamp) {
@@ -630,6 +649,38 @@ export default function QuickTask() {
             </div>
 
             <div className="flex gap-2">
+              <div className="relative">
+                <button
+                  onClick={() => setDropdownOpen(prev => ({ ...prev, dateFilter: !prev.dateFilter }))}
+                  className="flex items-center gap-2 px-3 py-2 border border-purple-200 rounded-md bg-white text-sm text-gray-700 hover:bg-gray-50 capitalize"
+                >
+                  <Filter className="h-4 w-4" />
+                  {dateFilter === 'all' ? 'All Tasks' : dateFilter}
+                  <ChevronDown size={16} className={`transition-transform ${dropdownOpen.dateFilter ? 'rotate-180' : ''}`} />
+                </button>
+                {dropdownOpen.dateFilter && (
+                  <div className="absolute z-50 mt-1 w-40 right-0 rounded-md bg-white shadow-lg border border-gray-200 py-1">
+                    {[
+                      { id: 'all', label: 'All Tasks' },
+                      { id: 'today', label: 'Today' },
+                      { id: 'overdue', label: 'Overdue' },
+                      { id: 'upcoming', label: 'Upcoming' }
+                    ].map((filter) => (
+                      <button
+                        key={filter.id}
+                        onClick={() => {
+                          setDateFilter(filter.id);
+                          setDropdownOpen(prev => ({ ...prev, dateFilter: false }));
+                        }}
+                        className={`block w-full text-left px-4 py-2 text-sm ${dateFilter === filter.id ? 'bg-purple-50 text-purple-700 font-bold' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="relative">
                 <button
                   onClick={() => setDropdownOpen(prev => ({ ...prev, frequency: !prev.frequency }))}

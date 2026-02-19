@@ -71,7 +71,7 @@ const LoginPage = () => {
           },
           (payload) => {
             const updatedUser = payload.new;
-            if (updatedUser.status !== 'active') {
+            if (updatedUser.status === 'inactive') {
               // 🚨 Auto logout when status becomes inactive
               localStorage.clear();
               setToast({ show: true, message: "Your account has been deactivated.", type: "error" });

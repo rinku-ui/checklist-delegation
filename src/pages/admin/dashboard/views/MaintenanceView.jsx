@@ -89,7 +89,7 @@ const StatCard = ({ icon: Icon, label, value, color }) => (
 )
 
 export default function MaintenanceView({ stats: originalStats, chartData, tasks = [] }) {
-    const [maintFilter, setMaintFilter] = useState('today');
+    const [maintFilter, setMaintFilter] = useState('all');
     const [isSaving, setIsSaving] = useState(false);
 
     // Dropdown lists
@@ -184,7 +184,7 @@ export default function MaintenanceView({ stats: originalStats, chartData, tasks
             }
             if (maintFilter === 'week') return isThisWeek(taskDate, { weekStartsOn: 1 });
             if (maintFilter === 'month') return isThisMonth(taskDate);
-            return true; // 'all' - currently shows everything except upcoming pending
+            return true; // 'all'
         });
     }, [tasks, maintFilter]);
 
@@ -193,6 +193,7 @@ export default function MaintenanceView({ stats: originalStats, chartData, tasks
         const currentTasks = filteredTasks;
         if (!currentTasks || currentTasks.length === 0) return {
             totalMachines: 0,
+            totalTasksCount: 0,
             totalCost: 0,
             freqData: [],
             costData: [],
@@ -226,16 +227,21 @@ export default function MaintenanceView({ stats: originalStats, chartData, tasks
             // Determine task status based on submission_date
             const taskStartDate = task.originalTaskStartDate ? new Date(task.originalTaskStartDate) : null;
             const hasSubmission = task.submission_date !== null && task.submission_date !== undefined;
+            const isTaskToday = taskStartDate ? isToday(taskStartDate) : false;
+            const isOverdue = taskStartDate ? (taskStartDate < today && !hasSubmission) : false;
 
             if (hasSubmission && task.admin_done) {
                 completedCount++;
             } else {
-                // If submitted but not admin approved, it's Pending Approval.
-                // If not submitted, it's User Pending.
-                pendingCount++;
-                // Check if overdue (task start date is in the past and not completed)
-                if (taskStartDate && taskStartDate < today && !hasSubmission) {
+                // If submitted but not admin approved, it's Pending Approval (always count)
+                // If not submitted, count ONLY if Today or Overdue (ignore upcoming)
+                if (hasSubmission && !task.admin_done) {
+                    pendingCount++;
+                } else if (isOverdue) {
+                    pendingCount++;
                     overdueCount++;
+                } else if (isTaskToday) {
+                    pendingCount++;
                 }
             }
 
@@ -249,9 +255,7 @@ export default function MaintenanceView({ stats: originalStats, chartData, tasks
             const month = date.toLocaleString('default', { month: 'short' });
             monthlyCost[month] = (monthlyCost[month] || 0) + cost;
 
-            // Department Cost (using machine_name as proxy for department if not available, or just mock logic if field missing)
-            // Assuming task.company_name or given_by might be used for department categorization if available
-            // For now, let's use a dummy or skip if no clear department field
+            // Department Cost Logic
         });
 
         const freqData = Object.keys(freqCounts).map(key => ({ name: key, count: freqCounts[key] }));
@@ -264,6 +268,7 @@ export default function MaintenanceView({ stats: originalStats, chartData, tasks
 
         return {
             totalMachines: uniqueMachines.size,
+            totalTasksCount: completedCount + pendingCount,
             totalCost,
             freqData,
             costData,
@@ -291,7 +296,7 @@ export default function MaintenanceView({ stats: originalStats, chartData, tasks
             {/* Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                 <StatCard icon={Settings} label="Total Machines" value={processedData?.totalMachines || 0} color="bg-blue-500" />
-                <StatCard icon={Calendar} label="Total Tasks" value={filteredTasks.length} color="bg-indigo-500" />
+                <StatCard icon={Calendar} label="Total Tasks" value={processedData?.totalTasksCount || 0} color="bg-indigo-500" />
                 <StatCard icon={CheckCircle} label="Tasks Complete" value={processedData?.completedCount || 0} color="bg-green-500" />
                 <StatCard icon={Clock} label="Tasks Pending" value={processedData?.pendingCount || 0} color="bg-amber-500" />
                 <StatCard icon={AlertTriangle} label="Tasks Overdue" value={processedData?.overdueCount || 0} color="bg-red-500" />

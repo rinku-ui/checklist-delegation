@@ -33,7 +33,7 @@ import TaskManagementTabs from "../../components/TaskManagementTabs.jsx"
 
 export default function AdminDashboard() {
   const [dashboardType, setDashboardType] = useState("checklist")
-  const [taskView, setTaskView] = useState("recent")
+  const [taskView, setTaskView] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterStaff, setFilterStaff] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")

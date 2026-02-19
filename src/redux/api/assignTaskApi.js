@@ -92,50 +92,89 @@ export const fetchUniqueDoerNameDataApi = async (department) => {
 
 
 export const pushAssignTaskApi = async (generatedTasks, targetTable = null) => {
-  // Determine which table to use. Use targetTable if provided, 
-  // otherwise fallback to frequency-based logic.
-  let submitTable = targetTable;
+  // If targetTable is explicitly provided, use it for all tasks (legacy behavior or forced override)
+  if (targetTable) {
+    const tasksData = generatedTasks.map((task) => ({
+      department: task.department,
+      given_by: task.givenBy,
+      name: task.doer,
+      task_description: task.description,
+      task_start_date: task.dueDate,
+      planned_date: task.dueDate,
+      frequency: task.frequency,
+      duration: task.duration || null,
+      enable_reminder: task.enableReminders ? "yes" : "no",
+      require_attachment: task.requireAttachment ? "yes" : "no",
+      status: targetTable === 'checklist' ? null : (task.status || 'pending')
+    }));
 
-  if (!submitTable) {
-    const firstTaskFrequency = generatedTasks[0]?.frequency?.toLowerCase() || "";
-    const isOneTime = firstTaskFrequency === "one-time" ||
-      firstTaskFrequency.includes("one time") ||
-      firstTaskFrequency.includes("no recurrence");
-    submitTable = isOneTime ? "delegation" : "checklist";
-  }
-
-  console.log("Submitting to table:", submitTable, "Frequency:", generatedTasks[0]?.frequency);
-
-  const tasksData = generatedTasks.map((task) => ({
-    department: task.department,
-    given_by: task.givenBy,
-    name: task.doer,
-    task_description: task.description,
-    task_start_date: task.dueDate,
-    frequency: task.frequency,
-    duration: task.duration || null,
-    enable_reminder: task.enableReminders ? "yes" : "no",
-    require_attachment: task.requireAttachment ? "yes" : "no",
-    status: submitTable === 'checklist' ? null : (task.status || 'pending')
-  }));
-
-  try {
-    const { data, error } = await supabase
-      .from(submitTable)
-      .insert(tasksData)
-      .select(); // Added select() to return inserted data
-
-    if (error) {
-      console.error("Error when posting data:", error);
+    try {
+      const { data, error } = await supabase.from(targetTable).insert(tasksData).select();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error(`Error when posting data to ${targetTable}:`, error);
       throw error;
     }
+  }
 
-    console.log("Posted successfully to", submitTable, ":", data);
-    return data;
+  // Otherwise, separate tasks by frequency and route to respective tables
+  const delegationTasks = [];
+  const checklistTasks = [];
+
+  generatedTasks.forEach(task => {
+    const freq = task.frequency?.toLowerCase() || "";
+    const isOneTime = freq === "one-time" ||
+      freq.includes("one time") ||
+      freq.includes("no recurrence");
+
+    const taskData = {
+      department: task.department,
+      given_by: task.givenBy,
+      name: task.doer,
+      task_description: task.description,
+      task_start_date: task.dueDate,
+      planned_date: task.dueDate,
+      frequency: task.frequency,
+      duration: task.duration || null,
+      enable_reminder: task.enableReminders ? "yes" : "no",
+      require_attachment: task.requireAttachment ? "yes" : "no",
+    };
+
+    if (isOneTime) {
+      delegationTasks.push({ ...taskData, status: task.status || 'pending' });
+    } else {
+      checklistTasks.push({ ...taskData, status: null });
+    }
+  });
+
+  const results = [];
+
+  try {
+    if (delegationTasks.length > 0) {
+      const { data, error } = await supabase.from('delegation').insert(delegationTasks).select();
+      if (error) {
+        console.error("Error inserting into delegation table:", error);
+        throw error;
+      }
+      if (data) results.push(...data);
+    }
+
+    if (checklistTasks.length > 0) {
+      const { data, error } = await supabase.from('checklist').insert(checklistTasks).select();
+      if (error) {
+        console.error("Error inserting into checklist table:", error);
+        throw error;
+      }
+      if (data) results.push(...data);
+    }
+
+    console.log("Tasks distributed successfully. Results:", results);
+    return results;
   } catch (error) {
-    console.error("Error from supabase:", error);
+    console.error("Error during distributed task assignment:", error);
     throw error;
   }
-}
+};
 
 

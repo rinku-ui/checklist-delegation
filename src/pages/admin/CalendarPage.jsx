@@ -105,13 +105,35 @@ const CalendarPage = () => {
     const fetchTasks = async () => {
         try {
             setLoading(true);
+            const role = localStorage.getItem('role');
+            const username = localStorage.getItem('user-name');
+            const userAccess = localStorage.getItem('user_access');
+
             const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString();
             const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
+            let checklistQuery = supabase.from('checklist').select('*').gte('task_start_date', startOfMonth).lte('task_start_date', endOfMonth);
+            let maintenanceQuery = supabase.from('maintenance_tasks').select('*').gte('task_start_date', startOfMonth).lte('task_start_date', endOfMonth);
+            let repairQuery = supabase.from('repair_tasks').select('*').gte('created_at', startOfMonth).lte('created_at', endOfMonth);
+
+            // Apply filters based on role
+            if (role === 'user' && username) {
+                checklistQuery = checklistQuery.eq('name', username);
+                maintenanceQuery = maintenanceQuery.eq('name', username);
+                repairQuery = repairQuery.eq('name', username);
+            } else if (role === 'admin' && userAccess && userAccess !== 'all') {
+                const allowedDepartments = userAccess.split(',').map(dept => dept.trim()).filter(d => d && d !== 'all');
+                if (allowedDepartments.length > 0) {
+                    checklistQuery = checklistQuery.in('department', allowedDepartments);
+                    maintenanceQuery = maintenanceQuery.in('department', allowedDepartments);
+                    repairQuery = repairQuery.in('department', allowedDepartments);
+                }
+            }
+
             const [checklistRes, maintenanceRes, repairRes, holidaysRes] = await Promise.all([
-                supabase.from('checklist').select('*').gte('task_start_date', startOfMonth).lte('task_start_date', endOfMonth),
-                supabase.from('maintenance_tasks').select('*').gte('task_start_date', startOfMonth).lte('task_start_date', endOfMonth),
-                supabase.from('repair_tasks').select('*').gte('created_at', startOfMonth).lte('created_at', endOfMonth),
+                checklistQuery,
+                maintenanceQuery,
+                repairQuery,
                 supabase.from('holidays').select('*')
             ]);
 

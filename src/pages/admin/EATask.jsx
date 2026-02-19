@@ -193,10 +193,11 @@ function TaskCard({ task, index, total, allDoers, onUpdate, onRemove }) {
                             <Clock className="w-3 h-3" /> Duration
                         </label>
                         <input
-                            type="time"
+                            type="text"
                             name="duration"
                             value={task.duration}
                             onChange={handleInputChange}
+                            placeholder="e.g. 1 hour"
                             className="w-full p-2.5 border border-gray-200 rounded-lg bg-gray-50 focus:ring-2 focus:ring-purple-500 outline-none transition-all text-sm"
                         />
                     </div>
@@ -373,19 +374,15 @@ export default function EATask() {
             // Send WhatsApp notifications (one per unique doer)
             try {
                 if (insertedData && insertedData.length > 0) {
-                    const notified = new Set();
                     for (const task of insertedData) {
-                        if (!notified.has(task.doer_name)) {
-                            notified.add(task.doer_name);
-                            await sendTaskAssignmentNotification({
-                                doerName: task.doer_name,
-                                taskId: task.task_id || task.id,
-                                description: task.task_description,
-                                startDate: new Date(task.planned_date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
-                                givenBy: task.given_by,
-                                taskType: 'ea'
-                            });
-                        }
+                        await sendTaskAssignmentNotification({
+                            doerName: task.doer_name,
+                            taskId: task.task_id || task.id,
+                            description: task.task_description,
+                            startDate: new Date(task.planned_date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+                            givenBy: task.given_by,
+                            taskType: 'ea'
+                        });
                     }
                 }
             } catch (whatsappError) {
