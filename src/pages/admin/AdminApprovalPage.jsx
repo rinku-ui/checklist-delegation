@@ -129,7 +129,7 @@ export default function AdminApprovalPage() {
             } else if (activeTab === "repair") {
                 await approveRepairTask(task.id);
             } else if (activeTab === "ea") {
-                await approveEATaskV2(task.id);
+                await approveEATaskV2(task.id, task.done_id);
             } else if (activeTab === "checklist") {
                 await approveChecklistTask(task.id);
             }
@@ -161,7 +161,7 @@ export default function AdminApprovalPage() {
             } else if (activeTab === "repair") {
                 await rejectRepairTask(task.id, reason);
             } else if (activeTab === "ea") {
-                await rejectEATask(task.id, reason);
+                await rejectEATask(task.id, task.done_id, reason);
             } else if (activeTab === "checklist") {
                 await rejectChecklistTask(task.id, reason);
             }
@@ -380,6 +380,11 @@ export default function AdminApprovalPage() {
                                                 {(task.remarks || task.remark) && (
                                                     <div className="text-xs text-gray-500 mt-1 italic">
                                                         Remark: {task.remarks || task.remark}
+                                                    </div>
+                                                )}
+                                                {task.status && (
+                                                    <div className="text-xs font-bold text-blue-600 mt-1 uppercase bg-blue-50 px-2 py-0.5 rounded-sm inline-block">
+                                                        Status: {task.status}
                                                     </div>
                                                 )}
                                             </td>

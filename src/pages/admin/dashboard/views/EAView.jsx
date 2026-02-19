@@ -199,10 +199,15 @@ export default function EAView() {
                 const isApproved = (t.status?.toLowerCase() === 'approved') || (t.status?.toLowerCase() === 'done' && t.admin_done);
                 if (isApproved) return false;
 
-                if (!t.planned_date) return true;
-                const planned = new Date(t.planned_date);
-                planned.setHours(0, 0, 0, 0);
-                return planned <= today;
+                // Use task_start_date or planned_date as fallback to show in active console
+                const referenceDate = t.task_start_date || t.planned_date;
+                if (!referenceDate) return true;
+
+                const taskDate = new Date(referenceDate);
+                taskDate.setHours(0, 0, 0, 0);
+
+                // Show if it was started on or before today, or if it is specifically 'extended'
+                return taskDate <= today || t.status?.toLowerCase() === 'extended' || t.status?.toLowerCase() === 'extend';
             });
         } else {
             // Completed view: show all approved/admin_done tasks
@@ -217,14 +222,15 @@ export default function EAView() {
 
         // Filter out upcoming the tasks for stats calculation (except completed)
         const activeOrDoneTasks = tasks.filter(t => {
-            const isCompleted = t.status?.toLowerCase() === 'done' && t.admin_done;
-            const isApproved = t.status?.toLowerCase() === 'approved';
-            if (isCompleted || isApproved) return true;
+            const isCompleted = (t.status?.toLowerCase() === 'done' && t.admin_done) || t.status?.toLowerCase() === 'approved';
+            if (isCompleted) return true;
 
-            if (!t.planned_date) return true;
-            const planned = new Date(t.planned_date);
-            planned.setHours(0, 0, 0, 0);
-            return planned <= today;
+            const referenceDate = t.task_start_date || t.planned_date;
+            if (!referenceDate) return true;
+
+            const taskDate = new Date(referenceDate);
+            taskDate.setHours(0, 0, 0, 0);
+            return taskDate <= today || t.status?.toLowerCase() === 'extended' || t.status?.toLowerCase() === 'extend';
         });
 
         const total = activeOrDoneTasks.length;
@@ -275,13 +281,13 @@ export default function EAView() {
         return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     };
 
-    const getStatusStyles = (status, plannedDate, adminDone) => {
-        // Compare dates using ISO strings (YYYY-MM-DD) to avoid timezone issues
-        // and ensure TODAY is NOT counted as overdue.
+    const getStatusStyles = (status, plannedDate, adminDone, taskStartDate) => {
         const todayStr = new Date().toISOString().split('T')[0];
         const plannedStr = plannedDate ? new Date(plannedDate).toISOString().split('T')[0] : '';
+        const startStr = taskStartDate ? new Date(taskStartDate).toISOString().split('T')[0] : plannedStr;
 
-        const isOverdue = (status === 'pending' || status === 'extended') && plannedStr && plannedStr < todayStr;
+        // If it's extended, we follow the new planned date for overdue check
+        const isOverdue = (status === 'pending' || status === 'extended' || status === 'extend') && plannedStr && plannedStr < todayStr;
 
         if (isOverdue) return {
             bg: 'bg-red-50',
@@ -502,7 +508,8 @@ export default function EAView() {
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Name</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Mobile</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Target Task</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Date</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Start Date</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Planned Date</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Remarks Data</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider text-center">Status</th>
                             </tr>
@@ -516,7 +523,7 @@ export default function EAView() {
                                 </tr>
                             ) : (
                                 tableTasks.map((task) => {
-                                    const styles = getStatusStyles(task.status, task.planned_date, task.admin_done);
+                                    const styles = getStatusStyles(task.status, task.planned_date, task.admin_done, task.task_start_date);
                                     return (
                                         <tr
                                             key={task.task_id}
@@ -575,6 +582,14 @@ export default function EAView() {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <Calendar size={12} className="text-gray-400" />
+                                                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-tight">
+                                                        {formatDate(task.task_start_date || task.planned_date)}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
                                                 {editingTaskId === task.task_id ? (
                                                     <input
                                                         type="date"
@@ -585,7 +600,7 @@ export default function EAView() {
                                                 ) : (
                                                     <div className="flex items-center gap-2">
                                                         <Calendar size={12} className="text-indigo-400" />
-                                                        <span className={`text-[11px] font-black uppercase tracking-tight ${styles.label === 'Overdue' ? 'text-rose-600 animate-pulse' : 'text-gray-600'}`}>
+                                                        <span className={`text-[11px] font-black uppercase tracking-tight ${styles.label === 'Overdue' ? 'text-rose-600 animate-pulse' : 'text-gray-800'}`}>
                                                             {formatDate(task.planned_date)}
                                                         </span>
                                                     </div>

@@ -377,7 +377,6 @@ export default function RepairView({ tasks = [] }) {
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[200px]">Issue</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Date</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Status</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[150px]">Remarks</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-100">
@@ -406,9 +405,6 @@ export default function RepairView({ tasks = [] }) {
                                             <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold border uppercase ${getStatusColor(task.status, task.admin_done)}`}>
                                                 {task.status ? task.status.split(' ')[0] : "Pending"}
                                             </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-600">
-                                            {task.remarks || "-"}
                                         </td>
                                     </tr>
                                 ))

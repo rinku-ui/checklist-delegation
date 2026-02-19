@@ -74,16 +74,14 @@ export const postRepairTaskApi = async (formData) => {
     }
 };
 
-// --- UPDATE REPAIR (Admin Action) ---
 export const updateRepairData = async (updates) => {
     try {
-        // This handles the "Admin will complete remaining info" part
         const results = await Promise.all(updates.map(async (item) => {
             const { data, error } = await supabase
                 .from('repair_tasks')
                 .update({
-                    // Any submission (Completed, Done or Issue) needs admin approval first
-                    status: (item.status === 'Completed' || item.status === 'Done' || item.status === 'Issue') ? 'Pending Approval' : item.status,
+                    // Fallback to 'Pending Approval' status until admin_done column is added
+                    status: (item.status === 'Completed' || item.status === 'Done' || item.status === 'Issue' || item.status.includes('Completed')) ? 'Pending Approval' : item.status,
                     part_replaced: item.partReplaced || null,
                     bill_amount: item.billAmount || null,
                     remarks: item.remarks || null,
@@ -140,7 +138,7 @@ export const fetchPendingRepairApprovals = async () => {
         const { data, error } = await supabase
             .from('repair_tasks')
             .select('*')
-            .eq('status', 'Pending Approval') // Fetch tasks waiting for approval
+            .eq('status', 'Pending Approval') // Fallback to status-based filtering
             .order('submission_date', { ascending: false });
 
         if (error) throw error;
@@ -148,7 +146,7 @@ export const fetchPendingRepairApprovals = async () => {
             ...task,
             id: task.id,
             department: task.department || 'Repair',
-            name: task.assigned_person || task.filled_by // Use doer's name for approval list
+            name: task.assigned_person || task.filled_by
         }));
     } catch (error) {
         console.error("Error fetching pending repair approvals:", error);
@@ -160,7 +158,9 @@ export const approveRepairTask = async (id) => {
     try {
         const { data, error } = await supabase
             .from('repair_tasks')
-            .update({ status: 'Approved' }) // Mark as fully Approved
+            .update({
+                status: 'Approved' // Just set status for now
+            })
             .eq('id', id)
             .select()
             .single();
@@ -175,11 +175,11 @@ export const approveRepairTask = async (id) => {
 
 export const rejectRepairTask = async (id, reason) => {
     try {
-        // Reset status to Pending so doer can retry/edit
         const { data, error } = await supabase
             .from('repair_tasks')
             .update({
                 status: 'Pending',
+                submission_date: null,
                 work_done: null,
                 work_photo_url: null,
                 bill_copy_url: null,

@@ -233,8 +233,6 @@ export default function RepairPendingPage({ showLayout = true }) {
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Enable Reminders</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Require Attachment</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Status</th>
-                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Remarks</th>
-                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Upload Image</th>
                                 <th className="py-3 px-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-24">
                                     {showHistory ? "Updated" : "Action"}
                                 </th>
@@ -276,12 +274,6 @@ export default function RepairPendingPage({ showLayout = true }) {
                                                 ? (item.admin_done ? "Approved" : "Pending Approval")
                                                 : (item.status ? item.status.split(' ')[0] : "Pending")}
                                         </span>
-                                    </td>
-                                    <td className="py-4 px-4 align-top text-sm text-gray-600">
-                                        {item.remarks || "-"}
-                                    </td>
-                                    <td className="py-4 px-4 align-top text-sm text-gray-600 text-center">
-                                        -
                                     </td>
                                     <td className="py-4 px-4 align-top text-right">
                                         {showHistory ? (

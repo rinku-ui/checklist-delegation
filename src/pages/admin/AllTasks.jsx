@@ -374,8 +374,6 @@ const AllTasks = () => {
               { id: "status", label: "Status" },
               { id: "part_replaced", label: "Part Replaced" },
               { id: "bill_amount", label: "Bill Amount" },
-              { id: "remarks", label: "Remarks" },
-              { id: "work_photo_url", label: "Attachment" },
             ];
           } else {
             headers = [
@@ -404,6 +402,7 @@ const AllTasks = () => {
             { id: "department", label: "Department" },
             { id: "doer_name", label: "Doer Name" },
             { id: "phone_number", label: "Phone Number" },
+            { id: "task_start_date", label: "Task Start Date" },
             { id: "planned_date", label: "Planned Date" },
             { id: "status", label: "Status" },
           ];
@@ -442,6 +441,7 @@ const AllTasks = () => {
 
       if (showHistory) {
         if (activeTab === "repair") {
+          // Use status until admin_done column is added
           query = query.not("submission_date", "is", null).order("submission_date", { ascending: false });
         } else if (activeTab === "ea") {
           query = query.in("status", ["done", "approved"]).order("updated_at", { ascending: false });
@@ -450,9 +450,10 @@ const AllTasks = () => {
         }
       } else {
         if (activeTab === "repair") {
+          // Revert to submission_date logic until admin_done is added to avoid 400 error
           query = query.is("submission_date", null).order(dateColumn, { ascending: false });
         } else if (activeTab === "ea") {
-          query = query.in("status", ["pending", "extend", "extended"]).order("planned_date", { ascending: true });
+          query = query.in("status", ["pending", "extend", "extended"]).order("task_start_date", { ascending: true });
         } else {
           query = query.is(completionField, null).order(dateColumn, { ascending: false });
         }
@@ -491,7 +492,7 @@ const AllTasks = () => {
 
   // Filtering Logic
   const filteredPendingTasks = useMemo(() => {
-    const dateColumn = activeTab === "repair" ? "created_at" : (activeTab === "ea" ? "planned_date" : "task_start_date");
+    const dateColumn = activeTab === "repair" ? "created_at" : (activeTab === "ea" ? "task_start_date" : "task_start_date");
 
     // First, sort tasks by date to ensure we handle them in order
     const sortedTasks = [...tasks].sort((a, b) => {
@@ -615,7 +616,14 @@ const AllTasks = () => {
   const handleSelectAll = useCallback(
     (e) => {
       if (e.target.checked) {
-        setSelectedItems(new Set(filteredPendingTasks.map((t) => t.id)));
+        // Use the same dateColumn logic as in the render loop
+        const col = activeTab === "repair" ? "created_at" : (activeTab === "ea" ? "planned_date" : "task_start_date");
+        const submittableTasks = filteredPendingTasks.filter(t => {
+          const timeStatus = getTimeStatus(t[col]);
+          const isExtended = t.status?.toLowerCase() === "extended" || t.status?.toLowerCase() === "extend";
+          return timeStatus !== "Upcoming" || isExtended;
+        });
+        setSelectedItems(new Set(submittableTasks.map((t) => t.id)));
       } else {
         setSelectedItems(new Set());
         setRemarksData({});
@@ -623,7 +631,7 @@ const AllTasks = () => {
         setStatusData({});
       }
     },
-    [filteredPendingTasks, dateFilter]
+    [filteredPendingTasks, dateFilter, activeTab, getTimeStatus]
   );
 
   // File Upload
@@ -772,10 +780,20 @@ const AllTasks = () => {
           const taskStatus = statusData[id] || "done";
 
           if (taskStatus === "extended" && extendedDateData[id]) {
+            // 1. Insert extension record into ea_tasks_done
+            const { error: doneError } = await supabase.from("ea_tasks_done").insert([{
+              task_id: id,
+              status: "extended",
+              remarks: remarksData[id] || null,
+              given_by: localStorage.getItem("user-name") || "Admin"
+            }]);
+            if (doneError) throw doneError;
+
+            // 2. Update ea_tasks
             const extendedDate = new Date(extendedDateData[id]).toISOString();
             const { error: updateError } = await supabase.from("ea_tasks").update({
               planned_date: extendedDate,
-              status: "pending", // Reset to pending for the new date
+              status: "extended", // Keep as extended so it's visible as such
               remarks: remarksData[id] || null,
               updated_at: new Date().toISOString()
             }).eq("task_id", id);
@@ -796,9 +814,21 @@ const AllTasks = () => {
               });
             }
           } else if (taskStatus === "done") {
+            // 1. Insert completion record into ea_tasks_done
+            const { error: doneError } = await supabase.from("ea_tasks_done").insert([{
+              task_id: id,
+              status: "pending", // Waiting for admin approval
+              remarks: remarksData[id] || null,
+              image_url: imageUrl,
+              given_by: localStorage.getItem("user-name") || "Admin"
+            }]);
+            if (doneError) throw doneError;
+
+            // 2. Update ea_tasks
             const updates = {
               status: "done", // Mark as done for admin approval
               remarks: remarksData[id] || null,
+              admin_done: false,
               updated_at: new Date().toISOString()
             };
             if (imageUrl) {
@@ -1168,7 +1198,7 @@ const AllTasks = () => {
                               type="checkbox"
                               checked={selectedItems.has(task.id)}
                               onChange={(e) => handleSelectItem(task.id, e.target.checked)}
-                              disabled={dateFilter === "upcoming"}
+                              disabled={getTimeStatus(task[dateColumn]) === "Upcoming" && !(task.status?.toLowerCase() === "extended" || task.status?.toLowerCase() === "extend")}
                               className="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 disabled:opacity-30 disabled:cursor-not-allowed"
                             />
                           </td>
@@ -1199,9 +1229,9 @@ const AllTasks = () => {
                                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm">
                                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${task.status === "Pending" ? "bg-yellow-100 text-yellow-800" :
                                     (task.status === "Approved" || task.status === "Completed") ? "bg-green-100 text-green-800" :
-                                      task.status === "Pending Approval" ? "bg-orange-100 text-orange-800" :
+                                      (!task.admin_done && task.submission_date) ? "bg-orange-100 text-orange-800" :
                                         "bg-gray-100 text-gray-800"}`}>
-                                    {task.status}
+                                    {(!task.admin_done && task.submission_date) ? "Pending Approval" : task.status}
                                   </span>
                                 </td>
                                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">{task.part_replaced || "—"}</td>
@@ -1255,8 +1285,13 @@ const AllTasks = () => {
                               <td key={header.id} className={`px-3 sm:px-6 py-3 sm:py-4 text-sm text-gray-800 ${header.id === 'task_description' || header.id === 'issue_description' ? 'min-w-[200px] whitespace-normal' : 'whitespace-nowrap'} ${header.id === 'task_start_date' ? 'bg-yellow-50' : ''}`}>
                                 {header.id === "time_status"
                                   ? (
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getTimeStatus(task[dateColumn]) === 'Overdue' ? 'bg-red-100 text-red-800' : getTimeStatus(task[dateColumn]) === 'Today' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
-                                      {getTimeStatus(task[dateColumn])}
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${(activeTab === "ea" && (task.status?.toLowerCase() === "extended" || task.status?.toLowerCase() === "extend")) ? 'bg-amber-100 text-amber-800' :
+                                      getTimeStatus(task[dateColumn]) === 'Overdue' ? 'bg-red-100 text-red-800' :
+                                        getTimeStatus(task[dateColumn]) === 'Today' ? 'bg-green-100 text-green-800' :
+                                          'bg-blue-100 text-blue-800'}`}>
+                                      {(activeTab === "ea" && (task.status?.toLowerCase() === "extended" || task.status?.toLowerCase() === "extend"))
+                                        ? "Extended"
+                                        : getTimeStatus(task[dateColumn])}
                                     </span>
                                   )
                                   : header.id === "task_start_date" || header.id === "created_at" || header.id === "planned_date" || header.id === "updated_at"
@@ -1301,7 +1336,7 @@ const AllTasks = () => {
                                           )
                                           : (
                                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${activeTab === "ea"
-                                              ? (task[header.id]?.toLowerCase() === "approved" ? "bg-green-100 text-green-800" : task[header.id]?.toLowerCase() === "done" ? "bg-orange-100 text-orange-800" : (task[header.id]?.toLowerCase() === "pending" || task[header.id]?.toLowerCase() === "extend" || task[header.id]?.toLowerCase() === "extended") ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-800")
+                                              ? (task[header.id]?.toLowerCase() === "approved" ? "bg-green-100 text-green-800" : task[header.id]?.toLowerCase() === "done" ? "bg-orange-100 text-orange-800" : (task[header.id]?.toLowerCase() === "pending" || task[header.id]?.toLowerCase() === "extend" || task[header.id]?.toLowerCase() === "extended") ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-800")
                                               : (task[header.id] === "Done" || task[header.id] === "yes" || task[header.id] === "done" || task[header.id] === "approved" || task[header.id] === "Completed")
                                                 ? (task.admin_done ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800")
                                                 : (task[header.id] === "extend" || task[header.id] === "pending" || task[header.id] === "extended")
@@ -1309,7 +1344,7 @@ const AllTasks = () => {
                                                   : "bg-gray-100 text-gray-800"
                                               }`}>
                                               {activeTab === "ea" && showHistory
-                                                ? (task[header.id]?.toLowerCase() === "approved" || (task[header.id]?.toLowerCase() === "done" && task.admin_done) ? "Completed" : task[header.id]?.toLowerCase() === "done" ? "Pending Approval" : task[header.id])
+                                                ? (task[header.id]?.toLowerCase() === "approved" || (task[header.id]?.toLowerCase() === "done" && task.admin_done) ? "Completed" : task[header.id]?.toLowerCase() === "done" ? "Pending Approval" : (task[header.id]?.toLowerCase() === "extended" || task[header.id]?.toLowerCase() === "extend") ? "Extended" : task[header.id])
                                                 : (showHistory && (task[header.id] === "Done" || task[header.id] === "yes" || task[header.id] === "done" || task[header.id] === "Completed") && !task.admin_done)
                                                   ? "Pending Approval"
                                                   : (showHistory && (task[header.id] === "Done" || task[header.id] === "yes" || task[header.id] === "done" || task[header.id] === "Completed") && task.admin_done)

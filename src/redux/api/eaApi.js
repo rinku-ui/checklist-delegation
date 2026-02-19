@@ -17,17 +17,38 @@ export const fetchEATasks = async () => {
     }
 };
 
-// Fetch EA task history (completed/approved)
+// Fetch EA task history (completed/approved) from ea_tasks_done
 export const fetchEATasksHistory = async () => {
     try {
-        const { data, error } = await supabase
-            .from('ea_tasks')
+        const { data: doneData, error } = await supabase
+            .from('ea_tasks_done')
             .select('*')
-            .in('status', ['done', 'approved', 'Approved', 'Done'])
-            .order('updated_at', { ascending: false });
+            .in('status', ['done', 'approved', 'Approved', 'Done', 'extended', 'Extended'])
+            .order('created_at', { ascending: false });
 
         if (error) throw error;
-        return (data || []).map(row => ({ ...row, id: row.task_id, department: "EA" }));
+
+        if (!doneData || doneData.length === 0) return [];
+
+        const taskIds = doneData.map(d => d.task_id).filter(id => id);
+        let taskDetails = [];
+        if (taskIds.length > 0) {
+            const { data: details, error: detailsError } = await supabase
+                .from('ea_tasks')
+                .select('*')
+                .in('task_id', taskIds);
+            if (!detailsError) taskDetails = details;
+        }
+
+        return doneData.map(doneItem => {
+            const detail = taskDetails.find(t => t.task_id === doneItem.task_id);
+            return {
+                ...detail,
+                ...doneItem,
+                id: doneItem.task_id,
+                department: "EA"
+            };
+        });
     } catch (err) {
         console.error('Error fetching EA task history:', err);
         return [];
@@ -70,12 +91,28 @@ export const updateEATask = async (taskId, updates) => {
 // Complete EA task (mark for admin approval)
 export const completeEATask = async (task, remarks = '', imageUrl = '') => {
     try {
+        const givenBy = localStorage.getItem("user-name") || "Admin";
+
+        // 1. Insert into ea_tasks_done
+        const { error: doneError } = await supabase
+            .from('ea_tasks_done')
+            .insert([{
+                task_id: task.id || task.task_id,
+                status: 'pending', // Waiting for admin approval
+                remarks: remarks,
+                image_url: imageUrl,
+                given_by: givenBy
+            }]);
+        if (doneError) throw doneError;
+
+        // 2. Update ea_tasks
         const { data, error } = await supabase
             .from('ea_tasks')
             .update({
-                status: 'done', // Mark as pending for admin approval
+                status: 'done',
                 remarks: remarks,
                 image_url: imageUrl,
+                admin_done: false,
                 updated_at: new Date().toISOString()
             })
             .eq('task_id', task.id || task.task_id)
@@ -92,11 +129,25 @@ export const completeEATask = async (task, remarks = '', imageUrl = '') => {
 // Extend EA task deadline
 export const extendEATask = async (task, newPlannedDate, remarks = '') => {
     try {
+        const givenBy = localStorage.getItem("user-name") || "Admin";
+
+        // 1. Insert into ea_tasks_done as an 'extend' record
+        const { error: doneError } = await supabase
+            .from('ea_tasks_done')
+            .insert([{
+                task_id: task.id || task.task_id,
+                status: 'extended',
+                remarks: remarks,
+                given_by: givenBy
+            }]);
+        if (doneError) throw doneError;
+
+        // 2. Update ea_tasks
         const { data, error } = await supabase
             .from('ea_tasks')
             .update({
                 planned_date: newPlannedDate,
-                status: 'pending',
+                status: 'extended',
                 remarks: remarks,
                 updated_at: new Date().toISOString()
             })
@@ -129,63 +180,92 @@ export const deleteEATask = async (taskId) => {
 
 export const fetchPendingEAApprovals = async () => {
     try {
-        const { data, error } = await supabase
-            .from('ea_tasks')
+        // Fetch pending completions from ea_tasks_done
+        const { data: doneData, error } = await supabase
+            .from('ea_tasks_done')
             .select('*')
-            .in('status', ['done', 'Done']) // 'done' status means waiting for admin approval
-            .or('admin_done.is.null,admin_done.eq.false') // Only fetch tasks not yet approved
-            .order('updated_at', { ascending: false });
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
 
         if (error) throw error;
-        return (data || []).map(task => ({ ...task, id: task.task_id, department: "EA" }));
+        if (!doneData || doneData.length === 0) return [];
+
+        const taskIds = doneData.map(d => d.task_id).filter(id => id);
+        let taskDetails = [];
+        if (taskIds.length > 0) {
+            const { data: details, error: detailsError } = await supabase
+                .from('ea_tasks')
+                .select('*')
+                .in('task_id', taskIds);
+            if (!detailsError) taskDetails = details;
+        }
+
+        return doneData.map(doneItem => {
+            const detail = taskDetails.find(t => t.task_id === doneItem.task_id);
+            return {
+                ...detail,
+                ...doneItem,
+                done_id: doneItem.id, // Record the entry ID from ea_tasks_done
+                id: doneItem.task_id,
+                department: "EA"
+            };
+        });
     } catch (error) {
         console.error("Error fetching pending EA approvals:", error);
         return [];
     }
 };
 
-export const approveEATaskV2 = async (id) => {
-    console.log("APPROVING EA TASK WITH ID:", id);
+export const approveEATaskV2 = async (id, doneId) => {
+    console.log("APPROVING EA TASK WITH ID:", id, "DONE_ID:", doneId);
     try {
-        const numericId = parseInt(id);
-        if (isNaN(numericId)) {
-            console.error("Invalid Task ID provided to approveEATaskV2:", id);
-            throw new Error("Invalid Task ID: " + id);
+        // 1. Update ea_tasks_done
+        if (doneId) {
+            await supabase
+                .from('ea_tasks_done')
+                .update({ status: 'done', updated_at: new Date().toISOString() })
+                .eq('id', doneId);
         }
 
+        // 2. Update ea_tasks
         const { data, error } = await supabase
             .from('ea_tasks')
             .update({
-                admin_done: true, // Mark as admin approved
+                admin_done: true,
+                status: 'done',
                 updated_at: new Date().toISOString()
             })
-            .eq('task_id', numericId)
+            .eq('task_id', id)
             .select();
 
-        if (error) {
-            console.error("Supabase Error in approveEATaskV2:", error);
-            throw error;
-        }
-
-        console.log("EA Task Approved successfully:", data);
+        if (error) throw error;
         return data && data.length > 0 ? data[0] : null;
     } catch (error) {
-        console.error("Error in approveEATaskV2 catch block:", error);
+        console.error("Error in approveEATaskV2:", error);
         throw error;
     }
 };
 
-export const rejectEATask = async (id, reason) => {
+export const rejectEATask = async (id, doneId, reason) => {
     try {
-        const numericId = parseInt(id);
+        // 1. Mark ea_tasks_done as rejected
+        if (doneId) {
+            await supabase
+                .from('ea_tasks_done')
+                .update({ status: 'rejected', updated_at: new Date().toISOString() })
+                .eq('id', doneId);
+        }
+
+        // 2. Reset ea_tasks
         const { data, error } = await supabase
             .from('ea_tasks')
             .update({
                 admin_done: false,
-                status: 'pending', // Revert to pending
-                remarks: reason
+                status: 'pending',
+                remarks: reason,
+                updated_at: new Date().toISOString()
             })
-            .eq('task_id', numericId)
+            .eq('task_id', id)
             .select()
             .single();
 

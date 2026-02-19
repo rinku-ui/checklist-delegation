@@ -361,6 +361,7 @@ export default function EATask() {
                     doer_name: task.doer_name,
                     phone_number: task.phone_number,
                     planned_date: startDate.toISOString(),
+                    task_start_date: startDate.toISOString(), // Store original plan date
                     task_description: finalDescription,
                     duration: task.duration || null,
                     status: 'pending',
