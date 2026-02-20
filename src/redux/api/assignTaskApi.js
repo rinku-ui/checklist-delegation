@@ -32,15 +32,46 @@ export const fetchUniqueDepartmentDataApi = async () => {
 
 export const fetchUniqueGivenByDataApi = async () => {
   try {
+    console.log("🔍 API: Fetching 'Assign From' list from database...");
+
     const { data, error } = await supabase
       .from('assign_from')
-      .select('name')
-      .order('name', { ascending: true });
+      .select('*') // Fetch all to be safe and check column names
+      .order('id', { ascending: true });
 
-    if (error) throw error;
-    return data.map(d => d.name);
+    if (error) {
+      console.error("❌ API ERROR (assign_from):", error.message);
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      console.warn("⚠️ API: 'assign_from' table is empty. Add names in Settings.");
+      return [];
+    }
+
+    // Handle different possible column names (name, given_by, etc.)
+    const extractedNames = data.map(item => {
+      let val = item.name || item.given_by || item.value || (typeof item === 'string' ? item : null);
+
+      // Patch: if the value is a JSON string (due to previous bug), parse it
+      if (typeof val === 'string' && val.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(val);
+          return parsed.given_by || parsed.name || val;
+        } catch (e) {
+          // Not valid JSON, keep as is
+        }
+      }
+      return val;
+    }).filter(val => val && val.toString().trim() !== "");
+
+    // Get unique values and sort
+    const uniqueNames = [...new Set(extractedNames)].sort();
+
+    console.log("✅ API: Loaded Assigners:", uniqueNames);
+    return uniqueNames;
   } catch (error) {
-    console.log("error from supabase", error);
+    console.error("❌ API: Unexpected failure fetching assigners:", error);
     return [];
   }
 };

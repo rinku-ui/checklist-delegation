@@ -31,9 +31,6 @@ export const assignTaskInTable = createAsyncThunk('post/delegation', async ({ ta
 
 
 const assignTaskSlice = createSlice({
-  name: 'department',
-  name: 'givenBy',
-  name: 'doerName',
   name: 'assignTask',
   initialState: {
     department: [],

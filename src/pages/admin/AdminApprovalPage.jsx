@@ -8,6 +8,7 @@ import { fetchPendingEAApprovals, approveEATaskV2, rejectEATask, fetchApprovedEA
 import { fetchPendingChecklistApprovals, approveChecklistTask, rejectChecklistTask, fetchChecklistHistory } from "../../redux/api/quickTaskApi";
 import { CheckCircle2, Search, Play, Pause, AlertCircle, BookCheck, Wrench, Hammer, Briefcase, XCircle, History, Clock } from "lucide-react";
 import { sendTaskRejectionNotification } from "../../services/whatsappService";
+import AudioPlayer from "../../components/AudioPlayer";
 
 // Helper to extract audio URL from text
 const extractAudioUrl = (text) => {
@@ -15,58 +16,6 @@ const extractAudioUrl = (text) => {
     const match = text.match(/(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|wav|ogg|webm|m4a|aac)(\?.*)?)/i) ||
         text.match(/(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*)/i);
     return match ? match[0] : null;
-};
-
-const AudioPlayer = ({ url }) => {
-    const [isPlaying, setIsPlaying] = useState(false);
-    const audioRef = useRef(null);
-
-    const togglePlay = (e) => {
-        e.stopPropagation();
-        if (isPlaying) {
-            audioRef.current.pause();
-        } else {
-            audioRef.current.play();
-        }
-        setIsPlaying(!isPlaying);
-    };
-
-    useEffect(() => {
-        const audio = audioRef.current;
-        if (!audio) return;
-
-        const handleEnded = () => setIsPlaying(false);
-        audio.addEventListener('ended', handleEnded);
-        return () => audio.removeEventListener('ended', handleEnded);
-    }, []);
-
-    return (
-        <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] ${isPlaying
-            ? 'bg-indigo-50/80 border-indigo-200 shadow-sm scale-[1.02]'
-            : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-xs'
-            }`}>
-            <button
-                onClick={togglePlay}
-                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
-                    ? 'bg-gradient-to-r from-rose-500 to-pink-600'
-                    : 'bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-110'
-                    }`}
-            >
-                {isPlaying ? (
-                    <Pause size={12} className="text-white fill-white" />
-                ) : (
-                    <Play size={12} className="text-white fill-white ml-0.5" />
-                )}
-            </button>
-            <div className="flex flex-col">
-                <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-indigo-700' : 'text-gray-400'
-                    }`}>
-                    {isPlaying ? 'Playing...' : 'Voice Note'}
-                </span>
-                <audio ref={audioRef} src={url} className="hidden" />
-            </div>
-        </div>
-    );
 };
 
 export default function AdminApprovalPage() {

@@ -100,9 +100,11 @@ const RealtimeLogoutListener = () => {
         .from("users")
         .select("status")
         .eq("user_name", username)
-        .single();
+        .limit(1);
 
-      if (data && data.status === "inactive") {
+      const userDataResult = data && data.length > 0 ? data[0] : null;
+
+      if (userDataResult && userDataResult.status === "inactive") {
         localStorage.clear();
         navigate("/login");
         window.location.reload();

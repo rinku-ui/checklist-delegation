@@ -228,7 +228,7 @@ export const sendUrgentTaskNotification = async (taskDetails) => {
                     `Task ID: ${taskId}\n` +
                     `🏢 Dept: ${department || 'N/A'}\n` +
                     `📝 Task: ${displayDescription}\n` +
-                    `⏳ Start Date: ${dueDate}\n` +
+                    `⏳ Planned Date: ${dueDate}\n` +
                     `🧑 Given By: ${givenBy}\n`;
                 break;
 
@@ -285,7 +285,7 @@ export const sendChecklistTaskNotification = async (taskDetails) => {
             `📌 Task ID: ${taskId}\n` +
             `🏢 Dept: ${department || 'N/A'}\n` +
             `📝 Task: ${displayDescription}\n` +
-            `⏳ Start Date: ${startDate}\n` +
+            `⏳ Planned Date: ${startDate}\n` +
             (duration ? `⏱ Duration: ${duration}\n` : '') +
             `🧑 Given By: ${givenBy}\n\n` +
             `✅ Link: https://checklist-delegation-supabase-five.vercel.app/login\n` +

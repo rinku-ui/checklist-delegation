@@ -5,48 +5,14 @@ import { useDispatch, useSelector } from "react-redux"
 import { maintenanceData, maintenanceHistoryData, updateMaintenance } from "../../redux/slice/maintenanceSlice"
 import { Search, History, ArrowLeft, CheckCircle2, X, Upload, Save, Loader2, Play, Pause } from "lucide-react"
 import { useRef } from "react"
+import AudioPlayer from "../../components/AudioPlayer"
 
 const isAudioUrl = (url) => {
-    if (typeof url !== 'string') return false;
+    if (!url || typeof url !== 'string') return false;
     return url.startsWith('http') && (
         url.includes('audio-recordings') ||
+        url.includes('voice-notes') ||
         url.match(/\.(mp3|wav|ogg|webm|m4a|aac)(\?.*)?$/i)
-    );
-};
-
-const AudioPlayer = ({ url }) => {
-    const [isPlaying, setIsPlaying] = useState(false);
-    const audioRef = useRef(null);
-
-    const togglePlay = () => {
-        if (isPlaying) {
-            audioRef.current.pause();
-        } else {
-            audioRef.current.play();
-        }
-        setIsPlaying(!isPlaying);
-    };
-
-    useEffect(() => {
-        const audio = audioRef.current;
-        if (!audio) return;
-
-        const handleEnded = () => setIsPlaying(false);
-        audio.addEventListener('ended', handleEnded);
-        return () => audio.removeEventListener('ended', handleEnded);
-    }, []);
-
-    return (
-        <div className="flex items-center gap-2">
-            <button
-                onClick={togglePlay}
-                className="p-1.5 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200 transition-colors shadow-sm"
-            >
-                {isPlaying ? <Pause size={14} /> : <Play size={14} />}
-            </button>
-            <span className="text-xs font-medium text-purple-700">Voice Note</span>
-            <audio ref={audioRef} src={url} className="hidden" />
-        </div>
     );
 };
 

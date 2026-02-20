@@ -267,7 +267,7 @@ export const rejectEATask = async (id, doneId, reason) => {
             })
             .eq('task_id', id)
             .select()
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
         return data;

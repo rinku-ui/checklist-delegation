@@ -117,7 +117,7 @@ export const insertDelegationDoneAndUpdate = createAsyncThunk(
             .update(delegationUpdate)
             .eq('task_id', taskData.id || taskData.task_id)
             .select()
-            .single();
+            .maybeSingle();
 
           if (updateError) {
             console.error('Error updating delegation:', updateError);
@@ -347,7 +347,7 @@ export const updateDelegationDoneStatus = createAsyncThunk(
         .update({ status: 'done' })
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (doneError) throw doneError;
 

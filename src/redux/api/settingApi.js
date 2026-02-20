@@ -122,7 +122,7 @@ export const createUserApi = async (newUser) => {
         }
       ])
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.log("Error when posting data:", error);
@@ -140,14 +140,18 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
   try {
     const updateData = {
       user_name: updatedUser.user_name,
-      password: updatedUser.password,
       email_id: updatedUser.email_id,
       number: updatedUser.number,
-      employee_id: updatedUser.employee_id, // Add this line
+      employee_id: updatedUser.employee_id,
       role: updatedUser.role,
       status: updatedUser.status,
       user_access: updatedUser.user_access
     };
+
+    // Only update password if a new one is provided
+    if (updatedUser.password && updatedUser.password.trim() !== "") {
+      updateData.password = updatedUser.password;
+    }
 
     // Add leave data if provided
     if (updatedUser.leave_date !== undefined) {
@@ -165,7 +169,7 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
       .update(updateData)
       .eq("id", id)
       .select()
-      .single();
+      .maybeSingle();
 
     console.log(data, "data")
     console.log(error, "error")
@@ -192,7 +196,7 @@ export const createDepartmentApi = async (newDept) => {
         given_by: newDept.given_by
       }])
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return data;
@@ -212,7 +216,7 @@ export const updateDepartmentDataApi = async ({ id, updatedDept }) => {
       })
       .eq("id", id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return data;
@@ -263,7 +267,7 @@ export const updateCustomDropdownApi = async ({ id, category, value }) => {
       .update({ [column]: value })
       .eq("id", id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return {
@@ -326,20 +330,34 @@ export const fetchGivenByDataApi = async () => {
       .order('name', { ascending: true });
 
     if (error) throw error;
-    return data.map(d => ({ id: d.id, given_by: d.name }));
+    return data.map(d => {
+      let name = d.name;
+      if (typeof name === 'string' && name.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(name);
+          name = parsed.given_by || parsed.name || name;
+        } catch (e) { }
+      }
+      return { id: d.id, given_by: name };
+    });
   } catch (error) {
     console.log("error fetching assign_from data", error);
     return [];
   }
 };
 
-export const createAssignFromApi = async (name) => {
+export const createAssignFromApi = async (input) => {
   try {
+    // Handle both string and object input { given_by: 'name' }
+    const name = typeof input === 'string' ? input : (input?.given_by || input?.name);
+
+    if (!name) throw new Error("Name is required");
+
     const { data, error } = await supabase
       .from("assign_from")
       .insert([{ name }])
       .select()
-      .single();
+      .maybeSingle();
     if (error) throw error;
     return data;
   } catch (error) {
@@ -355,7 +373,7 @@ export const updateAssignFromApi = async ({ id, given_by }) => {
       .update({ name: given_by })
       .eq("id", id)
       .select()
-      .single();
+      .maybeSingle();
     if (error) throw error;
     return data;
   } catch (error) {
@@ -406,7 +424,7 @@ export const createCustomDropdownApi = async (item) => {
         [column]: item.value
       }])
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return {

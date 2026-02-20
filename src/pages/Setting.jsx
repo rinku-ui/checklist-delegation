@@ -664,9 +664,9 @@ const Setting = () => {
     setUserForm({
       username: user.user_name,
       email: user.email_id,
-      password: user.password,
+      password: '', // Leave empty when editing to keep current password
       phone: user.number,
-      employee_id: user.employee_id || '', // Add this line
+      employee_id: user.employee_id || '',
       department: user.user_access || '',
       role: user.role,
       status: user.status,
@@ -785,7 +785,7 @@ const Setting = () => {
 
 
   // User names list for dropdowns
-  const userNames = userData?.filter(u => u.user_name && u.user_name !== 'admin' && u.user_name !== 'DSMC').map(u => u.user_name) || [];
+  const userNames = (userData || []).filter(u => u && u.user_name && u.user_name !== 'admin' && u.user_name !== 'DSMC').map(u => u.user_name);
 
 
   const getStatusColor = (status) => {
@@ -885,12 +885,12 @@ const Setting = () => {
         <h3 className="text-sm font-medium text-yellow-800">Debug Info</h3>
         <p className="text-xs text-yellow-700">
           Total Users: {userData?.length || 0} | 
-          Active: {userData?.filter(u => u.status === 'active').length || 0} | 
-          Inactive: {userData?.filter(u => u.status === 'inactive').length || 0}
+          Active: {userData?.filter(u => u && u.status === 'active').length || 0} | 
+          Inactive: {userData?.filter(u => u && u.status === 'inactive').length || 0}
         </p>
-        <p className="text-xs text-yellow-700">
-          Employee IDs in DB: {userData?.map(u => u.employee_id).filter(Boolean).join(', ') || 'None'}
-        </p>
+        <div className="text-[10px] text-gray-400 mt-1 truncate">
+          Employee IDs in DB: {userData?.filter(u => u && u.employee_id).map(u => u.employee_id).join(', ') || 'None'}
+        </div>
       </div> */}
 
 
@@ -928,7 +928,7 @@ const Setting = () => {
                       className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-gray-50"
                     >
                       <option value="">Select person...</option>
-                      {userData && [...userData].sort((a, b) => a.user_name.localeCompare(b.user_name)).map(user => (
+                      {userData && [...userData].filter(u => u && u.user_name).sort((a, b) => a.user_name.localeCompare(b.user_name)).map(user => (
                         <option key={user.id} value={user.id}>{user.user_name}</option>
                       ))}
                     </select>
@@ -1149,7 +1149,7 @@ const Setting = () => {
                     className="w-full sm:w-48 pl-10 pr-8 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm shadow-sm"
                   />
                   <datalist id="usernameOptions">
-                    {userData?.map(user => (
+                    {(userData || []).filter(u => u && u.user_name).map(user => (
                       <option key={`opt-user-${user.id}`} value={user.user_name} />
                     ))}
                   </datalist>
@@ -1189,8 +1189,10 @@ const Setting = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {userData
-                      ?.filter(user =>
+                    {(userData || [])
+                      .filter(user =>
+                        user &&
+                        user.user_name &&
                         user.user_name !== 'admin' &&
                         user.user_name !== 'DSMC' && (
                           !usernameFilter || user.user_name.toLowerCase().includes(usernameFilter.toLowerCase()))

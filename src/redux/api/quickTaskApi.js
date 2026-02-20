@@ -1,4 +1,15 @@
-import supabase from "../../SupabaseClient";
+// Helper to parse JSON strings if accidentally stored as such
+const parseJsonIfNeeded = (val) => {
+  if (typeof val === 'string' && val.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(val);
+      return parsed.given_by || parsed.name || parsed.user_name || val;
+    } catch (e) {
+      return val;
+    }
+  }
+  return val;
+};
 
 // Update fetchChecklistData to support pagination and filtering
 // More efficient approach using window functions (if supported by Supabase)
@@ -69,7 +80,12 @@ export const fetchChecklistData = async (page = 0, pageSize = 50, nameFilter = '
 
     // Final client-side deduplication (should be minimal now)
     const finalSeen = new Set();
-    const finalData = (data || []).map(row => ({ ...row, id: row.task_id })).filter(row => {
+    const finalData = (data || []).map(row => ({
+      ...row,
+      id: row.task_id,
+      given_by: parseJsonIfNeeded(row.given_by),
+      name: parseJsonIfNeeded(row.name)
+    })).filter(row => {
       if (finalSeen.has(row.task_description)) {
         console.log("Final duplicate found:", row.task_description);
         return false;
@@ -159,7 +175,12 @@ export const fetchDelegationData = async (page = 0, pageSize = 50, nameFilter = 
 
     // Final client-side deduplication
     const finalSeen = new Set();
-    const finalData = (data || []).map(row => ({ ...row, id: row.task_id })).filter(row => {
+    const finalData = (data || []).map(row => ({
+      ...row,
+      id: row.task_id,
+      given_by: parseJsonIfNeeded(row.given_by),
+      name: parseJsonIfNeeded(row.name)
+    })).filter(row => {
       if (finalSeen.has(row.task_description)) {
         console.log("Final delegation duplicate found:", row.task_description);
         return false;
@@ -465,7 +486,7 @@ export const approveChecklistTask = async (id) => {
       .update({ admin_done: true })
       .eq('task_id', id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return data;
@@ -486,7 +507,7 @@ export const rejectChecklistTask = async (id, reason) => {
       })
       .eq('task_id', id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return data;

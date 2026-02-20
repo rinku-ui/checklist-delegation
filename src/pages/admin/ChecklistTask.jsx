@@ -515,10 +515,12 @@ export default function ChecklistTask() {
                 const insertedTasks = result.payload;
                 if (insertedTasks && insertedTasks.length > 0) {
                     for (const uiTask of tasks) {
+                        // Find matching task from inserted data
+                        // it.frequency from DB is lowercase (e.g. 'daily'), uiTask.frequency from UI is Title Case (e.g. 'Daily')
                         const t = insertedTasks.find(it =>
                             it.name === uiTask.doer &&
-                            it.task_description === uiTask.description &&
-                            it.frequency === uiTask.frequency
+                            it.frequency?.toLowerCase() === freqMap[uiTask.frequency]?.toLowerCase() &&
+                            (it.task_description === uiTask.description || (uiTask.recordedAudio && it.task_description?.includes('audio-recordings')))
                         );
                         if (t) {
                             const isOneTime = t.frequency?.toLowerCase().includes('one time') ||
@@ -527,7 +529,7 @@ export default function ChecklistTask() {
 
                             await sendTaskAssignmentNotification({
                                 doerName: t.name,
-                                taskId: t.task_id || t.id,
+                                taskId: t.id,
                                 description: t.task_description,
                                 startDate: new Date(t.task_start_date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
                                 givenBy: t.given_by,

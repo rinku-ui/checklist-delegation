@@ -9,6 +9,7 @@ import { customDropdownDetails, userDetails } from "../../redux/slice/settingSli
 import { ReactMediaRecorder } from "react-media-recorder";
 import supabase from "../../SupabaseClient";
 import { sendTaskAssignmentNotification } from "../../services/whatsappService";
+import AudioPlayer from "../../components/AudioPlayer";
 
 
 
@@ -19,28 +20,6 @@ const isAudioUrl = (url) => {
         url.includes('audio-recordings') ||
         url.includes('voice-notes') ||
         url.match(/\.(mp3|wav|ogg|webm|m4a|aac)(\?.*)?$/i)
-    );
-};
-
-const AudioPlayer = ({ url }) => {
-    const [isPlaying, setIsPlaying] = useState(false);
-    const audioRef = useRef(null);
-    const togglePlay = (e) => {
-        e.stopPropagation();
-        if (isPlaying) audioRef.current.pause();
-        else audioRef.current.play();
-        setIsPlaying(!isPlaying);
-    };
-    return (
-        <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] ${isPlaying ? 'bg-purple-50/80 border-purple-200 shadow-sm' : 'bg-white border-gray-100 hover:border-purple-100'}`}>
-            <button type="button" onClick={togglePlay} className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying ? 'bg-gradient-to-r from-rose-500 to-pink-600' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:scale-110'}`}>
-                {isPlaying ? <Pause size={12} className="text-white fill-white" /> : <Play size={12} className="text-white fill-white ml-0.5" />}
-            </button>
-            <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-purple-700' : 'text-gray-400'}`}>
-                {isPlaying ? 'Playing...' : 'Voice Note'}
-            </span>
-            <audio ref={audioRef} src={url} onEnded={() => setIsPlaying(false)} className="hidden" />
-        </div>
     );
 };
 

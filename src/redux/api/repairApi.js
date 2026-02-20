@@ -163,7 +163,7 @@ export const approveRepairTask = async (id) => {
             })
             .eq('id', id)
             .select()
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
         return data;
@@ -187,7 +187,7 @@ export const rejectRepairTask = async (id, reason) => {
             })
             .eq('id', id)
             .select()
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
         return data;

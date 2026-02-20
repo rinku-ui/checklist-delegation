@@ -1,5 +1,17 @@
-
 import supabase from "../../SupabaseClient";
+
+// Helper to parse JSON strings if accidentally stored as such
+const parseJsonIfNeeded = (val) => {
+    if (typeof val === 'string' && val.trim().startsWith('{')) {
+        try {
+            const parsed = JSON.parse(val);
+            return parsed.given_by || parsed.name || parsed.user_name || val;
+        } catch (e) {
+            return val;
+        }
+    }
+    return val;
+};
 
 // Fetch Maintenance Tasks (Active/Pending)
 export const fetchMaintenanceDataSortByDate = async (page = 1, limit = 50, searchTerm = '', frequency = '') => {
@@ -39,7 +51,14 @@ export const fetchMaintenanceDataSortByDate = async (page = 1, limit = 50, searc
         }
 
         console.log(`DEBUG: fetchMaintenanceDataSortByDate Result: ${data?.length || 0} pending tasks found. Total count: ${count}`);
-        return { data, totalCount: count };
+
+        const cleanedData = (data || []).map(row => ({
+            ...row,
+            given_by: parseJsonIfNeeded(row.given_by),
+            name: parseJsonIfNeeded(row.name)
+        }));
+
+        return { data: cleanedData, totalCount: count };
 
     } catch (error) {
         console.error("DEBUG: Catch Error in fetchMaintenanceDataSortByDate", error);
@@ -82,7 +101,13 @@ export const fetchMaintenanceDataForHistory = async (page = 1, searchTerm = '') 
             return [];
         }
 
-        return data;
+        const cleanedData = (data || []).map(row => ({
+            ...row,
+            given_by: parseJsonIfNeeded(row.given_by),
+            name: parseJsonIfNeeded(row.name)
+        }));
+
+        return cleanedData;
 
     } catch (error) {
         console.log("Error from Supabase", error);
@@ -125,7 +150,13 @@ export const fetchAllMaintenanceTasksForDashboard = async (page = 1, limit = 100
             console.log("DEBUG: Sample Task IDs:", data.slice(0, 3).map(t => t.id));
         }
 
-        return { data, totalCount: count };
+        const cleanedData = (data || []).map(row => ({
+            ...row,
+            given_by: parseJsonIfNeeded(row.given_by),
+            name: parseJsonIfNeeded(row.name)
+        }));
+
+        return { data: cleanedData, totalCount: count };
 
     } catch (error) {
         console.error("DEBUG: Catch Error in fetchAllMaintenanceTasksForDashboard", error);
@@ -283,7 +314,7 @@ export const approveMaintenanceTask = async (id) => {
             .update({ admin_done: true })
             .eq('id', id)
             .select() // .single may fail if no row found but here we have ID
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
         return data;
@@ -306,7 +337,7 @@ export const rejectMaintenanceTask = async (id, reason) => {
             })
             .eq('id', id)
             .select()
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
         return data;
