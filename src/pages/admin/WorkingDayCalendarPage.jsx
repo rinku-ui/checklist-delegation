@@ -128,8 +128,11 @@ const WorkingDayCalendarPage = () => {
     for (let i = 1; i <= daysInMonth; i++) {
         const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
         const dateObj = new Date(dateString);
-        const holiday = holidays.find(h => h.holiday_date === dateString);
-        const workingDay = workingDays.find(w => w.working_date === dateString);
+
+        // Use robust matching to handle ISO strings or timestamps from Supabase
+        const holiday = holidays.find(h => (h.holiday_date || "").split('T')[0] === dateString);
+        const workingDay = workingDays.find(w => (w.working_date || "").split('T')[0] === dateString);
+
         const englishDayName = dateObj.toLocaleDateString('en-GB', { weekday: 'long' });
 
         allDaysInMonth.push({
@@ -175,7 +178,7 @@ const WorkingDayCalendarPage = () => {
                     <div className="flex gap-4">
                         <LegendItem label="Working" color="bg-green-50 border border-green-200" />
                         <LegendItem label="Holiday" color="bg-red-50 border border-red-200" />
-                        <LegendItem label="Off Day" color="bg-gray-100 border border-gray-300" />
+                        <LegendItem label="Off Day" color="bg-gray-300 border border-gray-400" />
                     </div>
                 </div>
 
@@ -217,7 +220,7 @@ const WorkingDayCalendarPage = () => {
                                             key={dayInfo.date}
                                             className={`hover:bg-gray-50 transition-colors ${dayInfo.isHoliday ? 'bg-red-50/30' :
                                                 dayInfo.isWorking ? 'bg-green-50/20' :
-                                                    'bg-gray-50/30'
+                                                    'bg-gray-300'
                                                 }`}
                                         >
                                             <td className="px-4 py-3">
@@ -243,7 +246,7 @@ const WorkingDayCalendarPage = () => {
                                                         Working Day
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-300 text-gray-700 text-xs font-bold rounded">
                                                         Off Day
                                                     </span>
                                                 )}

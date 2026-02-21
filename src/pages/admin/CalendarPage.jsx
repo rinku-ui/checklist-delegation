@@ -83,6 +83,7 @@ const CalendarPage = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [tasks, setTasks] = useState([]);
     const [holidays, setHolidays] = useState([]);
+    const [workingDays, setWorkingDays] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // Modal & Edit State
@@ -130,11 +131,15 @@ const CalendarPage = () => {
                 }
             }
 
-            const [checklistRes, maintenanceRes, repairRes, holidaysRes] = await Promise.all([
+            const [checklistRes, maintenanceRes, repairRes, holidaysRes, workingDaysRes] = await Promise.all([
                 checklistQuery,
                 maintenanceQuery,
                 repairQuery,
-                supabase.from('holidays').select('*')
+                supabase.from('holidays').select('*'),
+                supabase.from('working_day_calender')
+                    .select('working_date')
+                    .gte('working_date', startOfMonth)
+                    .lte('working_date', endOfMonth)
             ]);
 
             const normalizedTasks = [
@@ -145,6 +150,7 @@ const CalendarPage = () => {
 
             setTasks(normalizedTasks);
             setHolidays(holidaysRes.data || []);
+            setWorkingDays(workingDaysRes.data || []);
         } catch (err) {
             console.error('Error fetching calendar tasks:', err);
         } finally {
@@ -152,14 +158,14 @@ const CalendarPage = () => {
         }
     };
 
-    const handleCellClick = (day, holiday) => {
+    const handleCellClick = (day, holiday, isOffDay) => {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dayTasks = tasks.filter(t => t.date?.split('T')[0] === dateStr);
 
         setSelectedDate(dateStr);
         setSelectedTasks(dayTasks);
         setIsHolidayDate(!!holiday);
-        setHolidayName(holiday?.holiday_name || '');
+        setHolidayName(holiday?.holiday_name || (isOffDay ? 'Off Day' : ''));
         setIsModalOpen(true);
         setEditingTaskId(null); // Reset editing state
     };
@@ -230,19 +236,21 @@ const CalendarPage = () => {
 
     for (let i = 1; i <= totalDays; i++) {
         const dayDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-        const holiday = holidays.find(h => h.holiday_date === dayDate);
+        const holiday = holidays.find(h => (h.holiday_date || "").split('T')[0] === dayDate);
+        const workingDay = workingDays.find(w => (w.working_date || "").split('T')[0] === dayDate);
         const dayTasks = holiday ? [] : tasks.filter(t => t.date?.split('T')[0] === dayDate);
         const isToday = new Date().toISOString().split('T')[0] === dayDate;
         const isHoliday = !!holiday;
+        const isOffDay = !isHoliday && !workingDay;
 
         days.push(
             <div
                 key={i}
-                onClick={() => handleCellClick(i, holiday)}
-                className={`aspect-square border-r border-b border-gray-200 p-2 cursor-pointer transition-colors relative ${isHoliday ? 'bg-red-50' : isToday ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
+                onClick={() => handleCellClick(i, holiday, isOffDay)}
+                className={`aspect-square border-r border-b border-gray-200 p-2 cursor-pointer transition-colors relative ${isHoliday ? 'bg-red-50' : isOffDay ? 'bg-gray-300' : isToday ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
             >
                 <div className="flex justify-between items-start mb-1">
-                    <span className={`text-xs font-bold ${isHoliday ? 'text-red-700 underline' : isToday ? 'text-blue-700' : 'text-gray-700'}`}>
+                    <span className={`text-xs font-bold ${isHoliday ? 'text-red-700 underline' : isOffDay ? 'text-gray-600' : isToday ? 'text-blue-700' : 'text-gray-700'}`}>
                         {i}
                     </span>
                     {dayTasks.length > 0 && !isHoliday && (
@@ -258,6 +266,12 @@ const CalendarPage = () => {
                     <div className="mt-1">
                         <p className="text-[10px] font-bold text-red-800 uppercase leading-tight truncate px-1">
                             {holiday.holiday_name}
+                        </p>
+                    </div>
+                ) : isOffDay ? (
+                    <div className="mt-1">
+                        <p className="text-[10px] font-bold text-gray-500 uppercase leading-tight truncate px-1">
+                            Off Day
                         </p>
                     </div>
                 ) : (
@@ -311,7 +325,8 @@ const CalendarPage = () => {
                         {[
                             { label: 'Checklist', color: 'bg-blue-600' },
                             { label: 'Maintenance', color: 'bg-orange-600' },
-                            { label: 'Repair', color: 'bg-red-600' }
+                            { label: 'Repair', color: 'bg-red-600' },
+                            { label: 'Off Day', color: 'bg-gray-300' }
                         ].map(item => (
                             <div key={item.label} className="flex items-center gap-2">
                                 <div className={`w-3 h-3 ${item.color} rounded-sm`}></div>
@@ -349,7 +364,7 @@ const CalendarPage = () => {
                         <div className="px-6 py-4 bg-blue-700 text-white flex justify-between items-center">
                             <div>
                                 <h2 className="text-lg font-bold uppercase tracking-widest flex items-center gap-3">
-                                    <Clock className="w-4 h-4" /> {isHolidayDate ? 'Public Holiday' : 'Task Records'}
+                                    <Clock className="w-4 h-4" /> {isHolidayDate ? 'Public Holiday' : selectedTasks.length === 0 && !workingDays.find(w => w.working_date === selectedDate) ? 'Off Day' : 'Task Records'}
                                 </h2>
                                 <p className="text-[10px] font-medium uppercase opacity-75 mt-0.5">
                                     {new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
