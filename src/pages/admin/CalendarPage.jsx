@@ -79,6 +79,19 @@ const AudioPlayer = ({ url }) => {
     );
 };
 
+const getHindiDay = (day) => {
+    const dayMap = {
+        'Sunday': 'रविवार',
+        'Monday': 'सोमवार',
+        'Tuesday': 'मंगलवार',
+        'Wednesday': 'बुधवार',
+        'Thursday': 'गुरुवार',
+        'Friday': 'शुक्रवार',
+        'Saturday': 'शनिवार'
+    };
+    return dayMap[day] || day;
+};
+
 const CalendarPage = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [tasks, setTasks] = useState([]);
@@ -278,8 +291,12 @@ const CalendarPage = () => {
                     <div className="space-y-0.5 mt-1 overflow-hidden h-[calc(100%-1.5rem)]">
                         {dayTasks.slice(0, 3).map((task, idx) => (
                             <div key={idx} className="bg-white border-l-4 border-gray-200 pl-1 py-0.5 shadow-sm mb-0.5">
-                                <p className="text-[9px] font-bold text-gray-700 truncate uppercase">
-                                    {isAudioUrl(task.title) ? "Voice Note" : task.title}
+                                <p className="text-[9px] font-bold text-gray-700 truncate uppercase flex items-center gap-1">
+                                    {isAudioUrl(task.title) ? (
+                                        <><Play size={8} className="text-blue-600 fill-blue-600 flex-shrink-0" /> <span className="truncate">Voice Note</span></>
+                                    ) : (
+                                        <span className="truncate">{task.title}</span>
+                                    )}
                                 </p>
                             </div>
                         ))}
@@ -340,7 +357,8 @@ const CalendarPage = () => {
                 <div className="bg-white border border-gray-200 rounded shadow-sm overflow-hidden">
                     <div className="grid grid-cols-7 bg-gray-100 border-b border-gray-200">
                         {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
-                            <div key={day} className="py-2 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest border-r border-gray-200 last:border-0">
+                            <div key={day} className="py-2 text-center text-[9px] font-bold text-gray-500 uppercase tracking-widest border-r border-gray-200 last:border-0 leading-tight">
+                                <span className="text-gray-400 block mb-0.5">{getHindiDay(day)}</span>
                                 {day}
                             </div>
                         ))}

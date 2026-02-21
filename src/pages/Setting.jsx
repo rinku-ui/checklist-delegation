@@ -50,6 +50,7 @@ const Setting = () => {
   const [showEndCalendar, setShowEndCalendar] = useState(false);
   const [startCalendarPos, setStartCalendarPos] = useState({ top: 0, left: 0 });
   const [endCalendarPos, setEndCalendarPos] = useState({ top: 0, left: 0 });
+  const [selectedLeaveTaskIds, setSelectedLeaveTaskIds] = useState([]);
   const startBtnRef = useRef(null);
   const endBtnRef = useRef(null);
 
@@ -254,13 +255,14 @@ const Setting = () => {
       ]);
 
       const combined = [
-        ...(checklistTasks || []).map(t => ({ ...t, _table: 'checklist', id: t.task_id })),
-        ...(delegationTasks || []).map(t => ({ ...t, _table: 'delegation', id: t.task_id })),
-        ...(maintenanceTasks || []).map(t => ({ ...t, _table: 'maintenance_tasks', id: t.id })),
-        ...(repairTasks || []).map(t => ({ ...t, _table: 'repair_tasks', id: t.id, task_description: t.issue_description, task_start_date: t.created_at })),
-        ...(eaTasks || []).map(t => ({ ...t, _table: 'ea_tasks', id: t.id, task_description: t.task_description, task_start_date: t.planned_date }))
+        ...(checklistTasks || []).map(t => ({ ...t, _table: 'checklist', id: t.task_id, _uniqueId: `checklist-${t.task_id}` })),
+        ...(delegationTasks || []).map(t => ({ ...t, _table: 'delegation', id: t.task_id, _uniqueId: `delegation-${t.task_id}` })),
+        ...(maintenanceTasks || []).map(t => ({ ...t, _table: 'maintenance_tasks', id: t.id, _uniqueId: `maintenance_tasks-${t.id}` })),
+        ...(repairTasks || []).map(t => ({ ...t, _table: 'repair_tasks', id: t.id, task_description: t.issue_description, task_start_date: t.created_at, _uniqueId: `repair_tasks-${t.id}` })),
+        ...(eaTasks || []).map(t => ({ ...t, _table: 'ea_tasks', id: t.id, task_description: t.task_description, task_start_date: t.planned_date, _uniqueId: `ea_tasks-${t.id}` }))
       ];
       setLeaveTasks(combined);
+      setSelectedLeaveTaskIds([]); // Clear selection on new fetch
       setHasFetched(true);
     } catch (err) {
       console.error('Error fetching leave tasks:', err);
@@ -269,40 +271,58 @@ const Setting = () => {
     }
   };
 
-  // Shift all fetched tasks to the substitute person and mark on leave
+  // Shift selected fetched tasks to the substitute person
   const handleShiftTasks = async () => {
-    // If there are tasks found, we MUST have a substitute person
-    if (leaveTasks.length > 0 && !shiftToPerson) {
+    // Determine which tasks to shift
+    const tasksToShift = leaveTasks.length > 0
+      ? leaveTasks.filter(t => selectedLeaveTaskIds.includes(t._uniqueId))
+      : [];
+
+    // If there are tasks found but none selected, alert user
+    if (leaveTasks.length > 0 && tasksToShift.length === 0 && shiftToPerson) {
+      showToast('Please select tasks to shift using the checkboxes', 'warning');
+      return;
+    }
+
+    // Must have a substitute if shifting tasks
+    if (tasksToShift.length > 0 && !shiftToPerson) {
       showToast('Please select a person to shift tasks to', 'error');
       return;
     }
 
-    const confirmMsg = leaveTasks.length > 0
-      ? `Shift ${leaveTasks.length} task(s) from "${leavePersonName}" to "${shiftToPerson}" and mark "${leavePersonName}" as On Leave?`
+    const isFullShift = tasksToShift.length === leaveTasks.length || leaveTasks.length === 0;
+
+    const confirmMsg = tasksToShift.length > 0
+      ? `Shift ${tasksToShift.length} selected task(s) from "${leavePersonName}" to "${shiftToPerson}"?`
       : `Mark "${leavePersonName}" as On Leave? (No tasks found to shift)`;
 
     if (!window.confirm(confirmMsg)) return;
 
     setLeaveSubmitting(true);
     try {
-      const checklistIds = leaveTasks.filter(t => t._table === 'checklist').map(t => t.task_id);
-      const delegationIds = leaveTasks.filter(t => t._table === 'delegation').map(t => t.task_id);
-      const maintenanceIds = leaveTasks.filter(t => t._table === 'maintenance_tasks').map(t => t.id);
-      const repairIds = leaveTasks.filter(t => t._table === 'repair_tasks').map(t => t.id);
-      const eaIds = leaveTasks.filter(t => t._table === 'ea_tasks').map(t => t.id);
+      const checklistIds = tasksToShift.filter(t => t._table === 'checklist').map(t => t.task_id);
+      const delegationIds = tasksToShift.filter(t => t._table === 'delegation').map(t => t.task_id);
+      const maintenanceIds = tasksToShift.filter(t => t._table === 'maintenance_tasks').map(t => t.id);
+      const repairIds = tasksToShift.filter(t => t._table === 'repair_tasks').map(t => t.id);
+      const eaIds = tasksToShift.filter(t => t._table === 'ea_tasks').map(t => t.id);
 
-      // Update User Status and Leave Dates
-      const { error: userUpdateError } = await supabase
-        .from('users')
-        .update({
-          status: 'on_leave',
-          leave_date: leaveStartDate,
-          leave_end_date: leaveEndDate,
-          remark: leaveRemark || 'Shifted tasks'
-        })
-        .eq('id', leavePersonId);
+      // Only mark user as on leave if it's the first shift or a direct "Mark on leave"
+      // or if all tasks are being shifted at once.
+      // Usually, we should probably mark as on leave on the first action.
+      const { data: currentUser } = await supabase.from('users').select('status').eq('id', leavePersonId).single();
 
-      if (userUpdateError) throw userUpdateError;
+      if (currentUser?.status !== 'on_leave') {
+        const { error: userUpdateError } = await supabase
+          .from('users')
+          .update({
+            status: 'on_leave',
+            leave_date: leaveStartDate,
+            leave_end_date: leaveEndDate,
+            remark: leaveRemark || 'Shifted tasks'
+          })
+          .eq('id', leavePersonId);
+        if (userUpdateError) throw userUpdateError;
+      }
 
       // Update Tasks (If any)
       if (checklistIds.length > 0) {
@@ -327,8 +347,8 @@ const Setting = () => {
       }
 
       // Send WhatsApp Notifications for shifted tasks
-      if (leaveTasks.length > 0) {
-        for (const task of leaveTasks) {
+      if (tasksToShift.length > 0) {
+        for (const task of tasksToShift) {
           await sendTaskReassignmentNotification({
             newDoerName: shiftToPerson,
             originalDoerName: leavePersonName,
@@ -342,10 +362,18 @@ const Setting = () => {
         }
       }
 
-      setLeaveSuccess(true);
-      setLeaveTasks([]);
+      // Filter out shifted tasks from the local view
+      const remainingTasks = leaveTasks.filter(t => !selectedLeaveTaskIds.includes(t._uniqueId));
+
+      if (remainingTasks.length === 0) {
+        setLeaveSuccess(true);
+      } else {
+        showToast(`${tasksToShift.length} tasks shifted to ${shiftToPerson}. ${remainingTasks.length} tasks remaining.`, 'success');
+      }
+
+      setLeaveTasks(remainingTasks);
+      setSelectedLeaveTaskIds([]); // Clear selection
       setShiftToPerson('');
-      setLeaveRemark('');
       // Re-fetch user details to reflect the "on leave" status immediately
       dispatch(userDetails());
     } catch (err) {
@@ -363,6 +391,7 @@ const Setting = () => {
     setLeaveStartDate('');
     setLeaveEndDate('');
     setLeaveTasks([]);
+    setSelectedLeaveTaskIds([]);
     setShiftToPerson('');
     setLeaveSuccess(false);
     setHasFetched(false);
@@ -979,7 +1008,23 @@ const Setting = () => {
                       type="button"
                       onClick={() => {
                         const rect = startBtnRef.current?.getBoundingClientRect();
-                        if (rect) setStartCalendarPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX });
+                        if (rect) {
+                          const calendarHeight = 360; // Estimated max height
+                          const calendarWidth = 288;
+
+                          let left = rect.left;
+                          if (left + calendarWidth > window.innerWidth) {
+                            left = window.innerWidth - calendarWidth - 20;
+                          }
+
+                          let top = rect.bottom + 4;
+                          // If it overflows bottom, show above the button
+                          if (top + calendarHeight > window.innerHeight) {
+                            top = rect.top - calendarHeight - 4;
+                          }
+
+                          setStartCalendarPos({ top: Math.max(10, top), left: Math.max(10, left) });
+                        }
                         setShowStartCalendar(!showStartCalendar);
                         setShowEndCalendar(false);
                       }}
@@ -1010,7 +1055,22 @@ const Setting = () => {
                       type="button"
                       onClick={() => {
                         const rect = endBtnRef.current?.getBoundingClientRect();
-                        if (rect) setEndCalendarPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX });
+                        if (rect) {
+                          const calendarHeight = 360;
+                          const calendarWidth = 288;
+
+                          let left = rect.left;
+                          if (left + calendarWidth > window.innerWidth) {
+                            left = window.innerWidth - calendarWidth - 20;
+                          }
+
+                          let top = rect.bottom + 4;
+                          if (top + calendarHeight > window.innerHeight) {
+                            top = rect.top - calendarHeight - 4;
+                          }
+
+                          setEndCalendarPos({ top: Math.max(10, top), left: Math.max(10, left) });
+                        }
                         setShowEndCalendar(!showEndCalendar);
                         setShowStartCalendar(false);
                       }}
@@ -1087,12 +1147,12 @@ const Setting = () => {
                     </div>
                     <button
                       onClick={handleShiftTasks}
-                      disabled={leaveSubmitting || !shiftToPerson}
+                      disabled={leaveSubmitting || !shiftToPerson || selectedLeaveTaskIds.length === 0}
                       className="py-2 px-5 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
                     >
                       {leaveSubmitting ? (
                         <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Shifting...</>
-                      ) : '✓ Confirm Shift'}
+                      ) : `✓ Confirm Shift (${selectedLeaveTaskIds.length})`}
                     </button>
                   </div>
                 </div>
@@ -1101,6 +1161,20 @@ const Setting = () => {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
+                        <th className="px-4 py-3 text-left w-10">
+                          <input
+                            type="checkbox"
+                            checked={leaveTasks.length > 0 && selectedLeaveTaskIds.length === leaveTasks.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedLeaveTaskIds(leaveTasks.map(t => t._uniqueId));
+                              } else {
+                                setSelectedLeaveTaskIds([]);
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                          />
+                        </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Task</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
@@ -1111,22 +1185,50 @@ const Setting = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-100">
                       {leaveTasks.map((task, idx) => (
-                        <tr key={`lt-${task.task_id}-${idx}`} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-xs text-gray-400">{idx + 1}</td>
+                        <tr key={task._uniqueId} className={`hover:bg-gray-50 transition-colors ${selectedLeaveTaskIds.includes(task._uniqueId) ? 'bg-purple-50/50' : ''}`}>
                           <td className="px-4 py-3">
-                            <div className="text-sm font-medium text-gray-800 max-w-xs truncate">{task.task_description}</div>
+                            <input
+                              type="checkbox"
+                              checked={selectedLeaveTaskIds.includes(task._uniqueId)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedLeaveTaskIds(prev => [...prev, task._uniqueId]);
+                                } else {
+                                  setSelectedLeaveTaskIds(prev => prev.filter(id => id !== task._uniqueId));
+                                }
+                              }}
+                              className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-400 font-medium">{idx + 1}</td>
+                          <td className="px-4 py-3" onClick={() => {
+                            // Click row to toggle checkbox
+                            if (selectedLeaveTaskIds.includes(task._uniqueId)) {
+                              setSelectedLeaveTaskIds(prev => prev.filter(id => id !== task._uniqueId));
+                            } else {
+                              setSelectedLeaveTaskIds(prev => [...prev, task._uniqueId]);
+                            }
+                          }}>
+                            <div className="text-sm font-bold text-gray-800 max-w-xs">{task.task_description}</div>
+                            {task.issue_description && task._table === 'repair_tasks' && (
+                              <div className="text-[10px] text-gray-500 font-medium mt-0.5">{task.issue_description}</div>
+                            )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${task._table === 'checklist' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${task._table === 'checklist' ? 'bg-blue-100 text-blue-700' :
+                              task._table === 'delegation' ? 'bg-purple-100 text-purple-700' :
+                                task._table === 'maintenance_tasks' ? 'bg-orange-100 text-orange-700' :
+                                  task._table === 'repair_tasks' ? 'bg-red-100 text-red-700' :
+                                    'bg-green-100 text-green-700'
                               }`}>
-                              {task._table === 'checklist' ? 'Checklist' : 'Delegation'}
+                              {task._table.replace('_tasks', '').replace('checklist', 'Check').replace('delegation', 'Deleg')}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-xs text-gray-600">
-                            {task.task_start_date ? new Date(task.task_start_date).toLocaleDateString('en-IN') : '—'}
+                          <td className="px-4 py-3 text-xs text-gray-600 font-medium whitespace-nowrap">
+                            {task.task_start_date ? new Date(task.task_start_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
                           </td>
-                          <td className="px-4 py-3 text-xs text-gray-600">{task.department || '—'}</td>
-                          <td className="px-4 py-3 text-xs text-gray-600">{task.given_by || '—'}</td>
+                          <td className="px-4 py-3 text-xs text-gray-600 font-medium truncate max-w-[100px]">{task.department || '—'}</td>
+                          <td className="px-4 py-3 text-xs text-gray-700 font-bold">{task.given_by || task.filled_by || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
