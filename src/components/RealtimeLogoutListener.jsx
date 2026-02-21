@@ -16,25 +16,30 @@ const RealtimeLogoutListener = () => {
   useEffect(() => {
     let subscription;
     const username = localStorage.getItem("user-name");
-    if (!username) return;
+    const userId = localStorage.getItem("user-id");
+    if (!username || !userId) return;
 
     subscription = supabase
       .channel("user-status-watch")
       .on(
         "postgres_changes",
         {
-          event: "UPDATE",
+          event: "*", // Listen for all changes (including DELETE)
           schema: "public",
           table: "users",
-          filter: `user_name=eq.${username}`,
+          filter: `id=eq.${userId}`,
         },
         (payload) => {
-          const updatedUser = payload.new;
-          if (updatedUser.status === "inactive") {
+          const isDeleted = payload.eventType === "DELETE";
+          const isInactive = payload.eventType === "UPDATE" && payload.new.status === "inactive";
+
+          if (isDeleted || isInactive) {
             // Show Chrome notification to user
             if (Notification.permission === "granted") {
-              new Notification("Account Deactivated", {
-                body: "Your account has been deactivated. You have been logged out.",
+              new Notification(isDeleted ? "Account Deleted" : "Account Deactivated", {
+                body: isDeleted
+                  ? "Your account has been removed. You have been logged out."
+                  : "Your account has been deactivated. You have been logged out.",
                 icon: "/logo.png",
               });
             }
@@ -104,7 +109,8 @@ const RealtimeLogoutListener = () => {
 
       const userDataResult = data && data.length > 0 ? data[0] : null;
 
-      if (userDataResult && userDataResult.status === "inactive") {
+      // If user doesn't exist (deleted) or is inactive, logout
+      if (!userDataResult || userDataResult.status === "inactive") {
         localStorage.clear();
         navigate("/login");
         window.location.reload();

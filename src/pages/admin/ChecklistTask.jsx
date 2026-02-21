@@ -409,39 +409,51 @@ export default function ChecklistTask() {
         "Yearly": "yearly"
     };
 
+    const getLocalDateString = (date) => {
+        if (!date) return "";
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const generateDatesForTask = async (task) => {
         const freqKey = freqMap[task.frequency] || "one-time";
         const dates = [];
         const startDate = task.date;
         const time = task.time;
 
-        if (freqKey === "one-time") {
-            const d = new Date(startDate);
-            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-            // Check if it's a holiday
-            if (holidays.includes(dateStr)) {
-                return []; // Return empty to prevent assignment on holiday
-            }
-
-            dates.push(`${dateStr}T${time}:00`);
-            return dates;
-        }
-
         const endDate = new Date(startDate);
-        endDate.setFullYear(endDate.getFullYear() + 1);
+        if (freqKey === "one-time") {
+            // Just check the start date
+        } else {
+            endDate.setFullYear(endDate.getFullYear() + 1);
+        }
 
         const { data: workingData } = await supabase
             .from('working_day_calender')
             .select('working_date')
-            .gte('working_date', startDate.toISOString().split('T')[0])
-            .lte('working_date', endDate.toISOString().split('T')[0]);
+            .gte('working_date', getLocalDateString(startDate))
+            .lte('working_date', getLocalDateString(endDate));
 
         const workingDaySet = new Set(workingData?.map(d => d.working_date) || []);
-        const isHoliday = (d) => holidays.includes(d.toISOString().split('T')[0]);
-        const isWorkingDay = (d) => workingDaySet.has(d.toISOString().split('T')[0]);
-        const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${time}:00`;
+        const isHoliday = (d) => holidays.includes(getLocalDateString(d));
+        const isWorkingDay = (d) => workingDaySet.has(getLocalDateString(d));
+        const toLocalISO = (d) => `${getLocalDateString(d)}T${time}:00`;
         const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+
+        if (freqKey === "one-time") {
+            const d = new Date(startDate);
+            const dateStr = getLocalDateString(d);
+
+            // Check if it's a holiday OR not a working day
+            if (isHoliday(d) || !isWorkingDay(d)) {
+                return []; // Return empty to prevent assignment
+            }
+
+            dates.push(toLocalISO(d));
+            return dates;
+        }
 
         if (freqKey === 'daily' || freqKey === 'alternate-day') {
             const validDays = [];
@@ -450,14 +462,15 @@ export default function ChecklistTask() {
                 if (!isHoliday(d) && isWorkingDay(d)) validDays.push(new Date(d));
                 d.setDate(d.getDate() + 1);
             }
-            if (freqKey === 'daily') validDays.forEach(day => dates.push(toISO(day)));
-            else validDays.forEach((day, i) => { if (i % 2 === 0) dates.push(toISO(day)); });
+            if (freqKey === 'daily') validDays.forEach(day => dates.push(toLocalISO(day)));
+            else validDays.forEach((day, i) => { if (i % 2 === 0) dates.push(toLocalISO(day)); });
         } else {
             let current = new Date(startDate);
             let attempts = 0;
             while (current <= endDate && attempts < 1000) {
                 attempts++;
-                if (!isHoliday(current) && isWorkingDay(current)) dates.push(toISO(current));
+                if (!isHoliday(current) && isWorkingDay(current)) dates.push(toLocalISO(current));
+
                 if (freqKey === 'weekly') current = addDays(current, 7);
                 else if (freqKey === 'fortnight') current = addDays(current, 14);
                 else if (freqKey === 'monthly') current.setMonth(current.getMonth() + 1);

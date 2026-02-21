@@ -54,6 +54,10 @@ const Setting = () => {
   const startBtnRef = useRef(null);
   const endBtnRef = useRef(null);
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [userToDeleteData, setUserToDeleteData] = useState({ id: null, name: '' });
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const { userData, department, departmentsOnly, givenBy, customDropdowns, loading, error } = useSelector((state) => state.setting);
   const dispatch = useDispatch();
 
@@ -684,14 +688,45 @@ const Setting = () => {
   };
 
   // Modified handleDeleteUser
-  const handleDeleteUser = async (userId) => {
-    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      try {
-        await dispatch(deleteUser(userId)).unwrap();
-        dispatch(userDetails()); // Explicitly refresh user details
-      } catch (error) {
-        console.error('Error deleting user:', error);
+  const handleDeleteUser = (userId) => {
+    const userToDel = userData.find(u => u.id === userId);
+    if (!userToDel) return;
+    setUserToDeleteData({ id: userId, name: userToDel.user_name });
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteUserAndTasks = async () => {
+    const { id: userId, name: userName } = userToDeleteData;
+    setIsDeleting(true);
+    try {
+      // 1. Delete tasks from all tables where this user is assigned
+      if (userName) {
+        const deletePromises = [
+          supabase.from('checklist').delete().eq('name', userName),
+          supabase.from('delegation').delete().eq('name', userName),
+          supabase.from('maintenance_tasks').delete().eq('name', userName),
+          supabase.from('repair_tasks').delete().eq('assigned_person', userName),
+          supabase.from('ea_tasks').delete().eq('doer_name', userName)
+        ];
+
+        const results = await Promise.all(deletePromises);
+
+        results.forEach((res, idx) => {
+          if (res.error) console.error(`Error deleting tasks from table index ${idx}:`, res.error);
+        });
       }
+
+      // 2. Delete the user
+      await dispatch(deleteUser(userId)).unwrap();
+
+      showToast(`User ${userName} and all associated tasks deleted successfully`, 'success');
+      dispatch(userDetails());
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error('Error deleting user and tasks:', error);
+      showToast('Error during deletion process', 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -2031,6 +2066,70 @@ const Setting = () => {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Custom Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-300"
+              onClick={() => !isDeleting && setShowDeleteConfirm(false)}
+            ></div>
+            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-red-50">
+              {/* Header with Icon */}
+              <div className="bg-gradient-to-br from-red-50 to-white px-6 pt-8 pb-4 text-center">
+                <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                  <Trash2 size={40} className="text-red-500" />
+                </div>
+                <h3 className="text-xl font-black text-gray-900 leading-tight">Delete User?</h3>
+                <p className="text-sm text-gray-500 mt-2 px-4">
+                  Are you sure you want to delete <span className="text-red-600 font-bold">"{userToDeleteData.name}"</span>?
+                </p>
+              </div>
+
+              {/* Warning Content */}
+              <div className="px-8 py-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
+                  <div className="pt-0.5">
+                    <Settings className="text-amber-600 w-5 h-5 animate-spin-slow" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-amber-900">Important Reminder</h4>
+                    <p className="text-xs text-amber-800/80 leading-relaxed mt-1">
+                      Have you <strong>shifted all tasks</strong> to another employee?
+                    </p>
+                    <p className="text-[10px] text-amber-700/70 font-medium mt-2 leading-tight">
+                      * If not, all pending and future tasks for this user will be <span className="font-bold underline">deleted instantly</span> from the database.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="px-8 pb-8 pt-4 flex gap-3">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3.5 px-4 bg-gray-50 text-gray-600 font-black text-sm rounded-2xl hover:bg-gray-100 transition-all border border-gray-100 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={confirmDeleteUserAndTasks}
+                  className="flex-1 py-3.5 px-4 bg-red-600 hover:bg-red-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-red-200 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-75"
+                >
+                  {isDeleting ? (
+                    <><RefreshCw size={18} className="animate-spin" /> Deleting...</>
+                  ) : (
+                    <>Delete Now</>
+                  )}
+                </button>
               </div>
             </div>
           </div>
