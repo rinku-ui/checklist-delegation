@@ -709,7 +709,6 @@ export default function AdminDashboard() {
             bill_amount: task.bill_amount,
             vendor_name: task.vendor_name,
             part_replaced: task.part_replaced,
-            work_done: task.work_done,
             image_url: task.image_url || task.uploaded_image_url,
             admin_done: task.admin_done || false // Add admin_done field for approval status
           };

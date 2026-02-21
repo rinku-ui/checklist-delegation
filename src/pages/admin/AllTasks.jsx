@@ -617,7 +617,6 @@ const AllTasks = () => {
       billAmount: task.bill_amount || "",
       status: task.status || "",
       remarks: task.remarks || "",
-      workDone: task.work_done || "",
       vendorName: task.vendor_name || "",
       workPhoto: null,
       billCopy: null
@@ -666,7 +665,6 @@ const AllTasks = () => {
         partReplaced: updateForm.partReplaced || null,
         billAmount: updateForm.billAmount ? parseFloat(updateForm.billAmount) : null, // Fix empty string issue
         remarks: updateForm.remarks || null,
-        workDone: updateForm.workDone || null,
         vendorName: updateForm.vendorName || null,
         workPhotoUrl: workPhotoUrl,
         billCopyUrl: billCopyUrl

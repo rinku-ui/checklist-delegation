@@ -86,7 +86,6 @@ export const updateRepairData = async (updates) => {
                     bill_amount: item.billAmount || null,
                     remarks: item.remarks || null,
                     vendor_name: item.vendorName || null,
-                    work_done: item.workDone || null,
                     work_photo_url: item.workPhotoUrl || null,
                     bill_copy_url: item.billCopyUrl || null,
                     submission_date: new Date().toISOString(),
@@ -180,7 +179,6 @@ export const rejectRepairTask = async (id, reason) => {
             .update({
                 status: 'Pending',
                 submission_date: null,
-                work_done: null,
                 work_photo_url: null,
                 bill_copy_url: null,
                 remarks: reason
