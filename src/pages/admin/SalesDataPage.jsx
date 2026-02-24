@@ -134,20 +134,47 @@ export default function AccountDataPage({ showLayout = true, departmentFilter = 
   }
 
   const filteredData = useMemo(() => {
-    let data = showHistory ? history : checklist;
+    let rawData = showHistory ? history : checklist;
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
-      data = data.filter(item => Object.values(item).some(v => v && String(v).toLowerCase().includes(lower)));
+      rawData = rawData.filter(item => Object.values(item).some(v => v && String(v).toLowerCase().includes(lower)));
     }
     if (departmentFilter && departmentFilter !== 'all') {
-      data = data.filter(item => item.department === departmentFilter);
+      rawData = rawData.filter(item => item.department === departmentFilter);
     }
-    // Only pending logic for main view (History shows all fetched)
-    if (!showHistory) {
-      const today = new Date().setHours(23, 59, 59, 999);
-      data = data.filter(item => new Date(item.task_start_date).getTime() <= today);
-    }
-    return data;
+
+    if (showHistory) return rawData;
+
+    // --- Smart Pending Logic (Deduplication) ---
+    const seen = new Set();
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    // Sort ascending by planned_date (or task_start_date)
+    const sorted = [...rawData].sort((a, b) => {
+      const dateA = new Date(a.planned_date || a.task_start_date).getTime();
+      const dateB = new Date(b.planned_date || b.task_start_date).getTime();
+      return dateA - dateB;
+    });
+
+    return sorted.filter(item => {
+      const taskDate = new Date(item.planned_date || item.task_start_date);
+      const isUpcoming = taskDate.getTime() > today.getTime();
+
+      if (isUpcoming) {
+        // UPCOMING: only show the NEXT (earliest) occurrence per series
+        const key = `upcoming::${item.task_description}::${item.name}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+      } else {
+        // OVERDUE & TODAY: show each day individually
+        const dateKey = taskDate.toDateString();
+        const key = `${item.task_description}::${item.name}::${dateKey}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+      }
+      return true;
+    });
   }, [checklist, history, searchTerm, showHistory, departmentFilter]);
 
   // Infinite Scroll

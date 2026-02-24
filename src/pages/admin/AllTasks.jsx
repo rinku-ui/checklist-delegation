@@ -100,7 +100,8 @@ const AllTasks = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const statusDateColumn = activeTab === "repair" ? "created_at" : "planned_date";
-  const sortDateColumn = activeTab === "repair" ? "created_at" : "task_start_date";
+  // Use planned_date for checklist/delegation sort — task_start_date is same for all occurrences of a recurring task
+  const sortDateColumn = activeTab === "repair" ? "created_at" : "planned_date";
   const [holidaysList, setHolidaysList] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
 
@@ -368,7 +369,7 @@ const AllTasks = () => {
         case "checklist":
         default:
           tableName = "checklist";
-          dateColumn = "planned_date";
+          dateColumn = "task_start_date"; // task_start_date = original admin start date; used for lte filter in query
           completionField = "submission_date";
           headers = [
             { id: "id", label: "Task ID" },
@@ -411,6 +412,15 @@ const AllTasks = () => {
           query = query.is("submission_date", null).order(dateColumn, { ascending: false });
         } else if (activeTab === "ea") {
           query = query.in("status", ["pending", "extend", "extended"]).order("task_start_date", { ascending: true });
+        } else if (activeTab === "checklist" || activeTab === "delegation") {
+          // Fetch ALL pending tasks (no DB date restriction).
+          // Smart dedup in filteredPendingTasks handles upcoming dedup:
+          //   Overdue/Today → show all occurrences per day
+          //   Upcoming      → show only NEXT occurrence per task series (avoids 300+ future rows)
+          // Sorted ascending: oldest overdue first → today → next upcoming
+          query = query
+            .is(completionField, null)
+            .order('planned_date', { ascending: true });
         } else {
           query = query.is(completionField, null).order(dateColumn, { ascending: false });
         }
@@ -449,7 +459,7 @@ const AllTasks = () => {
 
   // Filtering Logic
   const filteredPendingTasks = useMemo(() => {
-    // First, sort tasks by original start date to ensure we handle them in order
+    // Sort ascending by planned_date: oldest overdue first → today → upcoming
     const sortedTasks = [...tasks].sort((a, b) => {
       const dateA = a[sortDateColumn] ? new Date(a[sortDateColumn]) : new Date(0);
       const dateB = b[sortDateColumn] ? new Date(b[sortDateColumn]) : new Date(0);
@@ -467,47 +477,44 @@ const AllTasks = () => {
 
       if (!matchesSearch) return false;
 
-      // Date filtering logic: Today, Overdue, Upcoming
-      const today = new Date();
-      const todayStart = new Date(today);
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(today);
-      todayEnd.setHours(23, 59, 59, 999);
-
-      // Special case: Extended EA tasks should always be visible in "Today" if filtering for today
-      // or visible in their respective buckets based on their new date.
-      // The current logic handles them based on date, which is standard.
-
       const taskDateValue = task[statusDateColumn];
-      if (taskDateValue) {
-        const status = getTimeStatus(taskDateValue, task.status);
+      const status = taskDateValue ? getTimeStatus(taskDateValue, task.status) : null;
 
+      // Apply the dropdown date filter
+      if (taskDateValue && status) {
         if (dateFilter === "all") {
-          // Show all tasks, no date filtering
+          // Show all: overdue + today + upcoming
         } else if (dateFilter === "today") {
-          // Show only tasks for today
           if (status !== "Today") return false;
         } else if (dateFilter === "overdue") {
-          // Show only past tasks
           if (status !== "Overdue") return false;
         } else if (dateFilter === "upcoming") {
-          // Show only future tasks
           if (status !== "Upcoming") return false;
         }
       }
 
-      // Deduplication logic for checklist tasks
-      if (activeTab === "checklist") {
-        // Include date in key to avoid hiding different occurrences of the same recurring task
-        const taskDate = task[statusDateColumn] ? new Date(task[statusDateColumn]).toDateString() : "";
-        const key = `${task.task_description}-${task.name}-${taskDate}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
+      // Smart deduplication for checklist and delegation tabs
+      if (activeTab === "checklist" || activeTab === "delegation") {
+        if (status === "Upcoming") {
+          // UPCOMING: only show the NEXT (earliest) occurrence per task series
+          // Key without date — ensures only 1 upcoming row per recurring task
+          // (prevents 300+ future "ALL FINALIZING" rows from all appearing)
+          const key = `upcoming::${task.task_description}::${task.name}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+        } else {
+          // OVERDUE & TODAY: show each day individually
+          // (admin must see every missed day and today's task)
+          const taskDate = taskDateValue ? new Date(taskDateValue).toDateString() : "";
+          const key = `${task.task_description}::${task.name}::${taskDate}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+        }
       }
 
       return true;
     });
-  }, [tasks, searchTerm, activeTab, dateFilter]);
+  }, [tasks, searchTerm, activeTab, dateFilter, sortDateColumn, statusDateColumn]);
 
   const filteredHistoryTasks = useMemo(() => {
     const completionField = "submission_date";
@@ -834,7 +841,10 @@ const AllTasks = () => {
 
         if (originalTask && frequency && frequency !== "one-time" && frequency !== "no") {
           try {
-            const nextDate = calculateNextDueDate(originalTask.task_start_date || new Date(), frequency);
+            // KEY FIX: Calculate next occurrence from planned_date (current specific occurrence date)
+            // NOT task_start_date (original admin start date, same for all occurrences — would always generate same next date)
+            const currentOccurrenceDate = originalTask.planned_date || originalTask.task_start_date || new Date();
+            const nextDate = calculateNextDueDate(currentOccurrenceDate, frequency);
             if (nextDate) {
               // Construct new task object based on table type
               let newTask = {};
@@ -845,11 +855,13 @@ const AllTasks = () => {
                   given_by: originalTask.given_by,
                   name: originalTask.name,
                   task_description: originalTask.task_description,
-                  task_start_date: nextDate,
-                  frequency: originalTask.frequency, // Keep original casing or standardized
+                  // Preserve original admin start date; advance the per-occurrence planned_date
+                  task_start_date: originalTask.task_start_date || currentOccurrenceDate,
+                  planned_date: nextDate,
+                  frequency: originalTask.frequency,
                   enable_reminder: originalTask.enable_reminder,
                   require_attachment: originalTask.require_attachment,
-                  status: 'Pending' // Reset status for new task (or null depending on schema default)
+                  status: null // null = pending (matches schema default)
                 };
               } else if (activeTab === "maintenance") {
                 newTask = {
@@ -857,12 +869,13 @@ const AllTasks = () => {
                   given_by: originalTask.given_by,
                   name: originalTask.name,
                   task_description: originalTask.task_description,
-                  task_start_date: nextDate,
+                  task_start_date: originalTask.task_start_date || currentOccurrenceDate,
+                  planned_date: nextDate,
                   freq: originalTask.freq,
                   enable_reminders: originalTask.enable_reminders,
                   require_attachment: originalTask.require_attachment,
-                  company_name: originalTask.company_name, // Ensure this critical field is carried over if present
-                  status: null // Pending status usually null for maintenance
+                  company_name: originalTask.company_name,
+                  status: null
                 };
               }
 
@@ -1436,8 +1449,8 @@ const AllTasks = () => {
                             <span className="text-xs font-bold text-purple-800 uppercase tracking-wider">#{task.id}</span>
                           </div>
                           <span className={`px-2 py-0.5 inline-flex text-[10px] leading-5 font-semibold rounded-full ${getTimeStatus(task[statusDateColumn] || task.created_at, task.status) === 'Overdue' ? 'bg-red-100 text-red-800' :
-                              getTimeStatus(task[statusDateColumn] || task.created_at, task.status) === 'Today' ? 'bg-green-100 text-green-800' :
-                                'bg-blue-100 text-blue-800'}`}>
+                            getTimeStatus(task[statusDateColumn] || task.created_at, task.status) === 'Today' ? 'bg-green-100 text-green-800' :
+                              'bg-blue-100 text-blue-800'}`}>
                             {getTimeStatus(task[statusDateColumn] || task.created_at, task.status)}
                           </span>
                         </div>
@@ -1482,8 +1495,8 @@ const AllTasks = () => {
                                   </select>
                                 ) : (
                                   <span className={`px-2 inline-flex text-[10px] leading-5 font-semibold rounded-full ${(task.status === "Done" || task.status === "yes" || task.status === "done" || task.status === "approved" || task.status === "Completed")
-                                      ? (task.admin_done ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800")
-                                      : "bg-gray-100 text-gray-800"
+                                    ? (task.admin_done ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800")
+                                    : "bg-gray-100 text-gray-800"
                                     }`}>
                                     {(!task.admin_done && task.submission_date) ? "Pending Approval" : task.status}
                                   </span>

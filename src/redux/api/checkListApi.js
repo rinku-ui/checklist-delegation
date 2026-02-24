@@ -21,8 +21,10 @@ export const fetchChechListDataSortByDate = async (page = 1, limit = 50, searchT
     let query = supabase
       .from('checklist')
       .select('*', { count: 'exact' })
-      .lte('task_start_date', endOfTodayISO)
-      .order('task_start_date', { ascending: true })
+      // KEY FIX: Order by planned_date ascending (oldest/overdue first)
+      // and remove hard lte filter so upcoming tasks can also be seen.
+      // UI deduplication will handle not showing 300+ future rows.
+      .order('planned_date', { ascending: true })
       .is("submission_date", null)
       .is("status", null)
       .range(from, to);

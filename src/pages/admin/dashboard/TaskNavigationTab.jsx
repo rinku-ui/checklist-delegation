@@ -292,15 +292,32 @@ export default function TaskNavigationTabs({
       console.log('Raw data received:', data.length, 'records');
 
       // Process the data similar to your existing logic
+      const seen = new Set();
       const processedTasks = data.map((task) => {
-        const taskStartDate = parseTaskStartDate(task.task_start_date)
+        // Use planned_date for checklist/delegation as the primary date for status/display
+        // Use task_start_date for others (maintenance, repair, etc.)
+        const dateToUse = (dashboardType === 'checklist' || dashboardType === 'delegation')
+          ? (task.planned_date || task.task_start_date)
+          : task.task_start_date;
+
+        const taskStartDate = parseTaskStartDate(dateToUse)
         const completionDate = task.submission_date ? parseTaskStartDate(task.submission_date) : null
 
         let status = "pending"
-        if (completionDate || task.status === 'yes') {
+        if (completionDate || task.status === 'yes' || task.status === 'done') {
           status = "completed"
-        } else if (taskStartDate && isDateInPast(taskStartDate)) {
-          status = "overdue"
+        } else if (taskStartDate) {
+          if (isDateInPast(taskStartDate)) {
+            status = "overdue"
+          } else {
+            const today = new Date();
+            today.setHours(23, 59, 59, 999);
+            if (taskStartDate > today) {
+              status = "upcoming"
+            } else {
+              status = "pending" // Today
+            }
+          }
         }
 
         return {
@@ -310,25 +327,46 @@ export default function TaskNavigationTabs({
           assignedTo: task.name || "Unassigned",
           taskStartDate: formatDateToDDMMYYYY(taskStartDate),
           originalTaskStartDate: task.task_start_date,
+          plannedDate: task.planned_date,
           status,
           frequency: task.frequency || "one-time",
           rating: task.color_code_for || 0,
-          department: task.department || "N/A", // Add department field
+          department: task.department || "N/A",
         }
       })
 
       console.log('Processed tasks:', processedTasks.length, 'records');
 
-      // Apply client-side search filter if needed
+      // Apply client-side search filter AND smart deduplication
       let filteredTasks = processedTasks.filter((task) => {
+        // 1. Search filter
         if (searchQuery && searchQuery.trim() !== "") {
           const query = searchQuery.toLowerCase().trim()
-          return (
+          const matchesSearch = (
             (task.title && task.title.toLowerCase().includes(query)) ||
             (task.id && task.id.toString().includes(query)) ||
             (task.assignedTo && task.assignedTo.toLowerCase().includes(query))
           )
+          if (!matchesSearch) return false;
         }
+
+        // 2. Smart deduplication for checklist/delegation
+        if (dashboardType === 'checklist' || dashboardType === 'delegation') {
+          if (task.status === "upcoming") {
+            // UPCOMING: only show the NEXT (earliest) occurrence per task series
+            const key = `upcoming::${task.task_description}::${task.name}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+          } else {
+            // OVERDUE & TODAY: show each day individually
+            const taskDate = task.plannedDate ? new Date(task.plannedDate).toDateString() :
+              (task.originalTaskStartDate ? new Date(task.originalTaskStartDate).toDateString() : "");
+            const key = `${task.task_description}::${task.name}::${taskDate}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+          }
+        }
+
         return true
       })
 

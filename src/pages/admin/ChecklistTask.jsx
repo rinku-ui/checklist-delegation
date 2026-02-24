@@ -585,6 +585,8 @@ export default function ChecklistTask() {
                         enableReminders: task.enableReminders,
                         requireAttachment: task.requireAttachment,
                         dueDate,
+                        // originalStartDate = the admin-selected start date (same for all occurrences)
+                        originalStartDate: formatDateISO(task.date) + `T${task.time || "09:00"}:00`,
                         status: "pending"
                     });
                 }

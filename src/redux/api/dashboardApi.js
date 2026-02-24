@@ -22,10 +22,14 @@ export const fetchDashboardDataApi = async (
     const username = localStorage.getItem('user-name');
     const today = new Date().toISOString().split('T')[0];
 
+    const dateColumn = (dashboardType === 'checklist' || dashboardType === 'delegation') ? 'planned_date' : 'task_start_date';
+    // Use ascending order for checklist/delegation to show oldest/most overdue first
+    const isAscending = (dashboardType === 'checklist' || dashboardType === 'delegation');
+
     let query = supabase
       .from(dashboardType)
       .select('*')
-      .order('task_start_date', { ascending: false })
+      .order(dateColumn, { ascending: isAscending })
       .range(from, to);
 
     // Apply role-based filtering first
@@ -49,8 +53,8 @@ export const fetchDashboardDataApi = async (
     switch (taskView) {
       case 'recent':
         // Today's tasks only
-        query = query.gte('task_start_date', `${today}T00:00:00`)
-          .lte('task_start_date', `${today}T23:59:59`);
+        query = query.gte(dateColumn, `${today}T00:00:00`)
+          .lte(dateColumn, `${today}T23:59:59`);
         if (dashboardType === 'checklist') {
           // Exclude completed tasks for recent view
           query = query.is('submission_date', null);
@@ -59,12 +63,12 @@ export const fetchDashboardDataApi = async (
 
       case 'upcoming':
         // All future tasks (after today)
-        query = query.gt('task_start_date', `${today}T23:59:59`);
+        query = query.gt(dateColumn, `${today}T23:59:59`);
         break;
 
       case 'overdue':
         // Tasks before today that are not completed AND have null submission_date
-        query = query.lt('task_start_date', `${today}T00:00:00`)
+        query = query.lt(dateColumn, `${today}T00:00:00`)
           .is('submission_date', null);
 
         if (dashboardType === 'delegation') {
@@ -76,8 +80,10 @@ export const fetchDashboardDataApi = async (
         // No date filters for all tasks
         break;
       default:
-        // Limit to tasks up to today for other views if not specified
-        query = query.lte('task_start_date', `${today}T23:59:59`);
+        // For checklist/delegation "all" or undefined views, we don't want to restrict to today
+        if (dashboardType !== 'checklist' && dashboardType !== 'delegation') {
+          query = query.lte(dateColumn, `${today}T23:59:59`);
+        }
         break;
     }
 
@@ -135,11 +141,13 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = null, t
       query = query.eq('department', departmentFilter);
     }
 
+    const dateColumn = (dashboardType === 'checklist' || dashboardType === 'delegation') ? 'planned_date' : 'task_start_date';
+
     // Apply task view filtering
     switch (taskView) {
       case 'recent':
-        query = query.gte('task_start_date', `${today}T00:00:00`)
-          .lte('task_start_date', `${today}T23:59:59`);
+        query = query.gte(dateColumn, `${today}T00:00:00`)
+          .lte(dateColumn, `${today}T23:59:59`);
         if (dashboardType === 'checklist') {
           query = query.is('submission_date', null);
         }
@@ -147,12 +155,12 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = null, t
 
       case 'upcoming':
         // All future tasks (after today)
-        query = query.gt('task_start_date', `${today}T23:59:59`);
+        query = query.gt(dateColumn, `${today}T23:59:59`);
         break;
 
       case 'overdue':
         // Tasks before today that are not completed AND have null submission_date
-        query = query.lt('task_start_date', `${today}T00:00:00`)
+        query = query.lt(dateColumn, `${today}T00:00:00`)
           .is('submission_date', null);
 
         if (dashboardType === 'delegation') {
@@ -164,7 +172,9 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = null, t
         // No date filters
         break;
       default:
-        query = query.lte('task_start_date', `${today}T23:59:59`);
+        if (dashboardType !== 'checklist' && dashboardType !== 'delegation') {
+          query = query.lte(dateColumn, `${today}T23:59:59`);
+        }
         break;
     }
 
@@ -191,20 +201,21 @@ export const countPendingOrDelayTaskApi = async (dashboardType, staffFilter = nu
     const today = new Date().toISOString().split('T')[0];
     let query;
 
+    const dateColumn = (dashboardType === 'checklist' || dashboardType === 'delegation') ? 'planned_date' : 'task_start_date';
     if (dashboardType === 'delegation') {
       query = supabase
         .from('delegation')
         .select('*', { count: 'exact', head: true })
         .is('submission_date', null)
-        .gte('task_start_date', `${today}T00:00:00`)
-        .lte('task_start_date', `${today}T23:59:59`);
+        .gte(dateColumn, `${today}T00:00:00`)
+        .lte(dateColumn, `${today}T23:59:59`);
     } else {
       query = supabase
         .from('checklist')
         .select('*', { count: 'exact', head: true })
         .is('submission_date', null)
-        .gte('task_start_date', `${today}T00:00:00`)
-        .lte('task_start_date', `${today}T23:59:59`);
+        .gte(dateColumn, `${today}T00:00:00`)
+        .lte(dateColumn, `${today}T23:59:59`);
     }
 
     // Apply filters
@@ -290,12 +301,14 @@ export const fetchStaffTasksDataApi = async (dashboardType, staffFilter = null, 
       selectedMonth
     });
 
+    const dateColumn = (dashboardType === 'checklist' || dashboardType === 'delegation') ? 'planned_date' : 'task_start_date';
+
     // Build the query
     let query = supabase
       .from(dashboardType)
       .select('*')
-      .gte('task_start_date', `${startDate}T00:00:00`)
-      .lte('task_start_date', `${endDate}T23:59:59`)
+      .gte(dateColumn, `${startDate}T00:00:00`)
+      .lte(dateColumn, `${endDate}T23:59:59`)
       .not('name', 'is', null);
 
     // Apply role-based filtering
@@ -421,11 +434,13 @@ export const getStaffTasksCountApi = async (dashboardType, staffFilter = null, d
     const lastDayOfMonth = new Date(year, month, 0).getDate();
     const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDayOfMonth.toString().padStart(2, '0')}`;
 
+    const dateColumn = (dashboardType === 'checklist' || dashboardType === 'delegation') ? 'planned_date' : 'task_start_date';
+
     let query = supabase
       .from(dashboardType)
       .select('department, name')
-      .gte('task_start_date', `${startDate}T00:00:00`)
-      .lte('task_start_date', `${endDate}T23:59:59`)
+      .gte(dateColumn, `${startDate}T00:00:00`)
+      .lte(dateColumn, `${endDate}T23:59:59`)
       .not('name', 'is', null);
 
     // Apply role-based filtering
@@ -598,21 +613,23 @@ export const fetchChecklistDataByDateRangeApi = async (
     const role = localStorage.getItem('role');
     const username = localStorage.getItem('user-name');
 
+    const dateColumn = 'planned_date'; // This API is specific to checklist
+
     let query = supabase
       .from('checklist')
       .select('*')
-      .order('task_start_date', { ascending: false })
+      .order(dateColumn, { ascending: true }) // Ascending for date ranges usually better
       .range(from, to);
 
     // Apply date range filter ONLY
     if (startDate && endDate) {
       query = query
-        .gte('task_start_date', `${startDate}T00:00:00`)
-        .lte('task_start_date', `${endDate}T23:59:59`);
+        .gte(dateColumn, `${startDate}T00:00:00`)
+        .lte(dateColumn, `${endDate}T23:59:59`);
     } else if (startDate) {
-      query = query.gte('task_start_date', `${startDate}T00:00:00`);
+      query = query.gte(dateColumn, `${startDate}T00:00:00`);
     } else if (endDate) {
-      query = query.lte('task_start_date', `${endDate}T23:59:59`);
+      query = query.lte(dateColumn, `${endDate}T23:59:59`);
     }
 
     // Apply role-based filtering
@@ -682,15 +699,17 @@ export const getChecklistDateRangeCountApi = async (
       .from('checklist')
       .select('*', { count: 'exact', head: true });
 
+    const dateColumn = 'planned_date'; // checklist specific
+
     // Apply date range filter ONLY - no today date restrictions
     if (startDate && endDate) {
       query = query
-        .gte('task_start_date', `${startDate}T00:00:00`)
-        .lte('task_start_date', `${endDate}T23:59:59`);
+        .gte(dateColumn, `${startDate}T00:00:00`)
+        .lte(dateColumn, `${endDate}T23:59:59`);
     } else if (startDate) {
-      query = query.gte('task_start_date', `${startDate}T00:00:00`);
+      query = query.gte(dateColumn, `${startDate}T00:00:00`);
     } else if (endDate) {
-      query = query.lte('task_start_date', `${endDate}T23:59:59`);
+      query = query.lte(dateColumn, `${endDate}T23:59:59`);
     }
 
     // Apply role-based filtering
@@ -716,12 +735,12 @@ export const getChecklistDateRangeCountApi = async (
       case 'pending':
         const today = new Date().toISOString().split('T')[0];
         query = query.is('submission_date', null)
-          .gte('task_start_date', `${today}T00:00:00`);
+          .gte(dateColumn, `${today}T00:00:00`);
         break;
       case 'overdue':
         const todayOverdue = new Date().toISOString().split('T')[0];
         query = query.is('submission_date', null)
-          .lt('task_start_date', `${todayOverdue}T00:00:00`);
+          .lt(dateColumn, `${todayOverdue}T00:00:00`);
         break;
       // 'all' - no additional status filter
     }
@@ -756,6 +775,8 @@ export const getChecklistDateRangeStatsApi = async (
       startDate, endDate, staffFilter, departmentFilter
     });
 
+    const dateColumn = 'planned_date'; // checklist specific
+
     // MAIN FIX: Remove the today date filter that was limiting results
     let totalQuery = supabase
       .from('checklist')
@@ -764,8 +785,8 @@ export const getChecklistDateRangeStatsApi = async (
     // Apply ONLY date range filter - no other date restrictions
     if (startDate && endDate) {
       totalQuery = totalQuery
-        .gte('task_start_date', `${startDate}T00:00:00`)
-        .lte('task_start_date', `${endDate}T23:59:59`);
+        .gte(dateColumn, `${startDate}T00:00:00`)
+        .lte(dateColumn, `${endDate}T23:59:59`);
     }
 
     // Apply role-based filtering
