@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import AdminLayout from "../../components/layout/AdminLayout";
 import supabase from "../../SupabaseClient";
 import {
@@ -24,6 +25,7 @@ import {
   Filter,
 } from "lucide-react";
 import TaskManagementTabs from "../../components/TaskManagementTabs";
+import { customDropdownDetails } from "../../redux/slice/settingSlice";
 import { updateRepairData } from "../../redux/api/repairApi";
 import { sendTaskExtensionNotification, sendUrgentTaskNotification } from "../../services/whatsappService";
 import AudioPlayer from "../../components/AudioPlayer";
@@ -59,6 +61,8 @@ const RenderDescription = ({ text }) => {
 };
 
 const AllTasks = () => {
+  const dispatch = useDispatch();
+  const { customDropdowns = [] } = useSelector((state) => state.setting || {});
   const { showToast } = useMagicToast();
   // Active tab state
   const [activeTab, setActiveTab] = useState("checklist"); // checklist, maintenance, repair, ea
@@ -121,7 +125,8 @@ const AllTasks = () => {
       }
     };
     fetchInitialData();
-  }, []);
+    dispatch(customDropdownDetails());
+  }, [dispatch]);
 
 
   // Check user credentials
@@ -855,8 +860,8 @@ const AllTasks = () => {
                   given_by: originalTask.given_by,
                   name: originalTask.name,
                   task_description: originalTask.task_description,
-                  // Preserve original admin start date; advance the per-occurrence planned_date
-                  task_start_date: originalTask.task_start_date || currentOccurrenceDate,
+                  // Both task_start_date and planned_date are set to the next occurrence date
+                  task_start_date: nextDate,
                   planned_date: nextDate,
                   frequency: originalTask.frequency,
                   enable_reminder: originalTask.enable_reminder,
@@ -869,7 +874,7 @@ const AllTasks = () => {
                   given_by: originalTask.given_by,
                   name: originalTask.name,
                   task_description: originalTask.task_description,
-                  task_start_date: originalTask.task_start_date || currentOccurrenceDate,
+                  task_start_date: nextDate,
                   planned_date: nextDate,
                   freq: originalTask.freq,
                   enable_reminders: originalTask.enable_reminders,
@@ -1342,11 +1347,23 @@ const AllTasks = () => {
                                                 ? <span className="font-bold text-gray-900">{task[header.id] || "—"}</span>
                                                 : header.id === "machine_name"
                                                   ? (task.machine_name || (task.task_description ? task.task_description.split(' - ')[0] : "—"))
-                                                  : (header.id === 'task_description' || header.id === 'issue_description' || header.id === 'remarks')
-                                                    ? <RenderDescription text={task[header.id]} />
-                                                    : isAudioUrl(task[header.id])
-                                                      ? <AudioPlayer url={task[header.id]} />
-                                                      : task[header.id] || "—"}</td>
+                                                  : header.id === "part_name"
+                                                    ? (
+                                                      <div className="flex flex-col gap-1 min-w-[120px]">
+                                                        <span className="text-gray-900">{task.part_name || "—"}</span>
+                                                        <div className="flex gap-1 flex-wrap">
+                                                          {task.part_name && task.part_name.split(',').map(p => p.trim()).map((part, idx) => {
+                                                            const match = customDropdowns.find(d => d.category === "Part Name" && d.value === part && d.image_url);
+                                                            return match ? <img key={idx} src={match.image_url} alt={part} className="w-10 h-10 object-cover rounded shadow-sm border border-gray-200 bg-gray-50 flex-shrink-0" title={part} /> : null;
+                                                          })}
+                                                        </div>
+                                                      </div>
+                                                    )
+                                                    : (header.id === 'task_description' || header.id === 'issue_description' || header.id === 'remarks')
+                                                      ? <RenderDescription text={task[header.id]} />
+                                                      : isAudioUrl(task[header.id])
+                                                        ? <AudioPlayer url={task[header.id]} />
+                                                        : task[header.id] || "—"}</td>
                                 ))}
                                 {!showHistory && activeTab === "ea" && (
                                   <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">
@@ -1510,6 +1527,21 @@ const AllTasks = () => {
                             <div className="space-y-1">
                               <p className="text-[10px] text-gray-400 uppercase font-semibold">Machine / Unit</p>
                               <p className="text-sm text-gray-800">{task.machine_name || "—"}</p>
+                            </div>
+                          )}
+
+                          {task.part_name && (
+                            <div className="space-y-1">
+                              <p className="text-[10px] text-gray-400 uppercase font-semibold">Part</p>
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm text-gray-800">{task.part_name}</span>
+                                <div className="flex gap-2 flex-wrap">
+                                  {task.part_name.split(',').map(p => p.trim()).map((part, idx) => {
+                                    const match = customDropdowns?.find(d => d.category === "Part Name" && d.value === part && d.image_url);
+                                    return match ? <img key={idx} src={match.image_url} alt={part} className="w-12 h-12 object-cover rounded shadow-sm border border-gray-200 bg-gray-50 flex-shrink-0" title={part} /> : null;
+                                  })}
+                                </div>
+                              </div>
                             </div>
                           )}
 

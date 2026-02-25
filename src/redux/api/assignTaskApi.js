@@ -130,9 +130,8 @@ export const pushAssignTaskApi = async (generatedTasks, targetTable = null) => {
       given_by: task.givenBy,
       name: task.doer,
       task_description: task.description,
-      // task_start_date = original admin-selected start date (same for all occurrences of a recurring task)
-      // planned_date = specific occurrence date (dueDate)
-      task_start_date: task.originalStartDate || task.dueDate,
+      // task_start_date and planned_date are the same — both use the specific occurrence date (dueDate)
+      task_start_date: task.dueDate,
       planned_date: task.dueDate,
       frequency: task.frequency,
       duration: task.duration || null,
@@ -166,9 +165,8 @@ export const pushAssignTaskApi = async (generatedTasks, targetTable = null) => {
       given_by: task.givenBy,
       name: task.doer,
       task_description: task.description,
-      // task_start_date = original admin-selected start date (same for all occurrences of a recurring task)
-      // planned_date = specific occurrence date (dueDate)
-      task_start_date: task.originalStartDate || task.dueDate,
+      // task_start_date and planned_date are the same — both use the specific occurrence date (dueDate)
+      task_start_date: task.dueDate,
       planned_date: task.dueDate,
       frequency: task.frequency,
       duration: task.duration || null,

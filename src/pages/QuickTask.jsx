@@ -72,16 +72,8 @@ export default function QuickTask() {
   const [tasks, setTasks] = useState([]);
   const [delegationLoading, setDelegationLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [activeTab, setActiveTab] = useState('checklist');
-  const [freqFilter, setFreqFilter] = useState('');
   const tableContainerRef = useRef(null);
-  const [dateFilter, setDateFilter] = useState("all"); // all, today, overdue, upcoming
-  const [dropdownOpen, setDropdownOpen] = useState({
-    frequency: false,
-    dateFilter: false
-  });
   const [selectedTasks, setSelectedTasks] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
@@ -93,6 +85,19 @@ export default function QuickTask() {
   const [givenByList, setGivenByList] = useState([]);
   const [doersList, setDoersList] = useState([]);
   const [customOptions, setCustomOptions] = useState([]);
+
+  // Search and Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [freqFilter, setFreqFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('all');
+
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
   // const { quickTask, loading, delegationTasks, users } = useSelector((state) => state.quickTask);
   const {
@@ -135,18 +140,35 @@ export default function QuickTask() {
     fetchDropdownData();
   }, [dispatch]);
 
-  // Re-fetch when dateFilter or activeTab changes
+  // Re-fetch when activeTab changes
   useEffect(() => {
     if (activeTab === 'checklist') {
       dispatch(resetChecklistPagination());
-      dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, dateFilter }));
+      dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, dateFilter, nameFilter: searchTerm }));
     } else if (activeTab === 'delegation') {
       dispatch(resetDelegationPagination());
-      dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, dateFilter }));
+      dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, dateFilter, nameFilter: searchTerm }));
     } else if (activeTab === 'maintenance') {
-      dispatch(maintenanceData({ page: 1, frequency: freqFilter, searchTerm: searchTerm, dateFilter }));
+      dispatch(maintenanceData({ page: 1, frequency: freqFilter, searchTerm: searchTerm }));
     }
-  }, [dateFilter, dispatch, activeTab, freqFilter, searchTerm]);
+  }, [dispatch, activeTab]);
+
+  // Debounced search effect
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (activeTab === 'checklist') {
+        dispatch(resetChecklistPagination());
+        dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, dateFilter, nameFilter: searchTerm }));
+      } else if (activeTab === 'delegation') {
+        dispatch(resetDelegationPagination());
+        dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, dateFilter, nameFilter: searchTerm }));
+      } else if (activeTab === 'maintenance') {
+        dispatch(maintenanceData({ page: 1, frequency: freqFilter, searchTerm: searchTerm }));
+      }
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [searchTerm, dispatch]);
 
 
   // Add this new function
@@ -161,26 +183,21 @@ export default function QuickTask() {
         dispatch(uniqueChecklistTaskData({
           page: checklistPage,
           pageSize: 50,
-          dateFilter,
           append: true
         }));
       } else if (activeTab === 'delegation' && delegationHasMore) {
         dispatch(uniqueDelegationTaskData({
           page: delegationPage,
           pageSize: 50,
-          dateFilter,
           append: true
         }));
       } else if (activeTab === 'maintenance' && maintenanceHasMore) {
         dispatch(maintenanceData({
-          page: maintenancePage + 1,
-          frequency: freqFilter,
-          searchTerm: searchTerm,
-          dateFilter
+          page: maintenancePage + 1
         }));
       }
     }
-  }, [loading, maintenanceLoading, activeTab, checklistHasMore, delegationHasMore, maintenanceHasMore, checklistPage, delegationPage, maintenancePage, dispatch, dateFilter, freqFilter, searchTerm]);
+  }, [loading, maintenanceLoading, activeTab, checklistHasMore, delegationHasMore, maintenanceHasMore, checklistPage, delegationPage, maintenancePage, dispatch]);
 
   // Options for Maintenance dropdowns
   const machineOptions = useMemo(() =>
@@ -302,7 +319,9 @@ export default function QuickTask() {
           originalTask: originalTask ? {
             machine_name: originalTask.machine_name,
             part_name: originalTask.part_name,
-            task_description: originalTask.task_description
+            part_area: originalTask.part_area,
+            task_description: originalTask.task_description,
+            name: originalTask.name
           } : null
         })).unwrap();
       } else if (activeTab === 'delegation') {
@@ -350,9 +369,11 @@ export default function QuickTask() {
 
       // Refresh the data
       if (activeTab === 'checklist') {
-        dispatch(uniqueChecklistTaskData());
+        dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, dateFilter, nameFilter: searchTerm }));
       } else if (activeTab === 'maintenance') {
         dispatch(maintenanceData({ page: 1, frequency: freqFilter, searchTerm: searchTerm }));
+      } else if (activeTab === 'delegation') {
+        dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, dateFilter, nameFilter: searchTerm }));
       }
 
     } catch (error) {
@@ -448,72 +469,18 @@ export default function QuickTask() {
     }
   };
 
-  const requestSort = (key) => {
-    if (loading) return;
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const handleFrequencyFilterSelect = (freq) => {
-    setFreqFilter(freq);
-    setDropdownOpen({ ...dropdownOpen, frequency: false });
-
-    if (activeTab === 'maintenance') {
-      dispatch(maintenanceData({ page: 1, frequency: freq, searchTerm: searchTerm }));
-    }
-  };
-
-  const clearFrequencyFilter = () => {
-    setFreqFilter('');
-    setDropdownOpen({ ...dropdownOpen, frequency: false });
-
-    if (activeTab === 'maintenance') {
-      dispatch(maintenanceData({ page: 1, frequency: '', searchTerm: searchTerm }));
-    }
-  };
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   const filteredDelegationTasks = useMemo(() => {
     const seen = new Set();
-    const filtered = delegationTasks.filter(task => {
-      const freqFilterPass = !freqFilter || (task.frequency?.toLowerCase() === freqFilter.toLowerCase());
-      const searchTermPass = !searchTerm || (
-        task.task_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.given_by?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-
-      if (!freqFilterPass || !searchTermPass) return false;
-
-      const taskDateValue = task.planned_date || task.task_start_date;
-      const status = getTimeStatus(taskDateValue, task.status);
-
-      if (dateFilter !== "all" && dateFilter !== status.toLowerCase()) return false;
-
-      // Smart deduplication
-      if (status === "Upcoming") {
-        const key = `upcoming::${task.task_description}::${task.name}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-      } else {
-        const taskDate = taskDateValue ? new Date(taskDateValue).toDateString() : "";
-        const key = `${task.task_description}::${task.name}::${taskDate}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-      }
-
+    // Deduplicate strictly by task_description + name (API already deduped, this is a safety net)
+    return delegationTasks.filter(task => {
+      const key = `${(task.department || '').trim()}::${(task.task_description || '').trim()}::${(task.name || '').trim()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
-
-    // Default sort by planned_date ascending
-    return [...filtered].sort((a, b) => {
-      const dateA = new Date(a.planned_date || a.task_start_date || 0);
-      const dateB = new Date(b.planned_date || b.task_start_date || 0);
-      return dateA - dateB;
-    });
-  }, [delegationTasks, freqFilter, searchTerm, dateFilter]);
+  }, [delegationTasks]);
 
   // Keep allFrequencies as is (or modify if you want to fetch frequencies from elsewhere)
   const allFrequencies = useMemo(() => {
@@ -532,92 +499,55 @@ export default function QuickTask() {
 
   const filteredChecklistTasks = useMemo(() => {
     const seen = new Set();
-    const filtered = quickTask.filter(task => {
-      const freqFilterPass = !freqFilter || (task.frequency?.toLowerCase() === freqFilter.toLowerCase());
-      const searchTermPass = !searchTerm || task.task_description?.toLowerCase().includes(searchTerm.toLowerCase());
-
-      if (!freqFilterPass || !searchTermPass) return false;
-
-      const taskDateValue = task.planned_date || task.task_start_date;
-      const status = getTimeStatus(taskDateValue, task.status);
-
-      if (dateFilter !== "all" && dateFilter !== status.toLowerCase()) return false;
-
-      // Smart deduplication
-      if (status === "Upcoming") {
-        const key = `upcoming::${task.task_description}::${task.name}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-      } else {
-        const taskDate = taskDateValue ? new Date(taskDateValue).toDateString() : "";
-        const key = `${task.task_description}::${task.name}::${taskDate}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-      }
-
+    // Deduplicate strictly by task_description + name (API already deduped, this is a safety net)
+    const unique = quickTask.filter(task => {
+      const key = `${(task.department || '').trim()}::${(task.task_description || '').trim()}::${(task.name || '').trim()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
 
-    // Sort: either use sortConfig OR default to planned_date ascending
-    const sorted = [...filtered].sort((a, b) => {
+    // Sort by sortConfig or default to task_start_date ascending
+    return [...unique].sort((a, b) => {
       if (sortConfig.key) {
         const valA = a[sortConfig.key];
         const valB = b[sortConfig.key];
         if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
         if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
-      } else {
-        const dateA = new Date(a.planned_date || a.task_start_date || 0);
-        const dateB = new Date(b.planned_date || b.task_start_date || 0);
-        return dateA - dateB;
       }
+      const dateA = new Date(a.task_start_date || 0);
+      const dateB = new Date(b.task_start_date || 0);
+      return dateA - dateB;
     });
-
-    return sorted;
-  }, [quickTask, freqFilter, searchTerm, dateFilter, sortConfig]);
+  }, [quickTask, sortConfig]);
 
   const filteredMaintenance = useMemo(() => {
+    // Search filter
+    const searched = maintenance.filter(task =>
+      !searchTerm ||
+      task.task_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      task.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Deduplicate by task_description + name
     const seen = new Set();
-    const filtered = maintenance.filter(task => {
-      const freqFilterPass = !freqFilter || (task.freq?.toLowerCase() === freqFilter.toLowerCase());
-      const searchTermPass = !searchTerm ||
-        task.task_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.name?.toLowerCase().includes(searchTerm.toLowerCase());
-
-      if (!freqFilterPass || !searchTermPass) return false;
-
-      const taskDateValue = task.planned_date || task.task_start_date;
-      const status = getTimeStatus(taskDateValue, task.status);
-
-      if (dateFilter !== "all" && dateFilter !== status.toLowerCase()) return false;
-
-      // Smart deduplication
-      if (status === "Upcoming") {
-        const descKey = task.task_description || "";
-        const nameKey = task.name || "";
-        const key = `upcoming::${descKey}::${nameKey}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-      } else {
-        const taskDate = taskDateValue ? new Date(taskDateValue).toDateString() : "";
-        const descKey = task.task_description || "";
-        const nameKey = task.name || "";
-        const key = `${descKey}::${nameKey}::${taskDate}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-      }
-
+    const unique = searched.filter(task => {
+      const key = `${(task.machine_name || '').trim()}::${(task.part_name || '').trim()}::${(task.part_area || '').trim()}::${(task.task_description || '').trim()}::${(task.name || '').trim()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
 
-    // Default sort by planned_date ascending
-    return [...filtered].sort((a, b) => {
-      const dateA = new Date(a.planned_date || a.task_start_date || 0);
-      const dateB = new Date(b.planned_date || b.task_start_date || 0);
+    // Sort by task_start_date ascending
+    return [...unique].sort((a, b) => {
+      const dateA = new Date(a.task_start_date || 0);
+      const dateB = new Date(b.task_start_date || 0);
       return dateA - dateB;
     });
-  }, [maintenance, freqFilter, searchTerm, dateFilter]);
+  }, [maintenance, searchTerm]);
+
+
 
   function formatTimestampToDDMMYYYY(timestamp) {
     if (!timestamp || timestamp === "" || timestamp === null) {
@@ -682,6 +612,8 @@ export default function QuickTask() {
                   onClick={() => {
                     setActiveTab(tab.id);
                     setSelectedTasks([]);
+                    setEditingTaskId(null);
+                    setEditFormData({});
                     if (tab.id === 'checklist') {
                       dispatch(resetChecklistPagination());
                       dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, dateFilter }));
@@ -699,90 +631,16 @@ export default function QuickTask() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-grow md:max-w-xs min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400" size={16} />
+          <div className="flex items-center mt-2">
+            <div className="relative w-full md:w-96">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
-                placeholder="Search database..."
+                placeholder="Search tasks..."
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 outline-none transition-all"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-purple-50/50 border border-purple-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium transition-all"
-                disabled={loading || delegationLoading}
               />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex bg-gray-50 border border-gray-100 p-1 rounded-xl gap-1">
-                {[
-                  { id: 'all', label: 'All' },
-                  { id: 'overdue', label: 'Overdue' },
-                  { id: 'today', label: 'Today' },
-                  { id: 'upcoming', label: 'Upcoming' }
-                ].map((filter) => (
-                  <button
-                    key={filter.id}
-                    onClick={() => {
-                      setDateFilter(filter.id);
-                      setSelectedTasks([]);
-                    }}
-                    className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${dateFilter === filter.id
-                      ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-100'
-                      : 'text-gray-400 hover:text-gray-600'
-                      }`}
-                  >
-                    {filter.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex bg-gray-50 border border-gray-100 p-1 rounded-xl gap-1">
-                {[
-                  { id: '', label: 'All Frequencies' },
-                  { id: 'daily', label: 'Daily' },
-                  { id: 'fortnight', label: 'Fortnight' },
-                  { id: 'monthly', label: 'Monthly' }
-                ].map((freq) => (
-                  <button
-                    key={freq.id}
-                    onClick={() => handleFrequencyFilterSelect(freq.id)}
-                    className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${freqFilter === freq.id
-                      ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-100'
-                      : 'text-gray-400 hover:text-gray-600'
-                      }`}
-                  >
-                    {freq.label}
-                  </button>
-                ))}
-
-                {/* Overflow/More Dropdown for less common frequencies */}
-                {allFrequencies.filter(f => !['daily', 'fortnight', 'monthly', ''].includes(f)).length > 0 && (
-                  <div className="relative">
-                    <button
-                      onClick={() => setDropdownOpen(prev => ({ ...prev, frequency: !prev.frequency }))}
-                      className={`px-2 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1 ${!['daily', 'fortnight', 'monthly', ''].includes(freqFilter)
-                        ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-100'
-                        : 'text-gray-400 hover:text-gray-600'
-                        }`}
-                    >
-                      {!['daily', 'fortnight', 'monthly', ''].includes(freqFilter) ? freqFilter : <ChevronDown size={14} />}
-                    </button>
-                    {dropdownOpen.frequency && (
-                      <div className="absolute right-0 z-50 mt-2 w-48 rounded-xl bg-white shadow-2xl border border-purple-50 max-h-60 overflow-y-auto p-1 animate-in slide-in-from-top-2">
-                        {allFrequencies.filter(f => !['daily', 'fortnight', 'monthly', ''].includes(f)).map(freq => (
-                          <button
-                            key={freq}
-                            onClick={() => handleFrequencyFilterSelect(freq)}
-                            className={`block w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase rounded-lg transition-colors ${freqFilter === freq ? 'bg-purple-100 text-purple-700' : 'text-gray-600 hover:bg-purple-50'}`}
-                          >
-                            {freq}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </div>
@@ -790,15 +648,7 @@ export default function QuickTask() {
 
       {error && (
         <div className="mt-4 bg-red-50 p-4 rounded-md text-red-800 text-center">
-          {error}{" "}
-          <button
-            onClick={() => {
-              dispatch(uniqueChecklistTaskData())
-            }}
-            className="underline ml-2 hover:text-red-600"
-          >
-            Try again
-          </button>
+          {error} <button onClick={() => dispatch(uniqueChecklistTaskData())} className="underline ml-2 hover:text-red-600">Try again</button>
         </div>
       )}
 
@@ -963,7 +813,7 @@ export default function QuickTask() {
                                         ) : (
                                           <div className="relative">
                                             <textarea
-                                              value={editFormData.task_description}
+                                              value={editFormData.task_description || ''}
                                               onChange={(e) => handleInputChange('task_description', e.target.value)}
                                               className="w-full px-2 py-1 border border-gray-300 rounded text-sm pr-10"
                                               rows="3"
@@ -1027,7 +877,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.department}
+                                value={editFormData.department || ''}
                                 onChange={(e) => handleInputChange('department', e.target.value)}
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               >
@@ -1045,7 +895,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.given_by}
+                                value={editFormData.given_by || ''}
                                 onChange={(e) => handleInputChange('given_by', e.target.value)}
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               >
@@ -1063,7 +913,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.name}
+                                value={editFormData.name || ''}
                                 onChange={(e) => handleInputChange('name', e.target.value)}
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               >
@@ -1100,7 +950,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.frequency}
+                                value={editFormData.frequency || ''}
                                 onChange={(e) => handleInputChange('frequency', e.target.value)}
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-gray-100 italic"
                                 disabled
@@ -1126,7 +976,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.enable_reminder}
+                                value={editFormData.enable_reminder || ''}
                                 onChange={(e) => handleInputChange('enable_reminder', e.target.value)}
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               >
@@ -1143,7 +993,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.require_attachment}
+                                value={editFormData.require_attachment || ''}
                                 onChange={(e) => handleInputChange('require_attachment', e.target.value)}
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               >
@@ -1213,7 +1063,7 @@ export default function QuickTask() {
                                 <div className="space-y-1">
                                   <label className="text-[10px] font-black text-gray-400 uppercase">Description</label>
                                   <textarea
-                                    value={editFormData.task_description}
+                                    value={editFormData.task_description || ''}
                                     onChange={(e) => handleInputChange('task_description', e.target.value)}
                                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold"
                                     rows="3"
@@ -1223,7 +1073,7 @@ export default function QuickTask() {
                                   <div className="space-y-1">
                                     <label className="text-[10px] font-black text-gray-400 uppercase">Department</label>
                                     <select
-                                      value={editFormData.department}
+                                      value={editFormData.department || ''}
                                       onChange={(e) => handleInputChange('department', e.target.value)}
                                       className="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold"
                                     >
@@ -1233,7 +1083,7 @@ export default function QuickTask() {
                                   <div className="space-y-1">
                                     <label className="text-[10px] font-black text-gray-400 uppercase">Assign From</label>
                                     <select
-                                      value={editFormData.given_by}
+                                      value={editFormData.given_by || ''}
                                       onChange={(e) => handleInputChange('given_by', e.target.value)}
                                       className="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold"
                                     >
@@ -1406,7 +1256,7 @@ export default function QuickTask() {
                                         ) : (
                                           <div className="relative">
                                             <textarea
-                                              value={editFormData.task_description}
+                                              value={editFormData.task_description || ''}
                                               onChange={(e) => handleInputChange('task_description', e.target.value)}
                                               className="w-full px-2 py-1 border border-gray-300 rounded text-sm pr-10"
                                               rows="3"
@@ -1466,7 +1316,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.machine_name}
+                                value={editFormData.machine_name || ''}
                                 onChange={(e) => handleInputChange('machine_name', e.target.value)}
                                 className="w-full px-2 py-1 border border-purple-200 rounded text-[11px] font-bold focus:ring-1 focus:ring-purple-500 outline-none"
                               >
@@ -1482,7 +1332,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.part_name}
+                                value={editFormData.part_name || ''}
                                 onChange={(e) => handleInputChange('part_name', e.target.value)}
                                 className="w-full px-2 py-1 border border-purple-200 rounded text-[11px] font-bold focus:ring-1 focus:ring-purple-500 outline-none"
                               >
@@ -1498,7 +1348,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.part_area}
+                                value={editFormData.part_area || ''}
                                 onChange={(e) => handleInputChange('part_area', e.target.value)}
                                 className="w-full px-2 py-1 border border-purple-200 rounded text-[11px] font-bold focus:ring-1 focus:ring-purple-500 outline-none"
                               >
@@ -1514,7 +1364,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.given_by}
+                                value={editFormData.given_by || ''}
                                 onChange={(e) => handleInputChange('given_by', e.target.value)}
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               >
@@ -1530,7 +1380,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.name}
+                                value={editFormData.name || ''}
                                 onChange={(e) => handleInputChange('name', e.target.value)}
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               >
@@ -1562,7 +1412,7 @@ export default function QuickTask() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {editingTaskId === task.id ? (
                               <select
-                                value={editFormData.freq}
+                                value={editFormData.freq || ''}
                                 onChange={(e) => handleInputChange('freq', e.target.value)}
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-gray-100 italic"
                                 disabled
@@ -1593,7 +1443,7 @@ export default function QuickTask() {
                             {editingTaskId === task.id ? (
                               <input
                                 type="text"
-                                value={editFormData.remarks}
+                                value={editFormData.remarks || ''}
                                 onChange={(e) => handleInputChange('remarks', e.target.value)}
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               />
@@ -1641,7 +1491,7 @@ export default function QuickTask() {
                                 <div className="space-y-1">
                                   <label className="text-[10px] font-black text-gray-400 uppercase">Description</label>
                                   <textarea
-                                    value={editFormData.task_description}
+                                    value={editFormData.task_description || ''}
                                     onChange={(e) => handleInputChange('task_description', e.target.value)}
                                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold"
                                     rows="3"
@@ -1651,7 +1501,7 @@ export default function QuickTask() {
                                   <div className="space-y-1">
                                     <label className="text-[10px] font-black text-gray-400 uppercase">Machine</label>
                                     <select
-                                      value={editFormData.machine_name}
+                                      value={editFormData.machine_name || ''}
                                       onChange={(e) => handleInputChange('machine_name', e.target.value)}
                                       className="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold"
                                     >
@@ -1661,7 +1511,7 @@ export default function QuickTask() {
                                   <div className="space-y-1">
                                     <label className="text-[10px] font-black text-gray-400 uppercase">Part</label>
                                     <select
-                                      value={editFormData.part_name}
+                                      value={editFormData.part_name || ''}
                                       onChange={(e) => handleInputChange('part_name', e.target.value)}
                                       className="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold"
                                     >

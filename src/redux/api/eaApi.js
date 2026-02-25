@@ -168,6 +168,7 @@ export const extendEATask = async (task, newPlannedDate, remarks = '', imageUrl 
             .from('ea_tasks')
             .update({
                 planned_date: newPlannedDate,
+                task_start_date: newPlannedDate,
                 extended_date: newPlannedDate, // Added to store extended date explicitly
                 status: 'extended',
                 remarks: remarks,

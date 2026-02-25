@@ -13,54 +13,53 @@ const parseJsonIfNeeded = (val) => {
   return val;
 };
 
-// Update fetchChecklistData to support pagination and filtering
+// Fetch unique checklist tasks — one row per unique task_description + name combination
 export const fetchChecklistData = async (page = 0, pageSize = 50, nameFilter = '', dateFilter = 'all') => {
   try {
-    const start = page * pageSize;
-    const end = start + pageSize - 1;
-
-    // Dates for filtering
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(today);
-    todayEnd.setHours(23, 59, 59, 999);
+    // Fetch a large batch so we can deduplicate client-side, then paginate
+    const FETCH_LIMIT = 2000;
 
     let query = supabase
       .from('checklist')
-      .select('*', { count: 'exact' })
+      .select('*')
       .is('submission_date', null)
-      .order('planned_date', { ascending: true })
-      .range(start, end);
+      .order('task_start_date', { ascending: true })
+      .limit(FETCH_LIMIT);
 
     if (nameFilter) {
-      query = query.eq('name', nameFilter);
+      query = query.ilike('task_description', `%${nameFilter}%`);
     }
 
-    if (dateFilter === 'today') {
-      query = query.gte('planned_date', today.toISOString()).lte('planned_date', todayEnd.toISOString());
-    } else if (dateFilter === 'overdue') {
-      query = query.lt('planned_date', today.toISOString());
-    } else if (dateFilter === 'upcoming') {
-      query = query.gt('planned_date', todayEnd.toISOString());
-    }
-
-    const { data, count, error } = await query;
+    const { data, error } = await query;
 
     if (error) {
       console.log("Error when fetching data", error);
       return { data: [], total: 0 };
     }
 
-    const finalData = (data || []).map(row => ({
+    // Deduplicate: keep only first occurrence of each task_description + name combo
+    const seen = new Set();
+    const uniqueRows = (data || []).filter(row => {
+      const key = `${(row.department || '').trim()}::${(row.task_description || '').trim()}::${(row.name || '').trim()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const mapped = uniqueRows.map(row => ({
       ...row,
       id: row.task_id,
       given_by: parseJsonIfNeeded(row.given_by),
       name: parseJsonIfNeeded(row.name)
     }));
 
+    // Paginate the deduplicated result
+    const start = page * pageSize;
+    const paginated = mapped.slice(start, start + pageSize);
+
     return {
-      data: finalData,
-      total: count || 0
+      data: paginated,
+      total: mapped.length
     };
 
   } catch (error) {
@@ -69,54 +68,52 @@ export const fetchChecklistData = async (page = 0, pageSize = 50, nameFilter = '
   }
 };
 
-// Update fetchDelegationData similarly
+// Fetch unique delegation tasks — one row per unique task_description + name combination
 export const fetchDelegationData = async (page = 0, pageSize = 50, nameFilter = '', dateFilter = 'all') => {
   try {
-    const start = page * pageSize;
-    const end = start + pageSize - 1;
-
-    // Dates for filtering
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(today);
-    todayEnd.setHours(23, 59, 59, 999);
+    const FETCH_LIMIT = 2000;
 
     let query = supabase
       .from('delegation')
-      .select('*', { count: 'exact' })
+      .select('*')
       .is('submission_date', null)
-      .order('planned_date', { ascending: true })
-      .range(start, end);
+      .order('task_start_date', { ascending: true })
+      .limit(FETCH_LIMIT);
 
     if (nameFilter) {
-      query = query.eq('name', nameFilter);
+      query = query.ilike('task_description', `%${nameFilter}%`);
     }
 
-    if (dateFilter === 'today') {
-      query = query.gte('planned_date', today.toISOString()).lte('planned_date', todayEnd.toISOString());
-    } else if (dateFilter === 'overdue') {
-      query = query.lt('planned_date', today.toISOString());
-    } else if (dateFilter === 'upcoming') {
-      query = query.gt('planned_date', todayEnd.toISOString());
-    }
-
-    const { data, count, error } = await query;
+    const { data, error } = await query;
 
     if (error) {
       console.log("Error when fetching data", error);
       return { data: [], total: 0 };
     }
 
-    const finalData = (data || []).map(row => ({
+    // Deduplicate: keep only first occurrence of each task_description + name combo
+    const seen = new Set();
+    const uniqueRows = (data || []).filter(row => {
+      const key = `${(row.department || '').trim()}::${(row.task_description || '').trim()}::${(row.name || '').trim()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const mapped = uniqueRows.map(row => ({
       ...row,
       id: row.task_id,
       given_by: parseJsonIfNeeded(row.given_by),
       name: parseJsonIfNeeded(row.name)
     }));
 
+    // Paginate the deduplicated result
+    const start = page * pageSize;
+    const paginated = mapped.slice(start, start + pageSize);
+
     return {
-      data: finalData,
-      total: count || 0
+      data: paginated,
+      total: mapped.length
     };
 
   } catch (error) {
@@ -130,9 +127,10 @@ export const deleteChecklistTasksApi = async (tasks) => {
     const { error } = await supabase
       .from("checklist")
       .delete()
+      .eq("department", task.department)
       .eq("name", task.name)
       .eq("task_description", task.task_description)
-      .is("submission_date", null); // only delete if submission_date is null
+      .is("submission_date", null);
 
     if (error) throw error;
   }
@@ -140,15 +138,18 @@ export const deleteChecklistTasksApi = async (tasks) => {
 };
 
 export const deleteDelegationTasksApi = async (tasks) => {
-  const taskIds = tasks.map(t => t.id || t.taskId || t.task_id);
-  const { error } = await supabase
-    .from("delegation")
-    .delete()
-    .in("task_id", taskIds)
-    .is("submission_date", null); // ✅ only delete if submission_date IS NULL
+  for (const task of tasks) {
+    const { error } = await supabase
+      .from("delegation")
+      .delete()
+      .eq("department", task.department)
+      .eq("name", task.name)
+      .eq("task_description", task.task_description)
+      .is("submission_date", null);
 
-  if (error) throw error;
-  return taskIds;
+    if (error) throw error;
+  }
+  return tasks;
 };
 
 export const updateChecklistTaskApi = async (updatedTask, originalTask) => {
@@ -159,6 +160,7 @@ export const updateChecklistTaskApi = async (updatedTask, originalTask) => {
       name: updatedTask.name,
       task_description: updatedTask.task_description,
       task_start_date: updatedTask.task_start_date,
+      planned_date: updatedTask.task_start_date,
       frequency: updatedTask.frequency,
       require_attachment: updatedTask.require_attachment,
       remark: updatedTask.remark,
@@ -194,6 +196,7 @@ export const updateDelegationTaskApi = async (updatedTask, originalTask) => {
       name: updatedTask.name,
       task_description: updatedTask.task_description,
       task_start_date: updatedTask.task_start_date,
+      planned_date: updatedTask.task_start_date,
       frequency: updatedTask.frequency,
       duration: updatedTask.duration || null,
       enable_reminder: updatedTask.enable_reminder,

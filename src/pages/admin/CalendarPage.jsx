@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+"use client";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2, AlertCircle, X, Edit, Save, Loader2, Play, Pause } from 'lucide-react';
 import supabase from '../../SupabaseClient';
-import { useRef } from 'react';
 
 const extractAudioUrl = (text) => {
     if (!text || typeof text !== 'string') return null;
@@ -18,6 +18,31 @@ const isAudioUrl = (url) => {
         url.includes('voice-notes') ||
         url.match(/\.(mp3|wav|ogg|webm|m4a|aac)(\?.*)?$/i)
     );
+};
+
+// Helper to normalize any date format to YYYY-MM-DD
+const normalizeDate = (dateVal) => {
+    if (!dateVal) return null;
+    if (typeof dateVal === 'string') {
+        const isoMatch = dateVal.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (isoMatch) return isoMatch[1];
+        if (dateVal.includes('/')) {
+            const parts = dateVal.split('/');
+            if (parts.length === 3) {
+                return `${parts[2].trim()}-${parts[1].trim().padStart(2, '0')}-${parts[0].trim().padStart(2, '0')}`;
+            }
+        }
+    }
+    try {
+        const d = new Date(dateVal);
+        if (isNaN(d.getTime())) return null;
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    } catch (e) {
+        return null;
+    }
 };
 
 const AudioPlayer = ({ url }) => {
@@ -119,48 +144,122 @@ const CalendarPage = () => {
     const fetchTasks = async () => {
         try {
             setLoading(true);
+
             const role = localStorage.getItem('role');
             const username = localStorage.getItem('user-name');
             const userAccess = localStorage.getItem('user_access');
 
-            const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString();
-            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59).toISOString();
+            const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
 
-            let checklistQuery = supabase.from('checklist').select('*').gte('task_start_date', startOfMonth).lte('task_start_date', endOfMonth);
-            let maintenanceQuery = supabase.from('maintenance_tasks').select('*').gte('task_start_date', startOfMonth).lte('task_start_date', endOfMonth);
-            let repairQuery = supabase.from('repair_tasks').select('*').gte('created_at', startOfMonth).lte('created_at', endOfMonth);
+            // Format for Supabase (YYYY-MM-DD)
+            const startStr = `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}-01`;
+            const endStr = `${endOfMonth.getFullYear()}-${String(endOfMonth.getMonth() + 1).padStart(2, '0')}-${String(endOfMonth.getDate()).padStart(2, '0')}T23:59:59`;
 
-            // Apply filters based on role
+            let checklistQuery = supabase.from('checklist').select('*').gte('planned_date', startStr).lte('planned_date', endStr);
+            let maintenanceQuery = supabase.from('maintenance_tasks').select('*').gte('planned_date', startStr).lte('planned_date', endStr);
+            let repairQuery = supabase.from('repair_tasks').select('*').gte('created_at', startStr).lte('created_at', endStr);
+            let delegationQuery = supabase.from('delegation').select('*').gte('planned_date', startStr).lte('planned_date', endStr);
+            let eaQuery = supabase.from('ea_tasks').select('*').gte('planned_date', startStr).lte('planned_date', endStr);
+
+            // Role Filters
+            // For regular users, only show their own tasks
             if (role === 'user' && username) {
                 checklistQuery = checklistQuery.eq('name', username);
                 maintenanceQuery = maintenanceQuery.eq('name', username);
-                repairQuery = repairQuery.eq('name', username);
-            } else if (role === 'admin' && userAccess && userAccess !== 'all') {
-                const allowedDepartments = userAccess.split(',').map(dept => dept.trim()).filter(d => d && d !== 'all');
-                if (allowedDepartments.length > 0) {
-                    checklistQuery = checklistQuery.in('department', allowedDepartments);
-                    maintenanceQuery = maintenanceQuery.in('department', allowedDepartments);
-                    repairQuery = repairQuery.in('department', allowedDepartments);
-                }
+                repairQuery = repairQuery.eq('assigned_person', username); // standardizing on assigned_person
+                delegationQuery = delegationQuery.eq('name', username);
+                eaQuery = eaQuery.eq('doer_name', username);
             }
+            // For admins, we now show EVERYTHING by default to match the global counts 
+            // of the Working Day Calendar, unless we WANT to add optional filtering later.
+            // This fixes the issue where counts are visible but tasks are hidden due to 
+            // strict department/access rules.
 
-            const [checklistRes, maintenanceRes, repairRes, holidaysRes, workingDaysRes] = await Promise.all([
+            let [
+                checklistRes,
+                maintenanceRes,
+                repairRes,
+                delegationRes,
+                eaRes,
+                holidaysRes,
+                workingDaysRes
+            ] = await Promise.all([
                 checklistQuery,
                 maintenanceQuery,
                 repairQuery,
+                delegationQuery,
+                eaQuery,
                 supabase.from('holidays').select('*'),
-                supabase.from('working_day_calender')
+                supabase
+                    .from('working_day_calender')
                     .select('working_date')
-                    .gte('working_date', startOfMonth)
-                    .lte('working_date', endOfMonth)
+                    .gte('working_date', startStr)
+                    .lte('working_date', endStr)
             ]);
 
-            const normalizedTasks = [
-                ...(checklistRes.data || []).map(t => ({ ...t, id: t.task_id, cat: 'CK', title: t.tasks || t.task_description, date: t.task_start_date, type: 'checklist' })),
-                ...(maintenanceRes.data || []).map(t => ({ ...t, cat: 'MT', title: t.task_description || t.id, date: t.task_start_date, type: 'maintenance' })),
-                ...(repairRes.data || []).map(t => ({ ...t, cat: 'RP', title: t.issue_description || t.id, date: t.created_at, type: 'repair' }))
-            ];
 
+            const finalRepairRes = repairRes;
+            const finalEARes = eaRes;
+
+            const normalizedTasks = [
+                ...(checklistRes.data || []).map(t => ({
+                    ...t,
+                    id: t.task_id || t.id,
+                    cat: 'CK',
+                    title: t.task_description || t.tasks,
+                    date: normalizeDate(t.planned_date || t.task_start_date || t.created_at),
+                    type: 'checklist',
+                    name: t.name || t.assigned_person // Fallback for name field
+                })),
+
+                ...(maintenanceRes.data || []).map(t => ({
+                    ...t,
+                    cat: 'MT',
+                    title: t.task_description || t.id,
+                    date: normalizeDate(t.planned_date || t.task_start_date || t.created_at),
+                    type: 'maintenance',
+                    name: t.name || t.assigned_person
+                })),
+
+                ...(repairRes.data || []).map(t => ({
+                    ...t,
+                    cat: 'RP',
+                    title: t.issue_description || t.task_description || t.id,
+                    date: normalizeDate(t.planned_date || t.task_start_date || t.created_at),
+                    type: 'repair',
+                    name: t.assigned_person || t.name || t.filled_by
+                })),
+
+                ...(delegationRes.data || []).map(t => ({
+                    ...t,
+                    id: t.task_id || t.id,
+                    cat: 'DL',
+                    title: t.task_description || t.id,
+                    date: normalizeDate(t.planned_date || t.task_start_date || t.created_at),
+                    type: 'delegation',
+                    name: t.name || t.assigned_person
+                })),
+
+                ...(eaRes.data || []).map(t => ({
+                    ...t,
+                    id: t.task_id || t.id,
+                    cat: 'EA',
+                    title: t.task_description || t.id,
+                    date: normalizeDate(t.planned_date || t.task_start_date || t.created_at),
+                    type: 'ea',
+                    name: t.doer_name || t.name
+                }))
+            ].filter(t => t.date); // Ensure only tasks with a valid date are shown
+
+            // Sort by ascending date so tasks appear sequentially
+            normalizedTasks.sort((a, b) => {
+                const dateA = a.date ? new Date(a.date) : new Date(0);
+                const dateB = b.date ? new Date(b.date) : new Date(0);
+                return dateA - dateB;
+            });
+
+            console.log(`✅ Loaded ${normalizedTasks.length} tasks for Calendar.`);
             setTasks(normalizedTasks);
             setHolidays(holidaysRes.data || []);
             setWorkingDays(workingDaysRes.data || []);
@@ -173,7 +272,7 @@ const CalendarPage = () => {
 
     const handleCellClick = (day, holiday, isOffDay) => {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const dayTasks = tasks.filter(t => t.date?.split('T')[0] === dateStr);
+        const dayTasks = tasks.filter(t => t.date === dateStr);
 
         setSelectedDate(dateStr);
         setSelectedTasks(dayTasks);
@@ -249,9 +348,9 @@ const CalendarPage = () => {
 
     for (let i = 1; i <= totalDays; i++) {
         const dayDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-        const holiday = holidays.find(h => (h.holiday_date || "").split('T')[0] === dayDate);
-        const workingDay = workingDays.find(w => (w.working_date || "").split('T')[0] === dayDate);
-        const dayTasks = holiday ? [] : tasks.filter(t => t.date?.split('T')[0] === dayDate);
+        const holiday = holidays.find(h => normalizeDate(h.holiday_date) === dayDate);
+        const workingDay = workingDays.find(w => normalizeDate(w.working_date) === dayDate);
+        const dayTasks = tasks.filter(t => t.date === dayDate);
         const isToday = new Date().toISOString().split('T')[0] === dayDate;
         const isHoliday = !!holiday;
         const isOffDay = !isHoliday && !workingDay;
@@ -260,7 +359,7 @@ const CalendarPage = () => {
             <div
                 key={i}
                 onClick={() => handleCellClick(i, holiday, isOffDay)}
-                className={`aspect-square border-r border-b border-gray-200 p-2 cursor-pointer transition-colors relative ${isHoliday ? 'bg-red-50' : isOffDay ? 'bg-gray-300' : isToday ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
+                className={`aspect-square border-r border-b border-gray-200 p-2 cursor-pointer transition-colors relative ${isHoliday ? 'bg-rose-50' : isOffDay ? 'bg-slate-50' : isToday ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
             >
                 <div className="flex justify-between items-start mb-1">
                     <span className={`text-xs font-bold ${isHoliday ? 'text-red-700 underline' : isOffDay ? 'text-gray-600' : isToday ? 'text-blue-700' : 'text-gray-700'}`}>
@@ -269,42 +368,43 @@ const CalendarPage = () => {
                     {dayTasks.length > 0 && !isHoliday && (
                         <div className="flex gap-0.5">
                             {Array.from(new Set(dayTasks.map(d => d.cat))).map(cat => (
-                                <div key={cat} className={`w-2 h-2 rounded-full ${cat === 'CK' ? 'bg-blue-600' : cat === 'MT' ? 'bg-orange-600' : 'bg-red-600'}`} title={cat} />
+                                <div key={cat} className={`w-2 h-2 rounded-full ${cat === 'CK' ? 'bg-blue-600' :
+                                    cat === 'MT' ? 'bg-orange-600' :
+                                        cat === 'RP' ? 'bg-red-600' :
+                                            cat === 'DL' ? 'bg-purple-600' :
+                                                'bg-indigo-600'
+                                    }`} title={cat} />
                             ))}
                         </div>
                     )}
                 </div>
 
-                {isHoliday ? (
-                    <div className="mt-1">
-                        <p className="text-[10px] font-bold text-red-800 uppercase leading-tight truncate px-1">
+                <div className="space-y-0.5 mt-1 overflow-hidden h-[calc(100%-1.5rem)]">
+                    {isHoliday && (
+                        <p className="text-[9px] font-black text-red-600 uppercase leading-tight truncate px-1 mb-0.5 bg-red-100/50 rounded-sm">
                             {holiday.holiday_name}
                         </p>
-                    </div>
-                ) : isOffDay ? (
-                    <div className="mt-1">
-                        <p className="text-[10px] font-bold text-gray-500 uppercase leading-tight truncate px-1">
+                    )}
+                    {isOffDay && (
+                        <p className="text-[9px] font-black text-gray-500 uppercase leading-tight truncate px-1 mb-0.5 bg-gray-200/50 rounded-sm">
                             Off Day
                         </p>
-                    </div>
-                ) : (
-                    <div className="space-y-0.5 mt-1 overflow-hidden h-[calc(100%-1.5rem)]">
-                        {dayTasks.slice(0, 3).map((task, idx) => (
-                            <div key={idx} className="bg-white border-l-4 border-gray-200 pl-1 py-0.5 shadow-sm mb-0.5">
-                                <p className="text-[9px] font-bold text-gray-700 truncate uppercase flex items-center gap-1">
-                                    {isAudioUrl(task.title) ? (
-                                        <><Play size={8} className="text-blue-600 fill-blue-600 flex-shrink-0" /> <span className="truncate">Voice Note</span></>
-                                    ) : (
-                                        <span className="truncate">{task.title}</span>
-                                    )}
-                                </p>
-                            </div>
-                        ))}
-                        {dayTasks.length > 3 && (
-                            <p className="text-[9px] font-bold text-blue-700 pl-1">+ {dayTasks.length - 3} More</p>
-                        )}
-                    </div>
-                )}
+                    )}
+                    {dayTasks.slice(0, 3).map((task, idx) => (
+                        <div key={idx} className="bg-white border-l-4 border-gray-200 pl-1 py-0.5 shadow-sm mb-0.5">
+                            <p className="text-[9px] font-bold text-gray-700 truncate uppercase flex items-center gap-1">
+                                {isAudioUrl(task.title) ? (
+                                    <><Play size={8} className="text-blue-600 fill-blue-600 flex-shrink-0" /> <span className="truncate">Voice Note</span></>
+                                ) : (
+                                    <span className="truncate">{task.title}</span>
+                                )}
+                            </p>
+                        </div>
+                    ))}
+                    {dayTasks.length > 3 && (
+                        <p className="text-[9px] font-bold text-blue-700 pl-1">+ {dayTasks.length - 3} More</p>
+                    )}
+                </div>
             </div>
         );
     }
@@ -313,41 +413,43 @@ const CalendarPage = () => {
         <AdminLayout>
             <div className="max-w-7xl mx-auto space-y-4">
                 {/* Header Section */}
-                <div className="bg-white border-b border-gray-200 pb-5 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="bg-white border-b border-gray-200 pb-5 flex flex-col lg:flex-row justify-between items-center gap-6">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-700 rounded text-white font-bold">
+                        <div className="p-2 bg-blue-700 rounded text-white font-bold shadow-sm">
                             <CalendarIcon size={20} />
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold text-gray-900 leading-tight tracking-tight uppercase">Operational Calendar</h1>
-                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                            <h1 className="text-xl font-black text-gray-900 leading-tight tracking-tight uppercase">Operational Calendar</h1>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">
                                 Task Scheduling & Resource Planning
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-center border border-gray-300 rounded shadow-sm overflow-hidden">
-                        <button onClick={prevMonth} className="p-2 bg-gray-50 hover:bg-gray-100 transition-colors border-r border-gray-300 text-gray-700">
-                            <ChevronLeft size={16} strokeWidth={3} />
+                    <div className="flex items-center border border-gray-200 rounded-lg shadow-sm overflow-hidden bg-white shrink-0">
+                        <button onClick={prevMonth} className="p-3 bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-all border-r border-gray-200 text-gray-700">
+                            <ChevronLeft size={18} strokeWidth={3} />
                         </button>
-                        <div className="px-6 py-2 bg-white font-bold text-gray-900 text-sm min-w-[180px] text-center uppercase tracking-widest">
+                        <div className="px-8 py-2.5 font-black text-gray-900 text-sm min-w-[200px] text-center uppercase tracking-[0.2em]">
                             {monthName} {year}
                         </div>
-                        <button onClick={nextMonth} className="p-2 bg-gray-50 hover:bg-gray-100 transition-colors border-l border-gray-300 text-gray-700">
-                            <ChevronRight size={16} strokeWidth={3} />
+                        <button onClick={nextMonth} className="p-3 bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-all border-l border-gray-200 text-gray-700">
+                            <ChevronRight size={18} strokeWidth={3} />
                         </button>
                     </div>
 
-                    <div className="flex gap-4">
+                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 max-w-sm lg:max-w-none">
                         {[
                             { label: 'Checklist', color: 'bg-blue-600' },
                             { label: 'Maintenance', color: 'bg-orange-600' },
                             { label: 'Repair', color: 'bg-red-600' },
+                            { label: 'Delegation', color: 'bg-purple-600' },
+                            { label: 'EA', color: 'bg-indigo-600' },
                             { label: 'Off Day', color: 'bg-gray-300' }
                         ].map(item => (
-                            <div key={item.label} className="flex items-center gap-2">
-                                <div className={`w-3 h-3 ${item.color} rounded-sm`}></div>
-                                <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tighter">{item.label}</span>
+                            <div key={item.label} className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 border border-gray-100">
+                                <div className={`w-2.5 h-2.5 ${item.color} rounded-sm shadow-inner`}></div>
+                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-tight">{item.label}</span>
                             </div>
                         ))}
                     </div>
@@ -407,7 +509,12 @@ const CalendarPage = () => {
                                 <div className="space-y-3">
                                     {selectedTasks.map((task) => (
                                         <div key={task.id} className="border border-gray-200 rounded p-4 flex flex-col relative overflow-hidden">
-                                            <div className={`absolute top-0 left-0 w-2 h-full ${task.cat === 'CK' ? 'bg-blue-600' : task.cat === 'MT' ? 'bg-orange-600' : 'bg-red-600'}`}></div>
+                                            <div className={`absolute top-0 left-0 w-2 h-full ${task.cat === 'CK' ? 'bg-blue-600' :
+                                                task.cat === 'MT' ? 'bg-orange-600' :
+                                                    task.cat === 'RP' ? 'bg-red-600' :
+                                                        task.cat === 'DL' ? 'bg-purple-600' :
+                                                            'bg-indigo-600'
+                                                }`}></div>
                                             <div className="pl-4">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <span className="text-[10px] font-bold text-gray-400 uppercase">ID: #{task.id}</span>

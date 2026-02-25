@@ -277,6 +277,7 @@ export const updateMaintenanceTaskApi = async (updatedTask, originalTask) => {
             name: updatedTask.name,
             task_description: updatedTask.task_description,
             task_start_date: updatedTask.task_start_date,
+            planned_date: updatedTask.task_start_date,
             freq: updatedTask.freq,
             status: updatedTask.status,
             remarks: updatedTask.remarks
@@ -287,7 +288,9 @@ export const updateMaintenanceTaskApi = async (updatedTask, originalTask) => {
             query = query
                 .eq("machine_name", originalTask.machine_name)
                 .eq("part_name", originalTask.part_name)
+                .eq("part_area", originalTask.part_area)
                 .eq("task_description", originalTask.task_description)
+                .eq("name", originalTask.name)
                 .is("submission_date", null);
         } else {
             // Fallback to single record update
@@ -305,14 +308,20 @@ export const updateMaintenanceTaskApi = async (updatedTask, originalTask) => {
 
 export const deleteMaintenanceTasksApi = async (tasks) => {
     try {
-        const ids = tasks.map(t => t.id || t.taskId);
-        const { data, error } = await supabase
-            .from('maintenance_tasks')
-            .delete()
-            .in('id', ids);
+        for (const task of tasks) {
+            const { error } = await supabase
+                .from('maintenance_tasks')
+                .delete()
+                .eq("machine_name", task.machine_name)
+                .eq("part_name", task.part_name)
+                .eq("part_area", task.part_area)
+                .eq("task_description", task.task_description)
+                .eq("name", task.name)
+                .is("submission_date", null);
 
-        if (error) throw error;
-        return ids;
+            if (error) throw error;
+        }
+        return tasks.map(t => t.id || t.taskId);
     } catch (error) {
         console.error("Error deleting maintenance tasks:", error);
         throw error;

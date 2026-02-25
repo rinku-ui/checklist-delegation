@@ -33,7 +33,7 @@ import TaskManagementTabs from "../../components/TaskManagementTabs.jsx"
 
 export default function AdminDashboard() {
   const [dashboardType, setDashboardType] = useState("checklist")
-  const [taskView, setTaskView] = useState("all")
+  const [taskView, setTaskView] = useState("recent")
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterStaff, setFilterStaff] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
@@ -115,7 +115,7 @@ export default function AdminDashboard() {
           end.setHours(23, 59, 59, 999);
 
           const filteredData = data.filter(task => {
-            const taskDate = parseTaskStartDate(task.task_start_date);
+            const taskDate = parseTaskStartDate(task.planned_date || task.task_start_date);
             return taskDate && taskDate >= start && taskDate <= end;
           });
 
@@ -128,7 +128,7 @@ export default function AdminDashboard() {
           const start = new Date(startDate); start.setHours(0, 0, 0, 0);
           const end = new Date(endDate); end.setHours(23, 59, 59, 999);
           const filteredData = data.filter(task => {
-            const taskDate = parseTaskStartDate(task.task_start_date);
+            const taskDate = parseTaskStartDate(task.planned_date || task.task_start_date);
             return taskDate && taskDate >= start && taskDate <= end;
           });
           processFilteredData(filteredData, null);
@@ -238,28 +238,12 @@ export default function AdminDashboard() {
         if (taskStartDate) {
           totalTasks++;
 
-          if (dashboardType === "checklist") {
-            // For checklist: Use status field directly
-            if (task.status === 'yes') {
-              completedTasks++;
-            } else {
-              pendingTasks++;
-            }
-
-            // Overdue tasks for checklist: past tasks with status not 'yes'
-            if (taskStartDate && taskStartDate < today && task.status !== 'yes') {
-              overdueTasks++;
-            }
+          if (status === "completed") {
+            completedTasks++;
+          } else if (status === "overdue") {
+            overdueTasks++;
           } else {
-            // For delegation: Use submission_date
-            if (task.submission_date) {
-              completedTasks++;
-            } else {
-              pendingTasks++;
-              if (taskStartDate && taskStartDate < today) {
-                overdueTasks++;
-              }
-            }
+            pendingTasks++; // This is 'Due Today'
           }
         }
 
@@ -346,7 +330,7 @@ export default function AdminDashboard() {
       end.setHours(23, 59, 59, 999);
 
       const filteredData = data.filter(task => {
-        const taskDate = parseTaskStartDate(task.task_start_date);
+        const taskDate = parseTaskStartDate(task.planned_date || task.task_start_date);
         return taskDate && taskDate >= start && taskDate <= end;
       });
 
@@ -358,38 +342,25 @@ export default function AdminDashboard() {
       let notDoneTasks = 0;
 
       filteredData.forEach(task => {
-        const taskDate = parseTaskStartDate(task.task_start_date);
+        const taskStartDate = parseTaskStartDate(task.planned_date || task.task_start_date || task.created_at);
+        const completionDate = task.submission_date ? parseTaskStartDate(task.submission_date) : null;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        if (dashboardType === "checklist") {
-          // For checklist: Use status field
-          if (task.status === 'yes') {
-            completedTasks++;
-          } else if (task.status === 'no') {
-            notDoneTasks++;
-            pendingTasks++; // Not done tasks are also pending
-          } else {
-            // For null or other status
-            pendingTasks++;
-          }
+        let taskStatus = "pending";
+        if (completionDate || task.status === 'yes' || (task.status && task.status.toLowerCase().includes('done'))) {
+          taskStatus = "completed";
+        } else if (taskStartDate && isDateInPast(taskStartDate)) {
+          taskStatus = "overdue";
+        }
 
-          // Overdue tasks for checklist: past tasks with status not 'yes'
-          if (taskDate && taskDate < today && task.status !== 'yes') {
-            overdueTasks++;
-          }
+        totalTasks++;
+        if (taskStatus === "completed") {
+          completedTasks++;
+        } else if (taskStatus === "overdue") {
+          overdueTasks++;
         } else {
-          // Delegation logic
-          if (task.submission_date) {
-            completedTasks++;
-          } else {
-            pendingTasks++;
-            if (taskDate && taskDate < today) {
-              overdueTasks++;
-            }
-          }
-          // For delegation, not done is simply pending tasks
-          notDoneTasks = pendingTasks;
+          pendingTasks++;
         }
       });
 
@@ -629,8 +600,8 @@ export default function AdminDashboard() {
             }
           }
 
-          // FIXED: Use correct field name from your Supabase data
-          const taskStartDate = parseTaskStartDate(task.task_start_date || task.created_at);
+          // FIXED: Use correct field name from your Supabase data - prefer planned_date
+          const taskStartDate = parseTaskStartDate(task.planned_date || task.task_start_date || task.created_at);
           const completionDate = task.submission_date ? parseTaskStartDate(task.submission_date) : null;
 
           let status = "pending";
@@ -691,8 +662,8 @@ export default function AdminDashboard() {
             title: task.task_description || task.issue_description || "No Description",
             task_description: task.task_description || task.issue_description,
             assignedTo: task.name || task.assigned_person || "Unassigned",
-            taskStartDate: formatDateToDDMMYYYY(taskStartDate || (task.created_at ? new Date(task.created_at) : null)),
-            originalTaskStartDate: task.task_start_date || task.created_at,
+            taskStartDate: formatDateToDDMMYYYY(taskStartDate || (task.planned_date ? new Date(task.planned_date) : (task.task_start_date ? new Date(task.task_start_date) : (task.created_at ? new Date(task.created_at) : null)))),
+            originalTaskStartDate: task.planned_date || task.task_start_date || task.created_at,
             submission_date: task.submission_date,
             status,
             frequency: task.frequency || task.freq || "one-time",
@@ -1044,8 +1015,8 @@ export default function AdminDashboard() {
 
     const totalTasks = filteredTasks.length
     const completedTasks = filteredTasks.filter((task) => task.status === "completed").length
-    const pendingTasks = totalTasks - completedTasks
     const overdueTasks = filteredTasks.filter((task) => task.status === "overdue").length
+    const pendingTasks = totalTasks - completedTasks - overdueTasks
 
     return {
       totalTasks,

@@ -111,6 +111,7 @@ export const insertDelegationDoneAndUpdate = createAsyncThunk(
             // Update planned_date for extension
             if (taskData.next_extend_date) {
               delegationUpdate.planned_date = new Date(taskData.next_extend_date).toISOString();
+              delegationUpdate.task_start_date = delegationUpdate.planned_date;
               delegationUpdate.status = 'extend';
             }
           }

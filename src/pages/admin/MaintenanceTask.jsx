@@ -183,6 +183,7 @@ function MaintenanceTaskCard({
                                 {getUniqueDropdownValues("Part Name").filter(item => !item.parent || item.parent === task.machineName).map(item => (
                                     <label key={item.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-purple-50 cursor-pointer transition-colors border-b border-gray-100 last:border-b-0">
                                         <input type="checkbox" checked={task.partName?.includes(item.value)} onChange={() => handlePartToggle(item.value)} className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500" />
+                                        {item.image_url && <img src={item.image_url} alt={item.value} className="w-8 h-8 object-cover rounded shadow-sm border border-gray-200 bg-gray-50 flex-shrink-0" />}
                                         <span className="text-sm text-gray-700">{item.value}</span>
                                     </label>
                                 ))}

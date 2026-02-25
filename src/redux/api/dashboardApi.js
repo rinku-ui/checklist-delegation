@@ -99,8 +99,9 @@ export const fetchDashboardDataApi = async (
     const holidayDates = holidays ? holidays.map(h => h.holiday_date) : [];
 
     const filteredData = (data || []).filter(task => {
-      if (!task.task_start_date) return true;
-      const dateStr = task.task_start_date.split('T')[0];
+      const taskDateStr = task.planned_date || task.task_start_date;
+      if (!taskDateStr) return true;
+      const dateStr = taskDateStr.split('T')[0];
       return !holidayDates.includes(dateStr);
     });
 
@@ -354,24 +355,28 @@ export const fetchStaffTasksDataApi = async (dashboardType, staffFilter = null, 
       summary[key].total_tasks++;
 
       // Check if task is completed
+      // Generic completion check: has submission_date AND (if delegation) is approved
       const isCompleted = dashboardType === 'checklist'
-        ? task.status === 'yes' || task.status === 'yes' || task.status === 'Completed' || task.status === 'completed'
-        : (dashboardType === 'delegation' ? (task.status === 'done' && task.admin_done === true) || (task.status === 'completed' && task.admin_done === true) || (task.status === 'Done' && task.admin_done === true) : false);
+        ? (task.submission_date !== null || task.status === 'yes' || task.status === 'Completed')
+        : (dashboardType === 'delegation'
+          ? (task.submission_date !== null && task.admin_done === true)
+          : task.submission_date !== null);
 
       if (isCompleted) {
         summary[key].total_completed_tasks++;
 
-        // Check if done on time
-        if (task.submission_date && task.task_start_date) {
+        // Check if done on time - use planned_date as the definitive deadline
+        const dueDateStr = task.planned_date || task.task_start_date || task.created_at;
+        if (task.submission_date && dueDateStr) {
           const submissionDate = new Date(task.submission_date);
-          const startDate = new Date(task.task_start_date);
+          const dueDate = new Date(dueDateStr);
 
           // Compare dates only (ignore time)
           const submissionDateOnly = new Date(submissionDate.getFullYear(), submissionDate.getMonth(), submissionDate.getDate());
-          const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+          const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
 
-          // Count as "on time" only if submission date is same as or before start date
-          if (submissionDateOnly <= startDateOnly) {
+          // Count as "on time" only if submission date is same as or before due date
+          if (submissionDateOnly <= dueDateOnly) {
             summary[key].total_done_on_time++;
           }
         }
@@ -380,26 +385,32 @@ export const fetchStaffTasksDataApi = async (dashboardType, staffFilter = null, 
 
     // Calculate scores and convert to array
     let staffResults = Object.values(summary).map(staff => {
-      const completion_score = staff.total_tasks > 0
-        ? Number((((staff.total_completed_tasks / staff.total_tasks) * 100) - 100).toFixed(2))
-        : -100;
+      // Overall Performance Score: (On-time tasks / Total tasks) * 100
+      // This gives 0 if nothing completed, and reflects both completion and timeliness
+      const performance_score = staff.total_tasks > 0
+        ? Math.round((staff.total_done_on_time / staff.total_tasks) * 100)
+        : 0;
 
-      const ontime_score = staff.total_completed_tasks > 0
-        ? Number((((staff.total_done_on_time / staff.total_completed_tasks) * 100) - 100).toFixed(2))
-        : (staff.total_tasks > 0 ? -100 : 0);
+      // Completion rate for internal reference
+      const completion_rate = staff.total_tasks > 0
+        ? Math.round((staff.total_completed_tasks / staff.total_tasks) * 100)
+        : 0;
 
       return {
-        id: staff.name.replace(/\s+/g, "-").toLowerCase(),
-        department: staff.department,
-        name: staff.name,
-        email: `${staff.name.toLowerCase().replace(/\s+/g, ".")}@example.com`,
+        id: (staff.name || "unnamed").replace(/\s+/g, "-").toLowerCase(),
+        department: staff.department || "No Department",
+        name: staff.name || "Unnamed Staff",
+        email: `${(staff.name || "user").toLowerCase().replace(/\s+/g, ".")}@example.com`,
         total_tasks: staff.total_tasks,
         total_completed_tasks: staff.total_completed_tasks,
         total_done_on_time: staff.total_done_on_time,
-        completion_score,
-        ontime_score
+        completion_score: completion_rate,
+        ontime_score: performance_score // This is the 'Score' shown in the table
       };
     });
+
+    // Sort by on-time score descending (Top performers first)
+    staffResults.sort((a, b) => b.ontime_score - a.ontime_score || b.total_completed_tasks - a.total_completed_tasks);
 
     // Apply pagination
     const from = (page - 1) * limit;
@@ -655,12 +666,12 @@ export const fetchChecklistDataByDateRangeApi = async (
       case 'pending':
         const today = new Date().toISOString().split('T')[0];
         query = query.is('submission_date', null)
-          .gte('task_start_date', `${today}T00:00:00`);
+          .gte(dateColumn, `${today}T00:00:00`);
         break;
       case 'overdue':
         const todayOverdue = new Date().toISOString().split('T')[0];
         query = query.is('submission_date', null)
-          .lt('task_start_date', `${todayOverdue}T00:00:00`);
+          .lt(dateColumn, `${todayOverdue}T00:00:00`);
         break;
       // 'all' - no additional status filter
     }
@@ -817,13 +828,13 @@ export const getChecklistDateRangeStatsApi = async (
     let completedQuery = supabase
       .from('checklist')
       .select('*', { count: 'exact', head: true })
-      .eq('status', 'yes');
+      .not('submission_date', 'is', null);
 
     // Apply the same date range and filters
     if (startDate && endDate) {
       completedQuery = completedQuery
-        .gte('task_start_date', `${startDate}T00:00:00`)
-        .lte('task_start_date', `${endDate}T23:59:59`);
+        .gte('planned_date', `${startDate}T00:00:00`)
+        .lte('planned_date', `${endDate}T23:59:59`);
     }
     if (role === 'user' && username) {
       completedQuery = completedQuery.eq('name', username);
@@ -847,20 +858,18 @@ export const getChecklistDateRangeStatsApi = async (
     // Calculate pending tasks (total - completed)
     const pendingTasks = totalTasks - completedTasks;
 
-    // Get overdue tasks count (tasks before today that are not completed)
     const today = new Date().toISOString().split('T')[0];
     let overdueQuery = supabase
       .from('checklist')
       .select('*', { count: 'exact', head: true })
-      .or('status.is.null,status.neq.yes') // Not completed
       .is('submission_date', null) // Not submitted
-      .lt('task_start_date', `${today}T00:00:00`); // Before today
+      .lt('planned_date', `${today}T00:00:00`); // Before today
 
     // Apply the same date range and filters
     if (startDate && endDate) {
       overdueQuery = overdueQuery
-        .gte('task_start_date', `${startDate}T00:00:00`)
-        .lte('task_start_date', `${endDate}T23:59:59`);
+        .gte('planned_date', `${startDate}T00:00:00`)
+        .lte('planned_date', `${endDate}T23:59:59`);
     }
     if (role === 'user' && username) {
       overdueQuery = overdueQuery.eq('name', username);
@@ -1004,12 +1013,13 @@ export const countTotalTaskApi = async (dashboardType, staffFilter = null, depar
 
   try {
     const { start, end } = getCurrentMonthRange();
+    const dateColumn = (dashboardType === 'checklist' || dashboardType === 'delegation' || dashboardType === 'maintenance') ? 'planned_date' : 'task_start_date';
 
     let query = supabase
       .from(dashboardType)
       .select('*', { count: 'exact', head: true })
-      .gte('task_start_date', start)
-      .lte('task_start_date', end);
+      .gte(dateColumn, start)
+      .lte(dateColumn, end);
 
     // Apply filters
     if (role === 'user' && username) {
@@ -1045,6 +1055,7 @@ export const countCompleteTaskApi = async (dashboardType, staffFilter = null, de
 
   try {
     const { start, end } = getCurrentMonthRange();
+    const dateColumn = (dashboardType === 'checklist' || dashboardType === 'delegation' || dashboardType === 'maintenance') ? 'planned_date' : 'task_start_date';
     let query;
 
     if (dashboardType === 'delegation') {
@@ -1053,16 +1064,15 @@ export const countCompleteTaskApi = async (dashboardType, staffFilter = null, de
         .select('*', { count: 'exact', head: true })
         .eq('status', 'done')
         .eq('admin_done', true) // Only count as complete if admin approved
-        .gte('task_start_date', start)
-        .lte('task_start_date', end);
+        .gte(dateColumn, start)
+        .lte(dateColumn, end);
     } else {
       query = supabase
-        .from('checklist')
+        .from(dashboardType) // more generic
         .select('*', { count: 'exact', head: true })
         .not('submission_date', 'is', null)
-        // .eq('status', 'yes') // Removed status check to encompass all completions
-        .gte('task_start_date', start)
-        .lte('task_start_date', end);
+        .gte(dateColumn, start)
+        .lte(dateColumn, end);
     }
 
     // Apply filters
@@ -1099,6 +1109,7 @@ export const countOverDueORExtendedTaskApi = async (dashboardType, staffFilter =
 
   try {
     const { start, todayStart } = getCurrentMonthRange();
+    const dateColumn = (dashboardType === 'checklist' || dashboardType === 'delegation' || dashboardType === 'maintenance') ? 'planned_date' : 'task_start_date';
     let query;
 
     if (dashboardType === 'delegation') {
@@ -1106,18 +1117,15 @@ export const countOverDueORExtendedTaskApi = async (dashboardType, staffFilter =
         .from('delegation')
         .select('*', { count: 'exact', head: true })
         .is('submission_date', null)
-        // If admin_done is false but submission_date exists, it's not overdue, it's pending approval
-        // So we keep checking submission_date is null for overdue
-        .lt('task_start_date', todayStart)  // Overdue: started before today
-        .gte('task_start_date', start);     // Current month: from 1st of month
+        .lt(dateColumn, todayStart)  // Overdue: started before today
+        .gte(dateColumn, start);     // Current month: from 1st of month
     } else {
       query = supabase
-        .from('checklist')
+        .from(dashboardType) // more generic
         .select('*', { count: 'exact', head: true })
         .is('submission_date', null)
-        // .or('status.is.null,status.neq.yes') // Removed status check
-        .lt('task_start_date', todayStart)  // Overdue: started before today
-        .gte('task_start_date', start);     // Current month: from 1st of month
+        .lt(dateColumn, todayStart)  // Overdue: started before today
+        .gte(dateColumn, start);     // Current month: from 1st of month
     }
 
     // Apply filters

@@ -10,6 +10,8 @@ const WorkingDayCalendarPage = () => {
     const [loading, setLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
 
+    const [tasks, setTasks] = useState([]);
+
     useEffect(() => {
         fetchData();
     }, [currentDate]);
@@ -20,13 +22,17 @@ const WorkingDayCalendarPage = () => {
             const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString().split('T')[0];
             const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59).toISOString().split('T')[0];
 
-            const [holidaysRes, workingDaysRes] = await Promise.all([
+            const [holidaysRes, workingDaysRes, checklistRes, maintenanceRes, delegationRes, eaRes] = await Promise.all([
                 supabase.from('holidays').select('*'),
                 supabase.from('working_day_calender')
                     .select('*')
                     .gte('working_date', startOfMonth)
                     .lte('working_date', endOfMonth)
-                    .order('working_date', { ascending: true })
+                    .order('working_date', { ascending: true }),
+                supabase.from('checklist').select('planned_date, task_start_date').gte('planned_date', startOfMonth).lte('planned_date', endOfMonth),
+                supabase.from('maintenance_tasks').select('planned_date').gte('planned_date', startOfMonth).lte('planned_date', endOfMonth),
+                supabase.from('delegation').select('planned_date').gte('planned_date', startOfMonth).lte('planned_date', endOfMonth),
+                supabase.from('ea_tasks').select('planned_date').gte('planned_date', startOfMonth).lte('planned_date', endOfMonth)
             ]);
 
             if (holidaysRes.error && holidaysRes.error.code !== '42P01') throw holidaysRes.error;
@@ -34,6 +40,16 @@ const WorkingDayCalendarPage = () => {
 
             setHolidays(holidaysRes.data || []);
             setWorkingDays(workingDaysRes.data || []);
+
+            // Combine task dates for counting
+            const allTaskDates = [
+                ...(checklistRes.data || []).map(t => (t.planned_date || t.task_start_date || "").split('T')[0]),
+                ...(maintenanceRes.data || []).map(t => (t.planned_date || "").split('T')[0]),
+                ...(delegationRes.data || []).map(t => (t.planned_date || "").split('T')[0]),
+                ...(eaRes.data || []).map(t => (t.planned_date || "").split('T')[0])
+            ].filter(Boolean);
+
+            setTasks(allTaskDates);
         } catch (err) {
             console.error('Error fetching calendar data:', err);
         } finally {
@@ -156,6 +172,8 @@ const WorkingDayCalendarPage = () => {
 
         const englishDayName = dateObj.toLocaleDateString('en-GB', { weekday: 'long' });
 
+        const taskCount = tasks.filter(tDate => tDate === dateString).length;
+
         allDaysInMonth.push({
             date: dateString,
             day: i,
@@ -163,7 +181,8 @@ const WorkingDayCalendarPage = () => {
             isHoliday: !!holiday,
             isWorking: !!workingDay,
             holidayName: holiday?.holiday_name,
-            weekNum: workingDay?.week_num
+            weekNum: workingDay?.week_num,
+            taskCount
         });
     }
 
@@ -218,6 +237,7 @@ const WorkingDayCalendarPage = () => {
                                     <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase">Date</th>
                                     <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase">Day</th>
                                     <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase">Week #</th>
+                                    <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase text-center">Tasks Scheduled</th>
                                     <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase">Status</th>
                                 </tr>
                             </thead>
@@ -254,6 +274,15 @@ const WorkingDayCalendarPage = () => {
                                             </td>
                                             <td className="px-4 py-3 font-medium text-gray-700">
                                                 {dayInfo.weekNum || '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                {dayInfo.taskCount > 0 ? (
+                                                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-700 font-bold text-xs ring-1 ring-blue-300">
+                                                        {dayInfo.taskCount}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-300 font-medium text-xs">0</span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3">
                                                 {dayInfo.isHoliday ? (

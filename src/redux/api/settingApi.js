@@ -407,6 +407,7 @@ export const fetchCustomDropdownsApi = async () => {
             id: item.id,
             category: category,
             value: item[column],
+            image_url: item.image_url || null,
             // Include machine_name for Part Name entries to enable cascading
             ...(category === "Part Name" && item.machine_name && { parent: item.machine_name })
           });
@@ -480,6 +481,29 @@ export const uploadProfileImageApi = async (file, userId) => {
   }
 };
 
+export const uploadPartImageApi = async (file) => {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `part_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('parts')
+      .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('parts')
+      .getPublicUrl(fileName);
+
+    console.log('✅ Part image uploaded:', publicUrl);
+    return publicUrl;
+  } catch (error) {
+    console.error('❌ Error uploading part image:', error);
+    throw error;
+  }
+};
+
 // End of file
 
 export const deleteCustomDropdownApi = async (id) => {
@@ -510,7 +534,8 @@ export const createMachineEntriesApi = async (entries) => {
           formatted.push({
             id: item.id,
             category: category,
-            value: item[column]
+            value: item[column],
+            image_url: item.image_url || null
           });
         }
       });

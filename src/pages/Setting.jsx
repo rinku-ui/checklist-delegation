@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw } from 'lucide-react';
+import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw, Image } from 'lucide-react';
 import AdminLayout from '../components/layout/AdminLayout';
 import { useDispatch, useSelector } from 'react-redux';
 import { createDepartment, createUser, deleteUser, departmentOnlyDetails, givenByDetails, departmentDetails, updateDepartment, updateUser, userDetails, customDropdownDetails, createCustomDropdown, deleteCustomDropdown, createAssignFrom, deleteDepartment, deleteAssignFrom, updateCustomDropdown, updateAssignFrom, createMachineEntries, uploadProfileImage } from '../redux/slice/settingSlice';
+import { uploadPartImageApi } from '../redux/api/settingApi';
 import supabase from '../SupabaseClient';
 import CalendarComponent from '../components/CalendarComponent';
 import { createPortal } from 'react-dom';
@@ -486,15 +487,25 @@ const Setting = () => {
     partName: '',
     machineArea: ''
   });
-  const [inputParts, setInputParts] = useState(['']);
+  const [inputParts, setInputParts] = useState([{ name: '', file: null, preview: null }]);
 
   const handleAddPartInput = () => {
-    setInputParts([...inputParts, '']);
+    setInputParts([...inputParts, { name: '', file: null, preview: null }]);
   };
 
   const handlePartInputChange = (index, value) => {
     const newParts = [...inputParts];
-    newParts[index] = value;
+    newParts[index] = { ...newParts[index], name: value };
+    setInputParts(newParts);
+  };
+
+  const handlePartImageChange = (index, file) => {
+    const newParts = [...inputParts];
+    if (!file) {
+      newParts[index] = { ...newParts[index], file: null, preview: null };
+    } else {
+      newParts[index] = { ...newParts[index], file, preview: URL.createObjectURL(file) };
+    }
     setInputParts(newParts);
   };
 
@@ -668,22 +679,34 @@ const Setting = () => {
       try {
         const machineName = deptForm.givenBy;
         const machineArea = deptForm.machineArea;
-        const parts = inputParts.filter(p => p.trim() !== '');
+        const parts = inputParts.filter(p => p.name.trim() !== '');
 
         if (!machineName) {
           showToast("Machine Name is required", "error");
           return;
         }
 
+        showToast("Saving machine... please wait", "info");
+
         const entries = [];
         if (parts.length > 0) {
-          parts.forEach(part => {
+          for (const part of parts) {
+            let imageUrl = null;
+            if (part.file) {
+              try {
+                imageUrl = await uploadPartImageApi(part.file);
+              } catch (uploadErr) {
+                console.error('Part image upload failed:', uploadErr);
+                showToast(`Image upload failed for part "${part.name}", saving without image.`, "warning");
+              }
+            }
             entries.push({
               machine_name: machineName,
-              part_name: part,
-              machine_area: machineArea
+              part_name: part.name,
+              machine_area: machineArea,
+              ...(imageUrl && { image_url: imageUrl })
             });
-          });
+          }
         } else {
           entries.push({
             machine_name: machineName,
@@ -696,9 +719,11 @@ const Setting = () => {
 
         resetDeptForm();
         setShowDeptModal(false);
-        dispatch(customDropdownDetails()); // Explicitly refresh custom dropdowns
+        dispatch(customDropdownDetails());
+        showToast("Machine saved successfully!", "success");
       } catch (error) {
         console.error('Error adding category option:', error);
+        showToast("Failed to save machine.", "error");
       }
       return;
     }
@@ -929,8 +954,8 @@ const Setting = () => {
       machineArea: ''
     });
     setCurrentDeptId(null);
-    setIsEditing(false); // Reset editing state for department modal
-    setInputParts(['']);
+    setIsEditing(false);
+    setInputParts([{ name: '', file: null, preview: null }]);
   };
 
 
@@ -1843,7 +1868,15 @@ const Setting = () => {
                                           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Associated Parts</p>
                                           <div className="flex flex-wrap gap-2">
                                             {data.parts.length > 0 ? data.parts.map(part => (
-                                              <span key={part.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 text-xs font-medium rounded-md border border-gray-200 shadow-sm">
+                                              <span key={part.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-white text-gray-700 text-xs font-medium rounded-md border border-gray-200 shadow-sm">
+                                                {part.image_url && (
+                                                  <img
+                                                    src={part.image_url}
+                                                    alt={part.value}
+                                                    className="w-6 h-6 rounded object-cover border border-gray-100 flex-shrink-0"
+                                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                                  />
+                                                )}
                                                 {part.value}
                                                 <button
                                                   onClick={(e) => {
@@ -1918,6 +1951,14 @@ const Setting = () => {
                                     <div className="flex flex-wrap gap-2">
                                       {data.parts.length > 0 ? data.parts.map(part => (
                                         <span key={part.id} className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 text-gray-700 text-[10px] font-bold rounded border border-gray-100">
+                                          {part.image_url && (
+                                            <img
+                                              src={part.image_url}
+                                              alt={part.value}
+                                              className="w-5 h-5 rounded object-cover border border-gray-100 flex-shrink-0"
+                                              onError={(e) => { e.target.style.display = 'none'; }}
+                                            />
+                                          )}
                                           {part.value}
                                           <button
                                             onClick={(e) => {
@@ -2214,7 +2255,7 @@ const Setting = () => {
               onClick={() => setShowDeptModal(false)}
             ></div>
 
-            <div className="relative bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200 border border-white/50">
+            <div className="relative bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200 border border-white/50 max-h-[90vh] flex flex-col">
               {/* Premium Header */}
               <div className="bg-gradient-to-br from-purple-600 via-pink-600 to-rose-500 px-10 py-8 relative">
                 <div className="absolute inset-0 bg-white/5 backdrop-blur-[2px]"></div>
@@ -2240,7 +2281,7 @@ const Setting = () => {
                 </div>
               </div>
 
-              <div className="p-4 md:p-8 overflow-y-auto">
+              <div className="p-4 md:p-8 overflow-y-auto flex-1">
                 <form onSubmit={isEditing ? handleUpdateDepartment : handleAddDepartment} className="space-y-6">
                   <div className="space-y-2">
                     <label htmlFor="givenBy" className="block text-sm font-bold text-gray-700 ml-1">
@@ -2279,36 +2320,75 @@ const Setting = () => {
 
                   {activeTab === 'categories' && !isEditing && (
                     <>
-                      <div className="space-y-2 pt-2">
+                      <div className="space-y-3 pt-2">
                         <label className="block text-sm font-bold text-gray-700 ml-1">
-                          Part Names <span className="text-gray-400 font-normal text-xs">(Add multiple parts)</span>
+                          Part Names <span className="text-gray-400 font-normal text-xs">(Add multiple parts with optional images)</span>
                         </label>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {inputParts.map((part, index) => (
-                            <div key={index} className="flex gap-2">
-                              <input
-                                type="text"
-                                value={part}
-                                onChange={(e) => handlePartInputChange(index, e.target.value)}
-                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm transition-all"
-                                placeholder={`Part #${index + 1}`}
-                              />
-                              {inputParts.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemovePartInput(index)}
-                                  className="p-2 text-red-400 hover:bg-red-50 rounded-lg"
+                            <div key={index} className="bg-gray-50 rounded-xl border border-gray-200 p-3 space-y-2">
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="text"
+                                  value={part.name}
+                                  onChange={(e) => handlePartInputChange(index, e.target.value)}
+                                  className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm transition-all"
+                                  placeholder={`Part #${index + 1} name`}
+                                />
+                                {inputParts.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemovePartInput(index)}
+                                    className="p-2 text-red-400 hover:bg-red-50 rounded-lg flex-shrink-0"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Part Image Upload */}
+                              <div className="flex items-center gap-3">
+                                <label
+                                  htmlFor={`part-img-${index}`}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-dashed border-purple-300 text-purple-600 text-xs font-bold rounded-lg cursor-pointer hover:bg-purple-50 transition-all"
                                 >
-                                  <Trash2 size={18} />
-                                </button>
-                              )}
+                                  <Image size={14} />
+                                  {part.preview ? 'Change Image' : 'Add Image'}
+                                  <input
+                                    id={`part-img-${index}`}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => handlePartImageChange(index, e.target.files[0])}
+                                  />
+                                </label>
+                                {part.preview && (
+                                  <div className="relative flex-shrink-0">
+                                    <img
+                                      src={part.preview}
+                                      alt="Part preview"
+                                      className="w-10 h-10 rounded-lg object-cover border border-gray-200 shadow-sm"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handlePartImageChange(index, null)}
+                                      className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] hover:bg-red-600"
+                                    >
+                                      <X size={10} />
+                                    </button>
+                                  </div>
+                                )}
+                                {part.preview && (
+                                  <span className="text-[10px] text-green-600 font-bold">✓ Image ready</span>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
                         <button
                           type="button"
                           onClick={handleAddPartInput}
-                          className="mt-2 text-sm text-purple-600 font-bold hover:text-purple-800 flex items-center gap-1"
+                          className="mt-1 text-sm text-purple-600 font-bold hover:text-purple-800 flex items-center gap-1"
                         >
                           <Plus size={16} /> Add Another Part
                         </button>
@@ -2330,6 +2410,7 @@ const Setting = () => {
                       </div>
                     </>
                   )}
+
 
 
 
