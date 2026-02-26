@@ -604,7 +604,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gradient-to-br from-blue-50/50 to-purple-50/50 pb-24 md:pb-6">
+        <main className="flex-1 overflow-y-auto px-4 pb-4 md:px-6 md:pb-6 bg-gradient-to-br from-blue-50/50 to-purple-50/50 pb-24 md:pb-6">
           {children}
         </main>
 

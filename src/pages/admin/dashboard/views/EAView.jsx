@@ -503,7 +503,7 @@ export default function EAView() {
 
                 <div className="overflow-x-auto scrollbar-hide">
                     <table className="w-full text-left min-w-[700px]">
-                        <thead>
+                        <thead className="sticky top-0 z-20 bg-gray-50/90 backdrop-blur-sm">
                             <tr className="bg-gray-50/30">
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Name</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Mobile</th>

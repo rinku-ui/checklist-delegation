@@ -1052,7 +1052,7 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Main Dashboard Tabs */}
         {/* Main Dashboard Tabs - Premium UI */}
         <TaskManagementTabs

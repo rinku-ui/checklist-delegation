@@ -11,6 +11,8 @@ import {
   Play,
   Pause,
   BellRing,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useRef } from "react";
 import AdminLayout from "../components/layout/AdminLayout";
@@ -108,6 +110,8 @@ function DelegationDataPage() {
   const [userRole, setUserRole] = useState("");
   const [username, setUsername] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
   const filterOptions = [
     { value: "all", label: "All Tasks" },
     { value: "overdue", label: "Overdue" },
@@ -428,6 +432,90 @@ function DelegationDataPage() {
     username,
   ]);
 
+  const handlePageChange = useCallback((page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [showHistory, debouncedSearchTerm, dateFilter, startDate, endDate]);
+
+  const paginatedTasks = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return (showHistory ? filteredHistoryData : filteredDelegationTasks).slice(start, start + itemsPerPage);
+  }, [showHistory, filteredHistoryData, filteredDelegationTasks, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil((showHistory ? filteredHistoryData : filteredDelegationTasks).length / itemsPerPage);
+
+  const PaginationUI = () => {
+    if (totalPages <= 1) return null;
+    const currentTasks = showHistory ? filteredHistoryData : filteredDelegationTasks;
+    return (
+      <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200 mt-4 rounded-xl shadow-sm">
+        <div className="flex justify-between flex-1 sm:hidden">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="relative ml-3 inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+        <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-gray-700 font-medium">
+              Showing <span className="text-purple-600">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-purple-600">{Math.min(currentPage * itemsPerPage, currentTasks.length)}</span> of <span className="text-purple-600">{currentTasks.length}</span> results
+            </p>
+          </div>
+          <div>
+            <nav className="inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) pageNum = i + 1;
+                else if (currentPage <= 3) pageNum = i + 1;
+                else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                else pageNum = currentPage - 2 + i;
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => handlePageChange(pageNum)}
+                    className={`relative inline-flex items-center px-4 py-2 text-sm font-bold ${currentPage === pageNum ? 'z-10 bg-purple-600 text-white shadow-lg' : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'}`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const handleSelectItem = useCallback((id, isChecked) => {
     setSelectedItems((prev) => {
       const newSelected = new Set(prev);
@@ -737,95 +825,96 @@ function DelegationDataPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
-        <div className="flex flex-col gap-3 sm:gap-4">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Sticky Header and Controls */}
+        <div className="sticky top-0 z-40 bg-gray-50/95 backdrop-blur-md pt-2 pb-4 space-y-4 -mx-2 px-2 sm:mx-0 sm:px-0">
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-purple-700">
             {showHistory
               ? CONFIG.PAGE_CONFIG.historyTitle
               : CONFIG.PAGE_CONFIG.title}
           </h1>
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-            <div className="relative flex-1">
-              <Search
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder={
-                  showHistory ? "Search by Task ID..." : "Search tasks..."
-                }
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base"
-              />
-            </div>
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-purple-50 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+              <div className="relative flex-1">
+                <Search
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  size={18}
+                />
+                <input
+                  type="text"
+                  placeholder={
+                    showHistory ? "Search by Task ID..." : "Search tasks..."
+                  }
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                />
+              </div>
 
-            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-              {!showHistory && (
-                <div className="flex items-center gap-2 flex-1 sm:flex-none">
-                  <select
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
-                    className="w-full sm:w-auto border border-purple-200 rounded-md px-3 py-2 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 h-10"
-                  >
-                    {filterOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <button
-                onClick={toggleHistory}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm sm:text-base font-medium text-purple-700 bg-white border border-purple-200 rounded-md hover:bg-purple-50 transition-colors shadow-sm"
-              >
-                {showHistory ? (
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                {!showHistory && (
+                  <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                    <select
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                      className="w-full sm:w-auto border border-purple-200 rounded-md px-3 py-2 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 h-10"
+                    >
+                      {filterOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <button
+                  onClick={toggleHistory}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-200 rounded-md hover:bg-purple-50 transition-colors shadow-sm h-10"
+                >
+                  {showHistory ? (
+                    <>
+                      <ArrowLeft className="h-4 w-4 mr-1" />
+                      <span>Back</span>
+                    </>
+                  ) : (
+                    <>
+                      <History className="h-4 w-4 mr-1" />
+                      <span>History</span>
+                    </>
+                  )}
+                </button>
+
+                {!showHistory && (
                   <>
-                    <ArrowLeft className="h-4 w-4 mr-1" />
-                    <span className="hidden sm:inline">Back to Tasks</span>
-                    <span className="sm:hidden">Back</span>
-                  </>
-                ) : (
-                  <>
-                    <History className="h-4 w-4 mr-1" />
-                    <span className="hidden sm:inline">View History</span>
-                    <span className="sm:hidden">History</span>
+                    <button
+                      onClick={handleSendUrgentWhatsApp}
+                      disabled={selectedItems.size === 0 || isSubmitting}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all h-10"
+                      title="Send Urgent WhatsApp"
+                    >
+                      <BellRing className="h-4 w-4" />
+                      <span className="hidden sm:inline">Urgent WhatsApp</span>
+                      <span className="sm:hidden">Urgent</span>
+                    </button>
+
+                    <button
+                      onClick={handleSubmit}
+                      disabled={selectedItemsCount === 0 || isSubmitting}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors h-10"
+                    >
+                      {isSubmitting
+                        ? "..."
+                        : (
+                          <>
+                            <span className="hidden sm:inline">Submit Selected ({selectedItemsCount})</span>
+                            <span className="sm:hidden">Submit ({selectedItemsCount})</span>
+                          </>
+                        )}
+                    </button>
                   </>
                 )}
-              </button>
-
-              {!showHistory && (
-                <>
-                  <button
-                    onClick={handleSendUrgentWhatsApp}
-                    disabled={selectedItems.size === 0 || isSubmitting}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm sm:text-base font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all h-10"
-                    title="Send Urgent WhatsApp"
-                  >
-                    <BellRing className="h-4 w-4" />
-                    <span className="hidden sm:inline">Urgent WhatsApp</span>
-                    <span className="sm:hidden">Urgent</span>
-                  </button>
-
-                  <button
-                    onClick={handleSubmit}
-                    disabled={selectedItemsCount === 0 || isSubmitting}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm sm:text-base font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors h-10"
-                  >
-                    {isSubmitting
-                      ? "Processing..."
-                      : (
-                        <>
-                          <span className="hidden sm:inline">Submit Selected ({selectedItemsCount})</span>
-                          <span className="sm:hidden">Submit ({selectedItemsCount})</span>
-                        </>
-                      )}
-                  </button>
-                </>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -929,12 +1018,13 @@ function DelegationDataPage() {
                     </button>
                   )}
                 </div>
+                <PaginationUI />
               </div>
 
               {/* History Table - Mobile Responsive */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 sticky top-0 z-20 shadow-sm">
                     <tr>
                       <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         Task ID
@@ -968,8 +1058,8 @@ function DelegationDataPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredHistoryData.length > 0 ? (
-                      filteredHistoryData.map((history, index) => (
+                    {paginatedTasks.length > 0 ? (
+                      paginatedTasks.map((history, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-3 sm:px-6 py-2 sm:py-4">
                             <div className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words">
@@ -1083,8 +1173,8 @@ function DelegationDataPage() {
 
               {/* Mobile History Cards */}
               <div className="md:hidden space-y-4 p-4 bg-gray-50/50">
-                {filteredHistoryData.length > 0 ? (
-                  filteredHistoryData.map((history, index) => (
+                {paginatedTasks.length > 0 ? (
+                  paginatedTasks.map((history, index) => (
                     <div key={index} className="bg-white rounded-xl border border-purple-100 shadow-sm overflow-hidden">
                       <div className="bg-purple-50/50 px-4 py-3 border-b border-purple-100 flex justify-between items-center">
                         <span className="text-xs font-bold text-purple-800">#{history.id || index}</span>
@@ -1146,14 +1236,13 @@ function DelegationDataPage() {
                         )}
                       </div>
                     </div>
-                  ))
-                ) : (
+                  ))) : (
                   <div className="text-center py-10 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
                     <p>No records found</p>
                   </div>
                 )}
               </div>
-
+              <PaginationUI />
             </>
           ) : (
             <>
@@ -1212,8 +1301,8 @@ function DelegationDataPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredDelegationTasks.length > 0 ? (
-                      filteredDelegationTasks.map((account, index) => {
+                    {paginatedTasks.length > 0 ? (
+                      paginatedTasks.map((account, index) => {
                         const isSelected = selectedItems.has(account.id);
                         const rowColorClass = getRowColor(account.color_code_for);
                         const sequenceNumber = index + 1;
@@ -1422,8 +1511,8 @@ function DelegationDataPage() {
 
               {/* Mobile Regular Task Cards */}
               <div className="md:hidden space-y-4 p-4 bg-gray-50/50">
-                {filteredDelegationTasks.length > 0 ? (
-                  filteredDelegationTasks.map((account, index) => {
+                {paginatedTasks.length > 0 ? (
+                  paginatedTasks.map((account, index) => {
                     const isSelected = selectedItems.has(account.id);
                     const rowColorClass = getRowColor(account.color_code_for);
                     return (
@@ -1540,7 +1629,7 @@ function DelegationDataPage() {
                           </div>
                         </div>
                       </div>
-                    );
+                    )
                   })
                 ) : (
                   <div className="text-center py-20 bg-white rounded-xl border border-dashed border-gray-200">
@@ -1549,6 +1638,7 @@ function DelegationDataPage() {
                   </div>
                 )}
               </div>
+              <PaginationUI />
             </>
           )}
         </div>

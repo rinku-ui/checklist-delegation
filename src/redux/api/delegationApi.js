@@ -289,7 +289,21 @@ export const fetchDelegation_DoneDataSortByDate = async () => {
       // Filter by departments in user_access for admin
       const allowedDepartments = userAccess.split(',').map(dept => dept.trim()).filter(d => d && d !== 'all');
       if (allowedDepartments.length > 0) {
-        query = query.in('department', allowedDepartments);
+        // First get task_ids that belong to these departments from the delegation table
+        const { data: allowedTasks, error: allowedError } = await supabase
+          .from('delegation')
+          .select('task_id')
+          .in('department', allowedDepartments);
+
+        if (!allowedError && allowedTasks) {
+          const allowedTaskIds = allowedTasks.map(t => t.task_id);
+          if (allowedTaskIds.length > 0) {
+            query = query.in('task_id', allowedTaskIds);
+          } else {
+            // If no tasks in these departments, return empty
+            return [];
+          }
+        }
       }
     }
 

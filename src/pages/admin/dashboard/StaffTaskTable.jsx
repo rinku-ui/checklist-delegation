@@ -17,7 +17,7 @@ export default function StaffTasksTable({
   const [totalUsersCount, setTotalUsersCount] = useState(0)
   const [selectedMonth, setSelectedMonth] = useState('')
   const [availableMonths, setAvailableMonths] = useState([])
-  const itemsPerPage = 20
+  const itemsPerPage = 50
 
   // Generate available months (last 12 months)
   useEffect(() => {

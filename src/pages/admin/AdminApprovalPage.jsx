@@ -21,7 +21,7 @@ const extractAudioUrl = (text) => {
 
 export default function AdminApprovalPage() {
     const { showToast } = useMagicToast();
-    const [activeTab, setActiveTab] = useState("delegation");
+    const [activeTab, setActiveTab] = useState("checklist");
     const [viewMode, setViewMode] = useState("pending"); // 'pending' or 'history'
     const [pendingTasks, setPendingTasks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -162,104 +162,109 @@ export default function AdminApprovalPage() {
 
     return (
         <AdminLayout>
-            <div className="space-y-6">
-                <div className="flex flex-col gap-4">
-                    <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                        <AlertCircle className="text-amber-500" />
-                        Admin Approval
-                    </h1>
-                    <p className="text-gray-600">Review pending task completions submitted by users.</p>
-
-                    <div className="flex gap-4 items-center justify-between">
-                        {/* Tabs */}
-                        <div className="flex gap-2 overflow-x-auto pb-2">
-                            {/* ... existing category tabs ... */}
-                            <button
-                                onClick={() => setActiveTab("delegation")}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "delegation"
-                                    ? "bg-purple-100 text-purple-700 border border-purple-200"
-                                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                                    }`}
-                            >
-                                <BookCheck size={16} />
-                                Delegation
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("maintenance")}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "maintenance"
-                                    ? "bg-blue-100 text-blue-700 border border-blue-200"
-                                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                                    }`}
-                            >
-                                <Wrench size={16} />
-                                Maintenance
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("repair")}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "repair"
-                                    ? "bg-amber-100 text-amber-700 border border-amber-200"
-                                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                                    }`}
-                            >
-                                <Hammer size={16} />
-                                Repair
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("ea")}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "ea"
-                                    ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                                    }`}
-                            >
-                                <Briefcase size={16} />
-                                EA
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("checklist")}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "checklist"
-                                    ? "bg-indigo-100 text-indigo-700 border border-indigo-200"
-                                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                                    }`}
-                            >
-                                <BookCheck size={16} />
-                                Checklist
-                            </button>
-                        </div>
-
-                        {/* View Mode Toggle */}
-                        <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 shrink-0">
-                            <button
-                                onClick={() => setViewMode("pending")}
-                                className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${viewMode === "pending"
-                                    ? "bg-white text-gray-800 shadow-sm"
-                                    : "text-gray-500 hover:text-gray-700"
-                                    }`}
-                            >
-                                <Clock size={14} />
-                                Pending
-                            </button>
-                            <button
-                                onClick={() => setViewMode("history")}
-                                className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${viewMode === "history"
-                                    ? "bg-white text-gray-800 shadow-sm"
-                                    : "text-gray-500 hover:text-gray-700"
-                                    }`}
-                            >
-                                <History size={14} />
-                                History
-                            </button>
-                        </div>
+            <div className="space-y-4 sm:space-y-6">
+                {/* Sticky Header and Controls */}
+                <div className="sticky top-0 z-40 bg-gray-50/95 backdrop-blur-md pt-2 pb-4 space-y-4 -mx-2 px-2 sm:mx-0 sm:px-0">
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                            <AlertCircle className="text-amber-500" />
+                            Admin Approval
+                        </h1>
+                        <p className="text-xs text-gray-500 font-medium">Review pending task completions submitted by users.</p>
                     </div>
 
-                    <div className="relative max-w-md">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-purple-50 shadow-sm space-y-4">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                            {/* Tabs */}
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                                <button
+                                    onClick={() => setActiveTab("checklist")}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap min-w-[120px] justify-center ${activeTab === "checklist"
+                                        ? "bg-indigo-600 text-white shadow-md transform scale-[1.02]"
+                                        : "bg-white text-indigo-600 border border-indigo-100 hover:bg-indigo-50"
+                                        }`}
+                                >
+                                    <BookCheck size={16} />
+                                    Checklist
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("delegation")}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap min-w-[120px] justify-center ${activeTab === "delegation"
+                                        ? "bg-purple-600 text-white shadow-md transform scale-[1.02]"
+                                        : "bg-white text-purple-600 border border-purple-100 hover:bg-purple-50"
+                                        }`}
+                                >
+                                    <BookCheck size={16} />
+                                    Delegation
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("maintenance")}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap min-w-[120px] justify-center ${activeTab === "maintenance"
+                                        ? "bg-blue-600 text-white shadow-md transform scale-[1.02]"
+                                        : "bg-white text-blue-600 border border-blue-100 hover:bg-blue-50"
+                                        }`}
+                                >
+                                    <Wrench size={16} />
+                                    Maintenance
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("repair")}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap min-w-[120px] justify-center ${activeTab === "repair"
+                                        ? "bg-amber-600 text-white shadow-md transform scale-[1.02]"
+                                        : "bg-white text-amber-600 border border-amber-100 hover:bg-amber-50"
+                                        }`}
+                                >
+                                    <Hammer size={16} />
+                                    Repair
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("ea")}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap min-w-[120px] justify-center ${activeTab === "ea"
+                                        ? "bg-emerald-600 text-white shadow-md transform scale-[1.02]"
+                                        : "bg-white text-emerald-600 border border-emerald-100 hover:bg-emerald-50"
+                                        }`}
+                                >
+                                    <Briefcase size={16} />
+                                    EA Tasks
+                                </button>
+                            </div>
+
+                            {/* View Mode & Search */}
+                            <div className="flex flex-col sm:flex-row items-center gap-3">
+                                <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 shrink-0 w-full sm:w-auto">
+                                    <button
+                                        onClick={() => setViewMode("pending")}
+                                        className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${viewMode === "pending"
+                                            ? "bg-white text-gray-800 shadow-sm"
+                                            : "text-gray-500 hover:text-gray-700"
+                                            }`}
+                                    >
+                                        <Clock size={14} />
+                                        Pending
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode("history")}
+                                        className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${viewMode === "history"
+                                            ? "bg-white text-gray-800 shadow-sm"
+                                            : "text-gray-500 hover:text-gray-700"
+                                            }`}
+                                    >
+                                        <History size={14} />
+                                        History
+                                    </button>
+                                </div>
+                                <div className="relative w-full sm:w-64">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="Search records..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium shadow-sm"
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
