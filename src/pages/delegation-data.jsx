@@ -259,21 +259,28 @@ function DelegationPage({
       filtered = filtered.filter(task => task.department?.toLowerCase().includes(departmentFilter.toLowerCase()))
     }
 
-    // Today and Overdue Filter (Hide Upcoming) - REMOVED because filtering is handled at API level
-    // const today = new Date();
-    // today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
 
-    // filtered = filtered.filter(task => {
-    //   const taskDate = task.task_start_date ? new Date(task.task_start_date) : null;
-    //   if (taskDate) {
-    //     const taskDay = new Date(taskDate);
-    //     taskDay.setHours(0, 0, 0, 0);
-    //     return taskDay <= today; // Only show today and past
-    //   }
-    //   return true; // Show tasks without dates (e.g. manual entries)
-    // });
+    return filtered.map(task => {
+      const taskDate = task.task_start_date ? new Date(task.task_start_date) : null;
+      let timeStatus = "Not Submitted";
 
-    return filtered
+      if (taskDate) {
+        const taskDay = new Date(taskDate);
+        taskDay.setHours(0, 0, 0, 0);
+
+        if (taskDay < now) {
+          timeStatus = "Overdue";
+        } else if (taskDay.getTime() === now.getTime()) {
+          timeStatus = "Today";
+        } else {
+          timeStatus = "Upcoming";
+        }
+      }
+
+      return { ...task, timeStatus };
+    });
   }, [delegationTasks, searchTerm, freqFilter, departmentFilter])
 
   return (
@@ -318,6 +325,9 @@ function DelegationPage({
                       onChange={handleSelectAll}
                       className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                     />
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Time Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Actions
@@ -374,6 +384,15 @@ function DelegationPage({
                           onChange={() => handleCheckboxChange(task)}
                           className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                         />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs font-bold">
+                        <span className={`px-2 py-0.5 rounded-full ${task.timeStatus === "Overdue" ? "bg-red-100 text-red-700" :
+                          task.timeStatus === "Today" ? "bg-amber-100 text-amber-700" :
+                            task.timeStatus === "Upcoming" ? "bg-blue-100 text-blue-700" :
+                              "bg-gray-100 text-gray-700"
+                          }`}>
+                          {task.timeStatus}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {editingTaskId === task.id ? (
@@ -554,14 +573,13 @@ function DelegationPage({
                           task.name || "—"
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
+                      <td className="px-6 py-4 whitespace-nowrap bg-yellow-50">
                         {editingTaskId === task.id ? (
                           <input
                             type="datetime-local"
-                            value={editFormData.task_start_date ? new Date(editFormData.task_start_date).toISOString().slice(0, 16) : ''}
-                            onChange={(e) => handleInputChange('task_start_date', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-gray-100 italic"
-                            disabled
+                            value={editFormData.task_start_date ? editFormData.task_start_date.slice(0, 16) : ""}
+                            onChange={(e) => handleInputChange("task_start_date", e.target.value)}
+                            className="text-xs border-gray-300 rounded focus:ring-purple-500"
                           />
                         ) : (
                           formatDateTime(task.task_start_date) || "—"
@@ -678,8 +696,8 @@ function DelegationPage({
                         <div className="flex justify-between items-center mb-1">
                           <span className="text-[10px] font-black text-purple-500 uppercase tracking-wider">#{task.id || 'N/A'}</span>
                           <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight ${task.frequency === 'Daily' ? 'bg-blue-100 text-blue-800' :
-                              task.frequency === 'Weekly' ? 'bg-green-100 text-green-800' :
-                                'bg-purple-100 text-purple-800'
+                            task.frequency === 'Weekly' ? 'bg-green-100 text-green-800' :
+                              'bg-purple-100 text-purple-800'
                             }`}>
                             {task.frequency || 'Manual'}
                           </span>
@@ -754,6 +772,16 @@ function DelegationPage({
                               <div className="space-y-1">
                                 <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Start</span>
                                 <div className="text-[11px] font-bold text-gray-700">{formatDateTime(task.task_start_date)}</div>
+                              </div>
+                              <div className="space-y-1">
+                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Time Status</span>
+                                <div className={`text-[10px] font-bold w-fit px-2 py-0.5 rounded-full ${task.timeStatus === "Overdue" ? "bg-red-100 text-red-700" :
+                                  task.timeStatus === "Today" ? "bg-amber-100 text-amber-700" :
+                                    task.timeStatus === "Upcoming" ? "bg-blue-100 text-blue-700" :
+                                      "bg-gray-100 text-gray-700"
+                                  }`}>
+                                  {task.timeStatus}
+                                </div>
                               </div>
                             </div>
                           </>

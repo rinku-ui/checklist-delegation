@@ -20,19 +20,20 @@ const WorkingDayCalendarPage = () => {
         try {
             setLoading(true);
             const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString().split('T')[0];
-            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59).toISOString().split('T')[0];
+            const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+            const endStr = `${endOfMonth.getFullYear()}-${String(endOfMonth.getMonth() + 1).padStart(2, '0')}-${String(endOfMonth.getDate()).padStart(2, '0')}T23:59:59`;
 
             const [holidaysRes, workingDaysRes, checklistRes, maintenanceRes, delegationRes, eaRes] = await Promise.all([
                 supabase.from('holidays').select('*'),
                 supabase.from('working_day_calender')
                     .select('*')
                     .gte('working_date', startOfMonth)
-                    .lte('working_date', endOfMonth)
+                    .lte('working_date', endStr)
                     .order('working_date', { ascending: true }),
-                supabase.from('checklist').select('planned_date, task_start_date').gte('planned_date', startOfMonth).lte('planned_date', endOfMonth),
-                supabase.from('maintenance_tasks').select('planned_date').gte('planned_date', startOfMonth).lte('planned_date', endOfMonth),
-                supabase.from('delegation').select('planned_date').gte('planned_date', startOfMonth).lte('planned_date', endOfMonth),
-                supabase.from('ea_tasks').select('planned_date').gte('planned_date', startOfMonth).lte('planned_date', endOfMonth)
+                supabase.from('checklist').select('planned_date, task_start_date').gte('planned_date', startOfMonth).lte('planned_date', endStr),
+                supabase.from('maintenance_tasks').select('planned_date').gte('planned_date', startOfMonth).lte('planned_date', endStr),
+                supabase.from('delegation').select('planned_date').gte('planned_date', startOfMonth).lte('planned_date', endStr),
+                supabase.from('ea_tasks').select('planned_date').gte('planned_date', startOfMonth).lte('planned_date', endStr)
             ]);
 
             if (holidaysRes.error && holidaysRes.error.code !== '42P01') throw holidaysRes.error;

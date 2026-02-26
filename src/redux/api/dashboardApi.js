@@ -383,6 +383,23 @@ export const fetchStaffTasksDataApi = async (dashboardType, staffFilter = null, 
       }
     });
 
+    // Fetch user images for the staff found
+    const uniqueNames = [...new Set(tasksData.map(t => t.name).filter(Boolean))];
+    let userImageMap = {};
+
+    if (uniqueNames.length > 0) {
+      const { data: userDataForImages, error: userError } = await supabase
+        .from('users')
+        .select('user_name, profile_image')
+        .in('user_name', uniqueNames);
+
+      if (!userError && userDataForImages) {
+        userDataForImages.forEach(u => {
+          userImageMap[u.user_name] = u.profile_image;
+        });
+      }
+    }
+
     // Calculate scores and convert to array
     let staffResults = Object.values(summary).map(staff => {
       // Overall Performance Score: (On-time tasks / Total tasks) * 100
@@ -401,6 +418,7 @@ export const fetchStaffTasksDataApi = async (dashboardType, staffFilter = null, 
         department: staff.department || "No Department",
         name: staff.name || "Unnamed Staff",
         email: `${(staff.name || "user").toLowerCase().replace(/\s+/g, ".")}@example.com`,
+        profile_image: userImageMap[staff.name] || null,
         total_tasks: staff.total_tasks,
         total_completed_tasks: staff.total_completed_tasks,
         total_done_on_time: staff.total_done_on_time,

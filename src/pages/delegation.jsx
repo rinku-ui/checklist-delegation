@@ -346,6 +346,21 @@ function DelegationDataPage() {
       }
 
       return matchesSearch && matchesDateFilter;
+    }).map(task => {
+      let timeStatus = "Not Submitted";
+      if (task.planned_date || task.task_start_date) {
+        const pDate = new Date(task.planned_date || task.task_start_date);
+        pDate.setHours(0, 0, 0, 0);
+
+        if (pDate < today) {
+          timeStatus = "Overdue";
+        } else if (pDate.getTime() === today.getTime()) {
+          timeStatus = "Today";
+        } else {
+          timeStatus = "Upcoming";
+        }
+      }
+      return { ...task, timeStatus };
     });
   }, [delegation, debouncedSearchTerm, dateFilter, userRole, username]);
 
@@ -1159,6 +1174,9 @@ function DelegationDataPage() {
                         />
                       </th>
                       <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        Time Status
+                      </th>
+                      <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         Task ID
                       </th>
                       <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
@@ -1214,6 +1232,17 @@ function DelegationDataPage() {
                                   handleCheckboxClick(e, account.id)
                                 }
                               />
+                            </td>
+                            <td className="px-2 sm:px-6 py-2 sm:py-4">
+                              <div className="text-[10px] font-bold">
+                                <span className={`px-2 py-0.5 rounded-full ${account.timeStatus === "Overdue" ? "bg-red-100 text-red-700" :
+                                  account.timeStatus === "Today" ? "bg-amber-100 text-amber-700" :
+                                    account.timeStatus === "Upcoming" ? "bg-blue-100 text-blue-700" :
+                                      "bg-gray-100 text-gray-700"
+                                  }`}>
+                                  {account.timeStatus}
+                                </span>
+                              </div>
                             </td>
                             <td className="px-2 sm:px-6 py-2 sm:py-4">
                               <div className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words">
@@ -1409,6 +1438,13 @@ function DelegationDataPage() {
                             />
                             <span className="text-xs font-bold text-purple-800 uppercase tracking-wider">#{account.id}</span>
                           </div>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${account.timeStatus === "Overdue" ? "bg-red-100 text-red-700" :
+                            account.timeStatus === "Today" ? "bg-amber-100 text-amber-700" :
+                              account.timeStatus === "Upcoming" ? "bg-blue-100 text-blue-700" :
+                                "bg-gray-100 text-gray-700"
+                            }`}>
+                            {account.timeStatus}
+                          </span>
                         </div>
                         <div className="p-4 space-y-4">
                           <div className="space-y-1">

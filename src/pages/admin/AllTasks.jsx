@@ -284,8 +284,8 @@ const AllTasks = () => {
           completionField = "submission_date";
           if (showHistory) {
             headers = [
-              { id: "id", label: "Task ID" },
               { id: "time_status", label: "Time Status" },
+              { id: "id", label: "Task ID" },
               { id: "task_description", label: "Task Description" },
               { id: "department", label: "Department" },
               { id: "machine_name", label: "Machine Name" },
@@ -300,8 +300,8 @@ const AllTasks = () => {
             ];
           } else {
             headers = [
-              { id: "id", label: "Task ID" },
               { id: "time_status", label: "Time Status" },
+              { id: "id", label: "Task ID" },
               { id: "task_description", label: "Task Description" },
               { id: "department", label: "Department" },
               { id: "machine_name", label: "Machine Name" },
@@ -325,8 +325,8 @@ const AllTasks = () => {
           nameField = "assigned_person";
           if (showHistory) {
             headers = [
-              { id: "id", label: "Task ID" },
               { id: "time_status", label: "Time Status" },
+              { id: "id", label: "Task ID" },
               { id: "issue_description", label: "Issue Detail" },
               { id: "submission_date", label: "Submission Date" },
               { id: "filled_by", label: "Form Filled By" },
@@ -339,8 +339,8 @@ const AllTasks = () => {
           } else {
             headers = [
               { id: "action", label: "Action" },
-              { id: "id", label: "Task ID" },
               { id: "time_status", label: "Time Status" },
+              { id: "id", label: "Task ID" },
               { id: "issue_description", label: "Issue Detail" },
               { id: "filled_by", label: "Form Filled By" },
               { id: "assigned_person", label: "Assigned To" },
@@ -357,8 +357,8 @@ const AllTasks = () => {
           completionField = "status";
           nameField = "doer_name";
           headers = [
-            { id: "task_id", label: "Task ID" },
             { id: "time_status", label: "Time Status" },
+            { id: "task_id", label: "Task ID" },
             { id: "task_description", label: "Task Description" },
             { id: "department", label: "Department" },
             { id: "doer_name", label: "Doer Name" },
@@ -377,8 +377,8 @@ const AllTasks = () => {
           dateColumn = "task_start_date"; // task_start_date = original admin start date; used for lte filter in query
           completionField = "submission_date";
           headers = [
-            { id: "id", label: "Task ID" },
             { id: "time_status", label: "Time Status" },
+            { id: "id", label: "Task ID" },
             { id: "task_description", label: "Task Description" },
             { id: "department", label: "Department" },
             { id: "given_by", label: "Given By" },

@@ -297,7 +297,7 @@ export default function EATask() {
         const combined = [...historicalDoers];
         const existingNames = new Set(combined.map(d => d.name));
         if (userData && Array.isArray(userData)) {
-            userData.filter(u => u.role === 'user').forEach(user => {
+            userData.forEach(user => {
                 if (user.user_name && !existingNames.has(user.user_name)) {
                     combined.push({
                         name: user.user_name,

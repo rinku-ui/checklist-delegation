@@ -230,7 +230,7 @@ export default function StaffTasksTable({
             <table className="min-w-full divide-y divide-gray-100">
               <thead className="bg-blue-50/80 backdrop-blur-md sticky top-0 z-10 border-b border-blue-100">
                 <tr>
-                  {["Seq", "Staff Performance Detail", "Department", "Total", "Done", "On-Time", "Efficiency Score"].map((header, i) => (
+                  {["Seq", "Staff Performance Detail", "Department", "Total", "Done", "On-Time", "Done Score"].map((header, i) => (
                     <th key={header} scope="col" className={`px-4 py-4 text-left text-[11px] font-black text-blue-900 uppercase tracking-widest ${i === 1 ? 'min-w-[220px]' : ''}`}>
                       {header}
                     </th>
@@ -251,9 +251,29 @@ export default function StaffTasksTable({
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-xs shadow-sm bg-gradient-to-br ${index === 0 ? 'from-yellow-400 to-amber-600 text-white' : index === 1 ? 'from-slate-300 to-slate-500 text-white' : index === 2 ? 'from-orange-400 to-orange-700 text-white' : 'from-blue-100 to-blue-200 text-blue-700'}`}>
-                            {staff.name.charAt(0)}
-                          </div>
+                          {staff.profile_image ? (
+                            <div className="w-10 h-10 rounded-full border-2 border-blue-100 shadow-sm overflow-hidden flex-shrink-0">
+                              <img
+                                src={staff.profile_image}
+                                alt={staff.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'flex';
+                                }}
+                              />
+                              <div
+                                style={{ display: 'none' }}
+                                className={`w-full h-full flex items-center justify-center font-black text-xs bg-gradient-to-br ${index === 0 ? 'from-yellow-400 to-amber-600 text-white' : index === 1 ? 'from-slate-300 to-slate-500 text-white' : index === 2 ? 'from-orange-400 to-orange-700 text-white' : 'from-blue-100 to-blue-200 text-blue-700'}`}
+                              >
+                                {staff.name.charAt(0)}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs shadow-sm bg-gradient-to-br flex-shrink-0 ${index === 0 ? 'from-yellow-400 to-amber-600 text-white' : index === 1 ? 'from-slate-300 to-slate-500 text-white' : index === 2 ? 'from-orange-400 to-orange-700 text-white' : 'from-blue-100 to-blue-200 text-blue-700'}`}>
+                              {staff.name.charAt(0)}
+                            </div>
+                          )}
                           <div>
                             <div className="text-sm font-bold text-gray-900 tracking-tight">{staff.name}</div>
                             <div className="text-[10px] text-gray-400 font-medium">#{staff.id.split('-').pop()}</div>

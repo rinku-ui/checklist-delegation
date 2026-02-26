@@ -304,19 +304,26 @@ export default function TaskNavigationTabs({
         const completionDate = task.submission_date ? parseTaskStartDate(task.submission_date) : null
 
         let status = "pending"
-        if (completionDate || task.status === 'yes' || task.status === 'done') {
+        let timeStatus = "Upcoming"
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        if (completionDate || task.status === 'yes' || task.status === 'done' || task.admin_done) {
           status = "completed"
+          timeStatus = "Submitted"
         } else if (taskStartDate) {
-          if (isDateInPast(taskStartDate)) {
+          const taskDateOnly = new Date(taskStartDate);
+          taskDateOnly.setHours(0, 0, 0, 0);
+
+          if (taskDateOnly < now) {
             status = "overdue"
+            timeStatus = "Overdue"
+          } else if (taskDateOnly.getTime() === now.getTime()) {
+            status = "pending"
+            timeStatus = "Today"
           } else {
-            const today = new Date();
-            today.setHours(23, 59, 59, 999);
-            if (taskStartDate > today) {
-              status = "upcoming"
-            } else {
-              status = "pending" // Today
-            }
+            status = "upcoming"
+            timeStatus = "Upcoming"
           }
         }
 
@@ -329,6 +336,7 @@ export default function TaskNavigationTabs({
           originalTaskStartDate: task.task_start_date,
           plannedDate: task.planned_date,
           status,
+          timeStatus,
           frequency: task.frequency || "one-time",
           rating: task.color_code_for || 0,
           department: task.department || "N/A",
@@ -629,6 +637,9 @@ export default function TaskNavigationTabs({
                   <thead className="bg-gray-50 sticky top-0 z-10 transition-all">
                     <tr>
                       <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">ID</th>
+                      {dashboardType === "delegation" && (
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Time Status</th>
+                      )}
                       <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Description</th>
                       <th scope="col" className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-tight bg-gray-50/90 backdrop-blur-sm shadow-sm border-b border-gray-100">Staff</th>
                       {dashboardType === "checklist" && (
@@ -647,6 +658,17 @@ export default function TaskNavigationTabs({
                         onDoubleClick={() => handleEditClick(task)}
                       >
                         <td className="px-3 py-2 whitespace-nowrap text-xs font-bold text-purple-700">{task.id}</td>
+                        {dashboardType === "delegation" && (
+                          <td className="px-3 py-2 whitespace-nowrap text-[10px] font-bold">
+                            <span className={`px-2 py-0.5 rounded-full ${task.timeStatus === "Overdue" ? "bg-red-100 text-red-700" :
+                              task.timeStatus === "Today" ? "bg-amber-100 text-amber-700" :
+                                task.timeStatus === "Submitted" ? "bg-green-100 text-green-700" :
+                                  "bg-blue-100 text-blue-700"
+                              }`}>
+                              {task.timeStatus}
+                            </span>
+                          </td>
+                        )}
                         <td className="px-3 py-2 text-xs text-gray-700 min-w-[300px] max-w-sm font-medium">
                           {editingTaskId === task.id ? (
                             <ReactMediaRecorder
@@ -880,6 +902,18 @@ export default function TaskNavigationTabs({
                       <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Start Date</span>
                       <span className="text-xs font-semibold text-gray-700">{task.taskStartDate}</span>
                     </div>
+                    {dashboardType === "delegation" && (
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Time Status</span>
+                        <span className={`text-[10px] font-bold w-fit px-2 py-0.5 rounded-full ${task.timeStatus === "Overdue" ? "bg-red-100 text-red-700" :
+                          task.timeStatus === "Today" ? "bg-amber-100 text-amber-700" :
+                            task.timeStatus === "Submitted" ? "bg-green-100 text-green-700" :
+                              "bg-blue-100 text-blue-700"
+                          }`}>
+                          {task.timeStatus}
+                        </span>
+                      </div>
+                    )}
                     {dashboardType === "checklist" && (
                       <div className="flex flex-col col-span-2 mt-1">
                         <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Department</span>
