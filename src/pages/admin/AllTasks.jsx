@@ -842,6 +842,7 @@ const AllTasks = () => {
               planned_date: task?.planned_date,
               task_description: task?.task_description,
               status: "extended", // Lowercase
+              audio_url: task?.audio_url || null,
               submission_date: new Date().toISOString(),
               reason: remarksData[id] || null, // Aligned with delegation
               image_url: imageUrl, // Added to store image proof for extensions
@@ -885,6 +886,7 @@ const AllTasks = () => {
               planned_date: task?.planned_date,
               task_description: task?.task_description,
               status: "pending", // Waiting for admin approval (Lowercase)
+              audio_url: task?.audio_url || null,
               submission_date: new Date().toISOString(),
               reason: remarksData[id] || null,
               image_url: imageUrl,
@@ -947,6 +949,7 @@ const AllTasks = () => {
                   given_by: originalTask.given_by,
                   name: originalTask.name,
                   task_description: originalTask.task_description,
+                  audio_url: originalTask.audio_url || null,
                   // Both task_start_date and planned_date are set to the next occurrence date
                   task_start_date: nextDate,
                   planned_date: nextDate,
@@ -961,6 +964,7 @@ const AllTasks = () => {
                   given_by: originalTask.given_by,
                   name: originalTask.name,
                   task_description: originalTask.task_description,
+                  audio_url: originalTask.audio_url || null,
                   task_start_date: nextDate,
                   planned_date: nextDate,
                   freq: originalTask.freq,

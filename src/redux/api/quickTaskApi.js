@@ -27,7 +27,7 @@ export const fetchChecklistData = async (page = 0, pageSize = 50, nameFilter = '
       .limit(FETCH_LIMIT);
 
     if (nameFilter) {
-      query = query.ilike('task_description', `%${nameFilter}%`);
+      query = query.or(`task_description.ilike.%${nameFilter}%,name.ilike.%${nameFilter}%`);
     }
 
     const { data, error } = await query;
@@ -81,7 +81,7 @@ export const fetchDelegationData = async (page = 0, pageSize = 50, nameFilter = 
       .limit(FETCH_LIMIT);
 
     if (nameFilter) {
-      query = query.ilike('task_description', `%${nameFilter}%`);
+      query = query.or(`task_description.ilike.%${nameFilter}%,name.ilike.%${nameFilter}%`);
     }
 
     const { data, error } = await query;
@@ -138,17 +138,20 @@ export const deleteChecklistTasksApi = async (tasks) => {
 };
 
 export const deleteDelegationTasksApi = async (tasks) => {
-  for (const task of tasks) {
-    const { error } = await supabase
-      .from("delegation")
-      .delete()
-      .eq("department", task.department)
-      .eq("name", task.name)
-      .eq("task_description", task.task_description)
-      .is("submission_date", null);
+  // Use task_id (stored as `id` in the mapped row) for a reliable single-row delete
+  const taskIds = tasks.map(t => t.task_id || t.id).filter(Boolean);
 
-    if (error) throw error;
-  }
+  if (taskIds.length === 0) throw new Error("No valid task IDs to delete");
+
+  const { data, error } = await supabase
+    .from("delegation")
+    .delete()
+    .in("task_id", taskIds)
+    .is("submission_date", null)
+    .select();
+
+  if (error) throw error;
+  // Return the original task objects so the slice can filter them out by id
   return tasks;
 };
 

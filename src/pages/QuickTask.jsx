@@ -471,14 +471,23 @@ export default function QuickTask() {
 
   const filteredDelegationTasks = useMemo(() => {
     const seen = new Set();
+    // Apply client-side search filter across description AND name
+    const searched = delegationTasks.filter(task => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      return (
+        (task.task_description || '').toLowerCase().includes(term) ||
+        (task.name || '').toLowerCase().includes(term)
+      );
+    });
     // Deduplicate strictly by task_description + name (API already deduped, this is a safety net)
-    return delegationTasks.filter(task => {
+    return searched.filter(task => {
       const key = `${(task.department || '').trim()}::${(task.task_description || '').trim()}::${(task.name || '').trim()}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  }, [delegationTasks]);
+  }, [delegationTasks, searchTerm]);
 
   // Keep allFrequencies as is (or modify if you want to fetch frequencies from elsewhere)
   const allFrequencies = useMemo(() => {
@@ -497,8 +506,17 @@ export default function QuickTask() {
 
   const filteredChecklistTasks = useMemo(() => {
     const seen = new Set();
+    // Apply client-side search filter across description AND name
+    const searched = quickTask.filter(task => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      return (
+        (task.task_description || '').toLowerCase().includes(term) ||
+        (task.name || '').toLowerCase().includes(term)
+      );
+    });
     // Deduplicate strictly by task_description + name (API already deduped, this is a safety net)
-    const unique = quickTask.filter(task => {
+    const unique = searched.filter(task => {
       const key = `${(task.department || '').trim()}::${(task.task_description || '').trim()}::${(task.name || '').trim()}`;
       if (seen.has(key)) return false;
       seen.add(key);
@@ -518,7 +536,7 @@ export default function QuickTask() {
       const dateB = new Date(b.task_start_date || 0);
       return dateA - dateB;
     });
-  }, [quickTask, sortConfig]);
+  }, [quickTask, sortConfig, searchTerm]);
 
   const filteredMaintenance = useMemo(() => {
     // Search filter
@@ -634,7 +652,7 @@ export default function QuickTask() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
-                placeholder="Search tasks..."
+                placeholder="Search by task or name..."
                 className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 outline-none transition-all"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

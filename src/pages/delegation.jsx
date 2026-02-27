@@ -732,6 +732,7 @@ function DelegationDataPage() {
           duration: item.duration || "",
           image_url: uploadedImages[id] ? null : item.image,
           require_attachment: item.require_attachment,
+          audio_url: item.audio_url || null,
           submission_timestamp: new Date().toISOString()
         };
       });

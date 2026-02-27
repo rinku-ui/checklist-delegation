@@ -181,8 +181,12 @@ const quickTaskSlice = createSlice({
       })
       .addCase(deleteDelegationTask.fulfilled, (state, action) => {
         state.loading = false;
+        // action.payload is array of task objects; extract IDs to filter
+        const deletedIds = new Set(
+          action.payload.map(t => t.task_id || t.id)
+        );
         state.delegationTasks = state.delegationTasks.filter(
-          task => !action.payload.includes(task.id)
+          task => !deletedIds.has(task.task_id || task.id)
         );
       })
       .addCase(deleteDelegationTask.rejected, (state, action) => {
