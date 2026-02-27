@@ -236,8 +236,8 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
                         onStop={(blobUrl, blob) => onUpdate(task.id, { recordedAudio: { blobUrl, blob } })}
                         render={({ status, startRecording, stopRecording, clearBlobUrl }) => (
                             <div>
-                                {status !== 'recording' && !task.recordedAudio && (
-                                    <div className="relative">
+                                {status !== 'recording' && (
+                                    <div className="relative mb-3">
                                         <textarea
                                             name="description"
                                             value={task.description}
@@ -252,7 +252,7 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
                                     </div>
                                 )}
                                 {status === 'recording' && (
-                                    <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg animate-pulse">
+                                    <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg animate-pulse mb-3">
                                         <div className="flex items-center gap-2">
                                             <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
                                             <span className="text-red-600 font-bold text-sm">Recording...</span>
@@ -560,7 +560,7 @@ export default function ChecklistTask() {
             const allTasksToSubmit = [];
 
             for (const task of tasks) {
-                let finalDescription = task.description;
+                let audioUrl = null;
                 if (task.recordedAudio && task.recordedAudio.blob) {
                     const fileName = `voice-notes/${Date.now()}-${Math.random().toString(36).substring(7)}.webm`;
                     const { error: uploadError } = await supabase.storage
@@ -568,7 +568,7 @@ export default function ChecklistTask() {
                         .upload(fileName, task.recordedAudio.blob, { contentType: task.recordedAudio.blob.type || 'audio/webm', upsert: false });
                     if (uploadError) throw new Error(`Audio Upload Error: ${uploadError.message}`);
                     const { data: publicUrlData } = supabase.storage.from('audio-recordings').getPublicUrl(fileName);
-                    finalDescription = publicUrlData.publicUrl;
+                    audioUrl = publicUrlData.publicUrl;
                 }
 
                 const dates = await generateDatesForTask(task);
@@ -579,7 +579,8 @@ export default function ChecklistTask() {
                         department: task.department,
                         givenBy: task.givenBy,
                         doer: task.doer,
-                        description: finalDescription,
+                        task_description: task.description, // Aligned with schema
+                        audio_url: audioUrl, // Added audio_url
                         frequency: freqKey,
                         duration: task.duration || null,
                         enableReminders: task.enableReminders,
@@ -618,6 +619,7 @@ export default function ChecklistTask() {
             //                     doerName: t.name,
             //                     taskId: t.id,
             //                     description: t.task_description,
+            //                     audioUrl: t.audio_url,
             //                     startDate: new Date(t.task_start_date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
             //                     givenBy: t.given_by,
             //                     department: t.department,
@@ -765,9 +767,18 @@ export default function ChecklistTask() {
                                         <span className="text-gray-400">—</span>
                                         <div className="flex flex-col">
                                             <span className="text-gray-600 text-xs font-bold">{task.doer}</span>
-                                            <span className="text-[10px] text-gray-400 truncate max-w-[200px]">
-                                                {isAudioUrl(task.description) ? "Voice Note" : task.description}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                {task.description && (
+                                                    <span className="text-[10px] text-gray-400 truncate max-w-[150px]">
+                                                        {task.description}
+                                                    </span>
+                                                )}
+                                                {task.recordedAudio && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] text-purple-600 font-bold bg-purple-50 px-1.5 py-0.5 rounded">
+                                                        <Mic className="w-2 h-2" /> Voice
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <span className="ml-auto text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500 uppercase font-black">
                                             {task.frequency}

@@ -61,6 +61,7 @@ export const postRepairTaskApi = async (formData) => {
                 assigned_person: formData.assignedPerson,
                 machine_name: formData.machineName,
                 issue_description: formData.issueDetails,
+                audio_url: formData.audio_url || null, // Added audio_url
                 duration: formData.duration || null,
                 status: 'Pending'
             })

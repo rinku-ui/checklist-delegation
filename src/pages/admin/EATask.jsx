@@ -216,8 +216,8 @@ function TaskCard({ task, index, total, allDoers, onUpdate, onRemove }) {
                         onStop={(blobUrl, blob) => onUpdate(task.id, { recordedAudio: { blobUrl, blob } })}
                         render={({ status, startRecording, stopRecording, clearBlobUrl }) => (
                             <div>
-                                {status !== 'recording' && !task.recordedAudio && (
-                                    <div className="relative">
+                                {status !== 'recording' && (
+                                    <div className="relative mb-3">
                                         <textarea
                                             name="task_description"
                                             value={task.task_description}
@@ -237,7 +237,7 @@ function TaskCard({ task, index, total, allDoers, onUpdate, onRemove }) {
                                     </div>
                                 )}
                                 {status === 'recording' && (
-                                    <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg animate-pulse">
+                                    <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg animate-pulse mb-3">
                                         <div className="flex items-center gap-2">
                                             <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
                                             <span className="text-red-600 font-bold text-sm">Recording...</span>
@@ -370,7 +370,7 @@ export default function EATask() {
             const tasksToInsert = [];
 
             for (const task of tasks) {
-                let finalDescription = task.task_description;
+                let audioUrl = null;
 
                 if (task.recordedAudio && task.recordedAudio.blob) {
                     const fileName = `voice-notes/${Date.now()}-${Math.random().toString(36).substring(7)}.webm`;
@@ -379,7 +379,7 @@ export default function EATask() {
                         .upload(fileName, task.recordedAudio.blob, { contentType: task.recordedAudio.blob.type || 'audio/webm', upsert: false });
                     if (uploadError) throw new Error(`Audio Upload Error: ${uploadError.message}`);
                     const { data: publicUrlData } = supabase.storage.from('audio-recordings').getPublicUrl(fileName);
-                    finalDescription = publicUrlData.publicUrl;
+                    audioUrl = publicUrlData.publicUrl;
                 }
 
                 const startDate = new Date(`${task.planned_date}T${task.planned_time || "00:00"}:00`);
@@ -388,7 +388,8 @@ export default function EATask() {
                     phone_number: task.phone_number,
                     planned_date: startDate.toISOString(),
                     task_start_date: startDate.toISOString(), // Store original plan date
-                    task_description: finalDescription,
+                    task_description: task.task_description,
+                    audio_url: audioUrl,
                     duration: task.duration || null,
                     status: 'pending',
                     given_by: givenBy

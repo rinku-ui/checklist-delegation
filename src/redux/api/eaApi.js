@@ -110,6 +110,7 @@ export const completeEATask = async (task, remarks = '', imageUrl = '') => {
                 submission_date: new Date().toISOString(),
                 reason: remarks, // Aligned with delegation
                 image_url: imageUrl,
+                audio_url: task.audio_url || null, // Preserve audio_url in snapshot
                 given_by: task.given_by || givenBy,
                 task_start_date: task.task_start_date,
                 duration: task.duration || null,
@@ -156,6 +157,7 @@ export const extendEATask = async (task, newPlannedDate, remarks = '', imageUrl 
                 submission_date: new Date().toISOString(),
                 reason: remarks,
                 image_url: imageUrl, // Added to store image proof
+                audio_url: task.audio_url || null, // Preserve audio_url in snapshot
                 given_by: task.given_by || givenBy,
                 next_extend_date: newPlannedDate, // Aligned with delegation
                 task_start_date: task.task_start_date,

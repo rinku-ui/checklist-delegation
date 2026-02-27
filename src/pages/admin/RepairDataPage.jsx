@@ -192,11 +192,14 @@ export default function RepairPendingPage({ showLayout = true }) {
                                         {item.assigned_person || <span className="italic text-gray-400">Unassigned</span>}
                                     </td>
                                     <td className="py-4 px-4 align-top text-sm text-gray-600">
-                                        {isAudioUrl(item.issue_description) ? (
-                                            <AudioPlayer url={item.issue_description} />
-                                        ) : (
-                                            item.issue_description
+                                        {item.issue_description && !isAudioUrl(item.issue_description) && (
+                                            <div className="mb-2">{item.issue_description}</div>
                                         )}
+                                        {item.audio_url ? (
+                                            <AudioPlayer url={item.audio_url} />
+                                        ) : isAudioUrl(item.issue_description) ? (
+                                            <AudioPlayer url={item.issue_description} />
+                                        ) : null}
                                         {item.part_replaced && (
                                             <div className="mt-1 text-xs text-gray-500 flex items-center gap-1">
                                                 <Wrench className="w-3 h-3" /> Replaced: {item.part_replaced}
@@ -257,11 +260,14 @@ export default function RepairPendingPage({ showLayout = true }) {
                                 </div>
                                 <div className="flex-[2]">
                                     <span className="block text-xs font-bold text-purple-500 uppercase mb-1">Issue</span>
-                                    {isAudioUrl(selectedTask.issue_description) ? (
-                                        <AudioPlayer url={selectedTask.issue_description} />
-                                    ) : (
-                                        <span className="text-gray-600">{selectedTask.issue_description}</span>
+                                    {selectedTask.issue_description && !isAudioUrl(selectedTask.issue_description) && (
+                                        <div className="mb-2 text-gray-800 font-medium">{selectedTask.issue_description}</div>
                                     )}
+                                    {selectedTask.audio_url ? (
+                                        <AudioPlayer url={selectedTask.audio_url} />
+                                    ) : isAudioUrl(selectedTask.issue_description) ? (
+                                        <AudioPlayer url={selectedTask.issue_description} />
+                                    ) : null}
                                 </div>
                             </div>
                             <div className="space-y-4">

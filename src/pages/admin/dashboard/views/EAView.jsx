@@ -570,13 +570,14 @@ export default function EAView() {
                                                         rows={2}
                                                     />
                                                 ) : (
-                                                    <div className="max-w-xs group-hover:max-w-md transition-all duration-300">
-                                                        {isAudioUrl(task.task_description) ? (
-                                                            <AudioPlayer url={task.task_description} />
-                                                        ) : (
-                                                            <p className="text-xs font-medium text-gray-600 line-clamp-2 leading-relaxed italic border-l-2 border-indigo-100 pl-3">
+                                                    <div className="max-w-xs group-hover:max-w-sm transition-all duration-300 space-y-2">
+                                                        {task.task_description && !isAudioUrl(task.task_description) && (
+                                                            <p className="text-xs font-medium text-gray-600 line-clamp-3 leading-relaxed italic border-l-2 border-indigo-100 pl-3">
                                                                 "{task.task_description}"
                                                             </p>
+                                                        )}
+                                                        {(task.audio_url || isAudioUrl(task.task_description)) && (
+                                                            <AudioPlayer url={task.audio_url || task.task_description} />
                                                         )}
                                                     </div>
                                                 )}

@@ -434,44 +434,42 @@ function DelegationPage({
                             render={({ status, startRecording, stopRecording, clearBlobUrl }) => (
                               <div className="space-y-2">
                                 {status !== 'recording' && !recordedAudio && (
-                                  <div className="relative">
-                                    {isAudioUrl(editFormData.task_description) ? (
+                                  <div className="space-y-2">
+                                    <div className="relative">
+                                      <textarea
+                                        value={editFormData.task_description || ''}
+                                        onChange={(e) => handleInputChange('task_description', e.target.value)}
+                                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm pr-10 focus:ring-1 focus:ring-purple-500 outline-none"
+                                        rows="2"
+                                        placeholder="Enter task text..."
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={startRecording}
+                                        className="absolute bottom-2 right-2 p-1.5 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200"
+                                        title="Record Audio"
+                                      >
+                                        <Mic size={14} />
+                                      </button>
+                                    </div>
+                                    {(editFormData.audio_url || isAudioUrl(editFormData.task_description)) && (
                                       <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-2">
-                                        <div className="flex items-center justify-between mb-2">
-                                          <AudioPlayer url={editFormData.task_description} />
+                                        <div className="flex items-center justify-between mb-1">
+                                          <span className="text-[10px] font-bold text-indigo-600 uppercase">Existing Voice Note</span>
                                           <button
                                             type="button"
-                                            onClick={() => handleInputChange('task_description', '')}
+                                            onClick={() => {
+                                              handleInputChange('audio_url', null);
+                                              if (isAudioUrl(editFormData.task_description)) {
+                                                handleInputChange('task_description', '');
+                                              }
+                                            }}
                                             className="text-[10px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1"
                                           >
                                             <Trash2 size={10} /> Remove
                                           </button>
                                         </div>
-                                        <button
-                                          type="button"
-                                          onClick={startRecording}
-                                          className="mt-2 w-full flex items-center justify-center gap-2 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 transition-all"
-                                        >
-                                          <Mic size={12} /> Replace with Recording
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <div className="relative">
-                                        <textarea
-                                          value={editFormData.task_description}
-                                          onChange={(e) => handleInputChange('task_description', e.target.value)}
-                                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm pr-10"
-                                          rows="3"
-                                          placeholder="Enter task text..."
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={startRecording}
-                                          className="absolute bottom-2 right-2 p-1.5 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200"
-                                          title="Record Audio"
-                                        >
-                                          <Mic size={16} />
-                                        </button>
+                                        <AudioPlayer url={editFormData.audio_url || editFormData.task_description} />
                                       </div>
                                     )}
                                   </div>
@@ -512,12 +510,14 @@ function DelegationPage({
                             )}
                           />
                         ) : (
-                          <div className="whitespace-normal break-words underline-offset-2">
-                            {isAudioUrl(task.task_description) ? (
-                              <AudioPlayer url={task.task_description} />
-                            ) : (
-                              task.task_description || "—"
+                          <div className="whitespace-normal break-words underline-offset-2 space-y-2">
+                            {task.task_description && !isAudioUrl(task.task_description) && (
+                              <div className="text-gray-900">{task.task_description}</div>
                             )}
+                            {(task.audio_url || isAudioUrl(task.task_description)) && (
+                              <AudioPlayer url={task.audio_url || task.task_description} />
+                            )}
+                            {!task.task_description && !task.audio_url && "—"}
                           </div>
                         )}
                       </td>
@@ -749,12 +749,14 @@ function DelegationPage({
                           </div>
                         ) : (
                           <>
-                            <div className="text-sm font-bold text-gray-800 leading-tight mb-4">
-                              {isAudioUrl(task.task_description) ? (
-                                <AudioPlayer url={task.task_description} />
-                              ) : (
-                                task.task_description || "—"
+                            <div className="text-sm font-bold text-gray-800 leading-tight mb-4 space-y-2">
+                              {task.task_description && !isAudioUrl(task.task_description) && (
+                                <div>{task.task_description}</div>
                               )}
+                              {(task.audio_url || isAudioUrl(task.task_description)) && (
+                                <AudioPlayer url={task.audio_url || task.task_description} />
+                              )}
+                              {!task.task_description && !task.audio_url && "—"}
                             </div>
                             <div className="grid grid-cols-2 gap-4 border-t border-gray-50 pt-4">
                               <div className="space-y-1">

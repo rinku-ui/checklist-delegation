@@ -193,8 +193,8 @@ export const sendUrgentTaskNotification = async (taskDetails) => {
 
         const urlRegex = /(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|ogg|wav|webm|m4a)?)/i;
         const match = description && description.match(urlRegex);
-        const audioUrl = match ? match[0] : null;
-        const displayDescription = (audioUrl && description.trim() === audioUrl) ? `🎤 Voice Note: ${description}` : description;
+        const audioUrl = taskDetails.audioUrl || (match ? match[0] : null);
+        const displayDescription = (audioUrl && description?.trim() === audioUrl) ? `🎤 Voice Note: ${audioUrl}` : description;
 
         const header = taskType ? `🚨 URGENT ${taskType.toUpperCase()} ALERT 🚨` : `🚨 URGENT TASK ALERT 🚨`;
 
@@ -276,8 +276,8 @@ export const sendChecklistTaskNotification = async (taskDetails) => {
 
         const urlRegex = /(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|ogg|wav|webm|m4a)?)/i;
         const match = description && description.match(urlRegex);
-        const audioUrl = match ? match[0] : null;
-        const displayDescription = (audioUrl && description.trim() === audioUrl) ? `🎤 Voice Note: ${description}` : description;
+        const audioUrl = taskDetails.audioUrl || (match ? match[0] : null);
+        const displayDescription = (audioUrl && description?.trim() === audioUrl) ? `🎤 Voice Note: ${audioUrl}` : description;
 
         const message = `📋 *NEW CHECKLIST TASK*\n` +
             `Dear ${doerName},\n\n` +
@@ -314,8 +314,8 @@ export const sendMaintenanceTaskNotification = async (taskDetails) => {
 
         const urlRegex = /(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|ogg|wav|webm|m4a)?)/i;
         const match = description && description.match(urlRegex);
-        const audioUrl = match ? match[0] : null;
-        const displayDescription = (audioUrl && description.trim() === audioUrl) ? `🎤 Voice Note: ${description}` : description;
+        const audioUrl = taskDetails.audioUrl || (match ? match[0] : null);
+        const displayDescription = (audioUrl && description?.trim() === audioUrl) ? `🎤 Voice Note: ${audioUrl}` : description;
 
         const message = `🛠️ *MAINTENANCE TASK ASSIGNED*\n` +
             `Dear ${doerName},\n\n` +
@@ -354,8 +354,8 @@ export const sendRepairTaskNotification = async (taskDetails) => {
 
         const urlRegex = /(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|ogg|wav|webm|m4a)?)/i;
         const match = description && description.match(urlRegex);
-        const audioUrl = match ? match[0] : null;
-        const displayDescription = (audioUrl && description.trim() === audioUrl) ? `🎤 Voice Note: ${description}` : description;
+        const audioUrl = taskDetails.audioUrl || (match ? match[0] : null);
+        const displayDescription = (audioUrl && description?.trim() === audioUrl) ? `🎤 Voice Note: ${audioUrl}` : description;
 
         const message = `🔨 *REPAIR REQUEST ASSIGNED*\n` +
             `Dear ${doerName},\n\n` +
@@ -393,8 +393,8 @@ export const sendEATaskNotification = async (taskDetails) => {
 
         const urlRegex = /(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|ogg|wav|webm|m4a)?)/i;
         const match = description && description.match(urlRegex);
-        const audioUrl = match ? match[0] : null;
-        const displayDescription = (audioUrl && description.trim() === audioUrl) ? `🎤 Voice Note: ${description}` : description;
+        const audioUrl = taskDetails.audioUrl || (match ? match[0] : null);
+        const displayDescription = (audioUrl && description?.trim() === audioUrl) ? `🎤 Voice Note: ${audioUrl}` : description;
 
         const message = `💼 *NEW EA TASK*\n` +
             `Dear ${doerName},\n\n` +
@@ -430,8 +430,8 @@ export const sendDelegationTaskNotification = async (taskDetails) => {
 
         const urlRegex = /(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|ogg|wav|webm|m4a)?)/i;
         const match = description && description.match(urlRegex);
-        const audioUrl = match ? match[0] : null;
-        const displayDescription = (audioUrl && description.trim() === audioUrl) ? `🎤 Voice Note: ${description}` : description;
+        const audioUrl = taskDetails.audioUrl || (match ? match[0] : null);
+        const displayDescription = (audioUrl && description?.trim() === audioUrl) ? `🎤 Voice Note: ${audioUrl}` : description;
 
         const message = `🔔 *NEW DELEGATION TASK*\n` +
             `Dear ${doerName},\n\n` +
@@ -470,11 +470,11 @@ export const sendTaskExtensionNotification = async (taskDetails) => {
         // Extract audio URL from description if present
         const urlRegex = /(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|ogg|wav|webm|m4a)?)/i;
         const match = description && description.match(urlRegex);
-        const audioUrl = match ? match[0] : null;
+        const audioUrl = taskDetails.audioUrl || (match ? match[0] : null);
 
         // If description is JUST the URL, enhance it
-        const displayDescription = (audioUrl && description.trim() === audioUrl)
-            ? `🎤 Voice Note Link: ${description}`
+        const displayDescription = (audioUrl && description?.trim() === audioUrl)
+            ? `🎤 Voice Note Link: ${audioUrl}`
             : description;
 
         const message = `🔄 *TASK EXTENSION NOTICE*\n` +
@@ -540,8 +540,8 @@ export const sendTaskAssignmentNotification = async (taskDetails) => {
 
                 const urlRegex = /(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|ogg|wav|webm|m4a)?)/i;
                 const match = description && description.match(urlRegex);
-                const audioUrl = match ? match[0] : null;
-                const displayDescription = (audioUrl && description.trim() === audioUrl) ? `🎤 Voice Note Link: ${description}` : description;
+                const audioUrl = taskDetails.audioUrl || (match ? match[0] : null);
+                const displayDescription = (audioUrl && description?.trim() === audioUrl) ? `🎤 Voice Note Link: ${audioUrl}` : description;
 
                 const message = `🔔 *REMINDER: DELEGATION TASK*\n` +
                     `Dear ${doerName},\n\n` +
@@ -700,8 +700,8 @@ export const sendTaskReassignmentNotification = async (taskDetails) => {
 
         const urlRegex = /(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|ogg|wav|webm|m4a)?)/i;
         const match = description && description.match(urlRegex);
-        const audioUrl = match ? match[0] : null;
-        const displayDescription = (audioUrl && description.trim() === audioUrl) ? `🎤 Voice Note: ${description}` : description;
+        const audioUrl = taskDetails.audioUrl || (match ? match[0] : null);
+        const displayDescription = (audioUrl && description?.trim() === audioUrl) ? `🎤 Voice Note: ${audioUrl}` : description;
 
         const message = `🔄 *TASK REASSIGNED*\n` +
             `Dear ${newDoerName},\n\n` +

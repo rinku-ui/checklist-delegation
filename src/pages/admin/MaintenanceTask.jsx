@@ -367,8 +367,8 @@ function MaintenanceTaskCard({
                             onStop={(blobUrl, blob) => onUpdate(task.id, { recordedAudio: { blobUrl, blob } })}
                             render={({ status, startRecording, stopRecording, clearBlobUrl }) => (
                                 <div>
-                                    {status !== 'recording' && !task.recordedAudio && (
-                                        <div className="relative">
+                                    {status !== 'recording' && (
+                                        <div className="relative mb-3">
                                             <textarea
                                                 name="workDescription"
                                                 value={task.workDescription}
@@ -383,7 +383,7 @@ function MaintenanceTaskCard({
                                         </div>
                                     )}
                                     {status === 'recording' && (
-                                        <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg animate-pulse">
+                                        <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg animate-pulse mb-3">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
                                                 <span className="text-red-600 font-bold text-sm">Recording...</span>
@@ -621,9 +621,15 @@ export default function MaintenanceTask() {
         setIsSubmitting(true);
         try {
             const allTasks = [];
-            for (const task of tasks) {
+            for (let i = 0; i < tasks.length; i++) {
+                const task = tasks[i];
                 const generated = await generateDatesForTask(task);
-                allTasks.push(...generated);
+                generated.forEach(g => {
+                    allTasks.push({
+                        ...g,
+                        recordedAudio: task.recordedAudio
+                    });
+                });
             }
             if (allTasks.length === 0) { showToast("No valid tasks generated.", "error"); return; }
             setAllGeneratedTasks(allTasks);
@@ -642,7 +648,7 @@ export default function MaintenanceTask() {
             const finalTasks = [];
             for (let i = 0; i < tasks.length; i++) {
                 const task = tasks[i];
-                let finalDescription = task.workDescription;
+                let audioUrl = null;
 
                 if (task.recordedAudio && task.recordedAudio.blob) {
                     const fileName = `voice-notes/${Date.now()}-${Math.random().toString(36).substring(7)}.webm`;
@@ -651,10 +657,19 @@ export default function MaintenanceTask() {
                         .upload(fileName, task.recordedAudio.blob, { contentType: task.recordedAudio.blob.type || 'audio/webm', upsert: false });
                     if (uploadError) throw new Error(`Audio Upload Error: ${uploadError.message}`);
                     const { data: publicUrlData } = supabase.storage.from('audio-recordings').getPublicUrl(fileName);
-                    finalDescription = publicUrlData.publicUrl;
+                    audioUrl = publicUrlData.publicUrl;
                 }
 
-                const generated = await generateDatesForTask({ ...task, workDescription: finalDescription });
+                const generated = await generateDatesForTask({
+                    ...task,
+                    workDescription: task.workDescription // Keep text separate
+                });
+
+                // Add audio_url to each generated occurrence
+                generated.forEach(g => {
+                    g.audio_url = audioUrl;
+                });
+
                 finalTasks.push(...generated);
             }
 
@@ -675,6 +690,7 @@ export default function MaintenanceTask() {
                                 doerName: task.name,
                                 taskId: task.id,
                                 description: task.task_description,
+                                audioUrl: task.audio_url,
                                 startDate: new Date(task.task_start_date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
                                 givenBy: task.given_by,
                                 taskType: 'maintenance',
@@ -821,8 +837,24 @@ export default function MaintenanceTask() {
                                             {new Date(task.task_start_date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
                                         </span>
                                         <span className="text-gray-400">—</span>
-                                        <span className="text-gray-600 text-xs">{task.name}</span>
-                                        {task.machine_name && <span className="ml-auto text-xs text-purple-600 font-medium">{task.machine_name}</span>}
+                                        <div className="flex flex-col flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-gray-600 text-xs font-bold">{task.name}</span>
+                                                {task.machine_name && <span className="text-[10px] text-purple-600 font-black uppercase tracking-wider">{task.machine_name}</span>}
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                {task.task_description && (
+                                                    <span className="text-[10px] text-gray-400 truncate max-w-[150px]">
+                                                        {task.task_description}
+                                                    </span>
+                                                )}
+                                                {task.recordedAudio && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] text-purple-600 font-bold bg-purple-50 px-1.5 py-0.5 rounded">
+                                                        <Mic className="w-2 h-2" /> Voice
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 ))}
                                 {allGeneratedTasks.length > 20 && (

@@ -214,7 +214,14 @@ export default function MaintenanceDataPage({ showLayout = true }) {
                                         <td className="px-3 py-4 text-sm text-gray-600 whitespace-nowrap align-top">{item.name || "-"}</td>
                                         <td className="px-3 py-4 text-sm text-gray-800 align-top min-w-[250px]">
                                             <div className="whitespace-normal break-words leading-relaxed">
-                                                {isAudioUrl(item.task_description) ? <AudioPlayer url={item.task_description} /> : item.task_description}
+                                                {item.task_description && !isAudioUrl(item.task_description) && (
+                                                    <div className="mb-2">{item.task_description}</div>
+                                                )}
+                                                {item.audio_url ? (
+                                                    <AudioPlayer url={item.audio_url} />
+                                                ) : isAudioUrl(item.task_description) ? (
+                                                    <AudioPlayer url={item.task_description} />
+                                                ) : null}
                                             </div>
                                         </td>
                                         <td className="px-3 py-4 text-sm text-gray-600 whitespace-nowrap align-top bg-yellow-50">
@@ -269,7 +276,14 @@ export default function MaintenanceDataPage({ showLayout = true }) {
                                         <td className="px-3 py-4 align-top">
                                             {showHistory ? (
                                                 <span className="text-sm text-gray-500 italic block min-w-[150px]">
-                                                    {isAudioUrl(item.remarks) ? <AudioPlayer url={item.remarks} /> : (item.remarks || "-")}
+                                                    {item.remarks && !isAudioUrl(item.remarks) && (
+                                                        <div className="mb-1">{item.remarks}</div>
+                                                    )}
+                                                    {item.audio_url ? (
+                                                        <AudioPlayer url={item.audio_url} />
+                                                    ) : isAudioUrl(item.remarks) ? (
+                                                        <AudioPlayer url={item.remarks} />
+                                                    ) : null}
                                                 </span>
                                             ) : (
                                                 <textarea

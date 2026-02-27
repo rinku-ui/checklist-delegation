@@ -141,8 +141,8 @@ function RepairTaskCard({ task, index, total, givenBy, userData, machineOptions,
                         onStop={(blobUrl, blob) => onUpdate(task.id, { recordedAudio: { blobUrl, blob } })}
                         render={({ status, startRecording, stopRecording, clearBlobUrl }) => (
                             <div>
-                                {status !== 'recording' && !task.recordedAudio && (
-                                    <div className="relative">
+                                {status !== 'recording' && (
+                                    <div className="relative mb-3">
                                         <textarea
                                             name="issueDetails"
                                             value={task.issueDetails}
@@ -157,7 +157,7 @@ function RepairTaskCard({ task, index, total, givenBy, userData, machineOptions,
                                     </div>
                                 )}
                                 {status === 'recording' && (
-                                    <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg animate-pulse">
+                                    <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg animate-pulse mb-3">
                                         <div className="flex items-center gap-2">
                                             <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
                                             <span className="text-red-600 font-bold text-sm">Recording...</span>
@@ -249,7 +249,7 @@ export default function RepairTask() {
         try {
             const allResults = [];
             for (const task of tasks) {
-                let finalIssueDetails = task.issueDetails;
+                let audioUrl = null;
                 if (task.recordedAudio && task.recordedAudio.blob) {
                     const fileName = `voice-notes/${Date.now()}-${Math.random().toString(36).substring(7)}.webm`;
                     const { error: uploadError } = await supabase.storage
@@ -257,13 +257,14 @@ export default function RepairTask() {
                         .upload(fileName, task.recordedAudio.blob, { contentType: task.recordedAudio.blob.type || 'audio/webm', upsert: false });
                     if (uploadError) throw new Error(`Audio Upload Error: ${uploadError.message}`);
                     const { data: publicUrlData } = supabase.storage.from('audio-recordings').getPublicUrl(fileName);
-                    finalIssueDetails = publicUrlData.publicUrl;
+                    audioUrl = publicUrlData.publicUrl;
                 }
 
                 const result = await dispatch(createRepair({
                     ...task,
                     filledBy: task.filledBy,
-                    issueDetails: finalIssueDetails,
+                    issueDetails: task.issueDetails, // Keep text separate
+                    audio_url: audioUrl, // Added audio_url
                     duration: task.duration || null,
                 })).unwrap();
                 if (Array.isArray(result)) allResults.push(...result);
@@ -279,6 +280,7 @@ export default function RepairTask() {
                             doerName: assignee,
                             taskId: insertedTask.id,
                             description: insertedTask.issue_description,
+                            audioUrl: insertedTask.audio_url,
                             startDate: new Date(insertedTask.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
                             givenBy: insertedTask.filled_by,
                             taskType: 'repair',

@@ -5,7 +5,7 @@ import { Search, ChevronDown, Filter, Trash2, Edit, Save, X, Play, Pause, Mic, S
 import AdminLayout from "../components/layout/AdminLayout";
 import DelegationPage from "./delegation-data";
 import { useDispatch, useSelector } from "react-redux";
-import { deleteChecklistTask, deleteDelegationTask, uniqueChecklistTaskData, uniqueDelegationTaskData, updateChecklistTask, fetchUsers, resetChecklistPagination, resetDelegationPagination } from "../redux/slice/quickTaskSlice";
+import { deleteChecklistTask, deleteDelegationTask, uniqueChecklistTaskData, uniqueDelegationTaskData, updateChecklistTask, updateDelegationTask, fetchUsers, resetChecklistPagination, resetDelegationPagination } from "../redux/slice/quickTaskSlice";
 import { maintenanceData, deleteMaintenanceTask, updateMaintenanceTask } from "../redux/slice/maintenanceSlice";
 import { fetchUniqueDepartmentDataApi, fetchUniqueGivenByDataApi, fetchUniqueDoerNameDataApi } from "../redux/api/assignTaskApi";
 import { fetchCustomDropdownsApi } from "../redux/api/settingApi";
@@ -46,16 +46,20 @@ const getTimeStatus = (dateString, taskStatus) => {
   return "Upcoming";
 };
 
-const RenderDescription = ({ text }) => {
-  if (!text) return "—";
+const RenderDescription = ({ text, audioUrl }) => {
+  if (!text && !audioUrl) return "—";
 
   const urlRegex = /(https?:\/\/[^\s]+(?:voice-notes|audio-recordings)[^\s]*\.(?:mp3|wav|ogg|webm|m4a|aac)(\?.*)?)/i;
-  const match = text && text.match(urlRegex);
+  const match = text && typeof text === 'string' && text.match(urlRegex);
 
-  if (match) {
-    const url = match[0];
-    const cleanText = text.replace(url, '').replace(/Voice Note Link:/i, '').replace(/Voice Note:/i, '').trim();
+  let url = audioUrl || (match ? match[0] : null);
+  let cleanText = text || '';
 
+  if (match && !audioUrl) {
+    cleanText = text.replace(match[0], '').replace(/Voice Note Link:/i, '').replace(/Voice Note:/i, '').trim();
+  }
+
+  if (url) {
     return (
       <div className="flex flex-col gap-2 min-w-[200px]">
         {cleanText && <span className="whitespace-pre-wrap text-[11px] font-bold text-gray-700">{cleanText}</span>}
@@ -64,7 +68,7 @@ const RenderDescription = ({ text }) => {
     );
   }
 
-  return <span className="whitespace-pre-wrap text-[11px] font-bold text-gray-700" title={text}>{text}</span>;
+  return <span className="whitespace-pre-wrap text-[11px] font-bold text-gray-700" title={cleanText}>{cleanText || "—"}</span>;
 };
 
 export default function QuickTask() {
@@ -252,12 +256,13 @@ export default function QuickTask() {
         given_by: task.given_by || '',
         name: task.name || '',
         task_description: task.task_description || '',
+        audio_url: task.audio_url || null, // Added audio_url
         task_start_date: task.task_start_date || '',
         frequency: task.frequency || '',
         enable_reminder: task.enable_reminder || '',
         require_attachment: task.require_attachment || '',
         remark: task.remark || '',
-        originalAudioUrl: isAudioUrl(task.task_description) ? task.task_description : null,
+        originalAudioUrl: task.audio_url || (isAudioUrl(task.task_description) ? task.task_description : null),
       });
     }
   };
@@ -297,7 +302,7 @@ export default function QuickTask() {
             .from('audio-recordings')
             .getPublicUrl(fileName);
 
-          finalEditData.task_description = publicUrlData.publicUrl;
+          finalEditData.audio_url = publicUrlData.publicUrl; // Store in audio_url column
 
           if (editFormData.originalAudioUrl) {
             audioToCleanup = editFormData.originalAudioUrl;
@@ -782,51 +787,42 @@ export default function QuickTask() {
                                 render={({ status, startRecording, stopRecording, clearBlobUrl }) => (
                                   <div className="space-y-2">
                                     {status !== 'recording' && !recordedAudio && (
-                                      <div className="relative">
-                                        {isAudioUrl(editFormData.task_description) ? (
+                                      <div className="space-y-2">
+                                        <div className="relative">
+                                          <textarea
+                                            value={editFormData.task_description || ''}
+                                            onChange={(e) => handleInputChange('task_description', e.target.value)}
+                                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm pr-10 focus:ring-1 focus:ring-purple-500 outline-none"
+                                            rows="2"
+                                            placeholder="Enter task text..."
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={startRecording}
+                                            className="absolute bottom-2 right-2 p-1.5 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200"
+                                            title="Record Audio"
+                                          >
+                                            <Mic size={14} />
+                                          </button>
+                                        </div>
+                                        {(editFormData.audio_url || isAudioUrl(editFormData.task_description)) && (
                                           <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-2">
-                                            <div className="flex items-center justify-between mb-2">
-                                              {isAudioUrl(task.task_description) ? (
-                                                <AudioPlayer url={task.task_description} />
-                                              ) : (
-                                                <span className="text-[11px] font-bold text-gray-700 block py-1 line-clamp-2" title={task.task_description}>
-                                                  {task.task_description}
-                                                </span>
-                                              )}
+                                            <div className="flex items-center justify-between mb-1">
+                                              <span className="text-[10px] font-bold text-indigo-600 uppercase">Existing Voice Note</span>
                                               <button
                                                 type="button"
-                                                onClick={() => handleInputChange('task_description', '')}
+                                                onClick={() => {
+                                                  handleInputChange('audio_url', null);
+                                                  if (isAudioUrl(editFormData.task_description)) {
+                                                    handleInputChange('task_description', '');
+                                                  }
+                                                }}
                                                 className="text-[10px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1"
                                               >
                                                 <Trash2 size={10} /> Remove
                                               </button>
                                             </div>
-                                            <AudioPlayer url={editFormData.task_description} />
-                                            <button
-                                              type="button"
-                                              onClick={startRecording}
-                                              className="mt-2 w-full flex items-center justify-center gap-2 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 transition-all"
-                                            >
-                                              <Mic size={12} /> Replace with Recording
-                                            </button>
-                                          </div>
-                                        ) : (
-                                          <div className="relative">
-                                            <textarea
-                                              value={editFormData.task_description || ''}
-                                              onChange={(e) => handleInputChange('task_description', e.target.value)}
-                                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm pr-10"
-                                              rows="3"
-                                              placeholder="Enter task text..."
-                                            />
-                                            <button
-                                              type="button"
-                                              onClick={startRecording}
-                                              className="absolute bottom-2 right-2 p-1.5 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200"
-                                              title="Record Audio"
-                                            >
-                                              <Mic size={16} />
-                                            </button>
+                                            <AudioPlayer url={editFormData.audio_url || editFormData.task_description} />
                                           </div>
                                         )}
                                       </div>
@@ -868,7 +864,7 @@ export default function QuickTask() {
                               />
                             ) : (
                               <div className="whitespace-normal break-words">
-                                <RenderDescription text={task.task_description} />
+                                <RenderDescription text={task.task_description} audioUrl={task.audio_url} />
                               </div>
                             )}
                           </td>
@@ -1104,6 +1100,11 @@ export default function QuickTask() {
                               <>
                                 <div className="text-sm font-bold text-gray-800 leading-tight mb-2">
                                   <RenderDescription text={task.task_description} />
+                                  {task.audio_url && (
+                                    <div className="mt-2">
+                                      <AudioPlayer url={task.audio_url} />
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-bold text-gray-500">
                                   <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>{task.department}</span>
@@ -1233,7 +1234,27 @@ export default function QuickTask() {
                                   <div className="space-y-2">
                                     {status !== 'recording' && !recordedAudio && (
                                       <div className="relative">
-                                        {isAudioUrl(editFormData.task_description) ? (
+                                        {editFormData.audio_url ? (
+                                          <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-2">
+                                            <div className="flex items-center justify-between mb-2">
+                                              <AudioPlayer url={editFormData.audio_url} />
+                                              <button
+                                                type="button"
+                                                onClick={() => handleInputChange('audio_url', null)}
+                                                className="text-[10px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1"
+                                              >
+                                                <Trash2 size={10} /> Remove
+                                              </button>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={startRecording}
+                                              className="mt-2 w-full flex items-center justify-center gap-2 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 transition-all"
+                                            >
+                                              <Mic size={12} /> Replace with Recording
+                                            </button>
+                                          </div>
+                                        ) : isAudioUrl(editFormData.task_description) ? (
                                           <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-2">
                                             <div className="flex items-center justify-between mb-2">
                                               <AudioPlayer url={editFormData.task_description} />
@@ -1310,7 +1331,12 @@ export default function QuickTask() {
                                 )}
                               />
                             ) : (
-                              <RenderDescription text={task.task_description || task.work_description} />
+                              <>
+                                <RenderDescription
+                                  text={task.task_description || task.work_description}
+                                  audioUrl={task.audio_url}
+                                />
+                              </>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -1531,7 +1557,10 @@ export default function QuickTask() {
                             ) : (
                               <>
                                 <div className="text-sm font-bold text-gray-800 leading-tight mb-3">
-                                  <RenderDescription text={task.task_description || task.work_description} />
+                                  <RenderDescription
+                                    text={task.task_description || task.work_description}
+                                    audioUrl={task.audio_url}
+                                  />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-1">
