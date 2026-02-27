@@ -5,6 +5,11 @@ const MagicToast = ({ message, type, onClose, duration }) => {
     const [isExiting, setIsExiting] = useState(false);
     const [progress, setProgress] = useState(100);
 
+    const handleClose = useCallback(() => {
+        setIsExiting(true);
+        setTimeout(onClose, 400); // Wait for exit animation
+    }, [onClose]);
+
     useEffect(() => {
         const startTime = Date.now();
         const interval = setInterval(() => {
@@ -18,11 +23,6 @@ const MagicToast = ({ message, type, onClose, duration }) => {
 
         return () => clearInterval(interval);
     }, [duration, handleClose]);
-
-    const handleClose = useCallback(() => {
-        setIsExiting(true);
-        setTimeout(onClose, 400); // Wait for exit animation
-    }, [onClose]);
 
     const getConfig = () => {
         switch (type) {
