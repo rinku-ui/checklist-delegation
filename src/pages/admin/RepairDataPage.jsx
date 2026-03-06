@@ -173,9 +173,9 @@ export default function RepairPendingPage({ showLayout = true }) {
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Name</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Task Description</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-yellow-50">Task Start Date & Time</th>
-                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Freq</th>
-                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Enable Reminders</th>
-                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Require Attachment</th>
+                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Duration</th>
+                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Vendor</th>
+                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Bill Amount</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Status</th>
                                 <th className="py-3 px-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-24">
                                     {showHistory ? "Updated" : "Action"}
@@ -212,9 +212,9 @@ export default function RepairPendingPage({ showLayout = true }) {
                                             hour: '2-digit', minute: '2-digit', hour12: true
                                         }) : '-'}
                                     </td>
-                                    <td className="py-4 px-4 align-top text-sm text-gray-600 text-center">-</td>
-                                    <td className="py-4 px-4 align-top text-sm text-gray-600 text-center">No</td>
-                                    <td className="py-4 px-4 align-top text-sm text-gray-600 text-center">No</td>
+                                    <td className="py-4 px-4 align-top text-sm text-gray-600 text-center">{item.duration || "-"}</td>
+                                    <td className="py-4 px-4 align-top text-sm text-gray-600 text-center">{item.vendor_name || "-"}</td>
+                                    <td className="py-4 px-4 align-top text-sm text-gray-600 text-center">{item.bill_amount ? `₹${item.bill_amount}` : "-"}</td>
                                     <td className="py-4 px-4 align-top">
                                         <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold border uppercase ${getStatusColor(item.status, item.admin_done)}`}>
                                             {item.status && (item.status.includes("Completed") || item.status === 'Done' || item.status.includes("Complete"))

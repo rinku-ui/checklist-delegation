@@ -283,6 +283,8 @@ const AllTasks = () => {
     try {
       setIsLoading(true);
       setError(null);
+      setTasks([]);
+      setHistoryData([]);
 
       let tableName;
       let dateColumn;
@@ -345,7 +347,9 @@ const AllTasks = () => {
               { id: "machine_name", label: "Machine Name" },
               { id: "status", label: "Status" },
               { id: "part_replaced", label: "Part Replaced" },
+              { id: "vendor_name", label: "Vendor" },
               { id: "bill_amount", label: "Bill Amount" },
+              { id: "duration", label: "Duration" },
             ];
           } else {
             headers = [
@@ -358,7 +362,9 @@ const AllTasks = () => {
               { id: "machine_name", label: "Machine" },
               { id: "status", label: "Status" },
               { id: "part_replaced", label: "Part" },
+              { id: "vendor_name", label: "Vendor" },
               { id: "bill_amount", label: "Amount" },
+              { id: "duration", label: "Duration" },
             ];
           }
           break;
@@ -404,62 +410,44 @@ const AllTasks = () => {
 
       setTableHeaders(showHistory ? headers.filter(h => h.id !== "time_status") : headers);
 
-      setFetchingProgress(0);
-      let allFetchedData = [];
-      let page = 0;
-      const CHUNK_SIZE = 1000;
-      let hasMore = true;
+      let query = supabase.from(tableName).select("*");
 
-      while (hasMore) {
-        let query = supabase.from(tableName).select("*");
+      if (userRole !== "admin") {
+        query = query.eq(nameField, username);
+      }
 
-        if (userRole !== "admin") {
-          query = query.eq(nameField, username);
-        }
-
-        if (showHistory) {
-          if (activeTab === "repair") {
-            query = query.not("submission_date", "is", null).order("submission_date", { ascending: false });
-          } else if (activeTab === "ea") {
-            query = supabase.from("ea_tasks_done").select("*").order("created_at", { ascending: false });
-          } else {
-            query = query.not(completionField, "is", null).order(completionField, { ascending: false });
-          }
+      if (showHistory) {
+        if (activeTab === "repair") {
+          query = query.not("submission_date", "is", null).order("submission_date", { ascending: false });
+        } else if (activeTab === "ea") {
+          query = supabase.from("ea_tasks_done").select("*").order("created_at", { ascending: false });
         } else {
-          if (activeTab === "repair") {
-            query = query.is("submission_date", null).order(dateColumn, { ascending: false });
-          } else if (activeTab === "ea") {
-            query = query.in("status", ["pending", "extend", "extended"]).order("task_start_date", { ascending: true });
-          } else if (activeTab === "checklist" || activeTab === "delegation" || activeTab === "maintenance") {
-            // Fetch ALL pending tasks (no DB date restriction).
-            // Smart dedup in filteredPendingTasks handles upcoming dedup:
-            //   Overdue/Today → show all occurrences per day
-            //   Upcoming      → show only NEXT occurrence per task series
-            // Sorted ascending: oldest overdue first → today → next upcoming
-            query = query
-              .is(completionField, null)
-              .order('planned_date', { ascending: true });
-          }
+          query = query.not(completionField, "is", null).order(completionField, { ascending: false });
         }
-
-        // Apply pagination for the fetch
-        const { data, error: fetchError } = await query.range(page * CHUNK_SIZE, (page + 1) * CHUNK_SIZE - 1);
-
-        if (fetchError) throw fetchError;
-
-        if (data && data.length > 0) {
-          allFetchedData = [...allFetchedData, ...data];
-          page++;
-          setFetchingProgress(allFetchedData.length);
-
-          if (data.length < CHUNK_SIZE || allFetchedData.length >= 20000) {
-            hasMore = false;
-          }
-        } else {
-          hasMore = false;
+      } else {
+        if (activeTab === "repair") {
+          query = query.is("submission_date", null).order(dateColumn, { ascending: false });
+        } else if (activeTab === "ea") {
+          query = query.in("status", ["pending", "extend", "extended"]).order("task_start_date", { ascending: true });
+        } else if (activeTab === "checklist" || activeTab === "delegation" || activeTab === "maintenance") {
+          // Fetch ALL pending tasks (no DB date restriction).
+          // Smart dedup in filteredPendingTasks handles upcoming dedup:
+          //   Overdue/Today → show all occurrences per day
+          //   Upcoming      → show only NEXT occurrence per task series
+          // Sorted ascending: oldest overdue first → today → next upcoming
+          query = query
+            .is(completionField, null)
+            .order('planned_date', { ascending: true });
         }
       }
-      // END of pending tasks block (else for if showHistory)
+
+      // Fetch once without loop
+      const { data, error: fetchError } = await query.limit(10000);
+
+      if (fetchError) throw fetchError;
+
+      let allFetchedData = data || [];
+
 
       if (allFetchedData.length > 0) {
         // Filter out tasks that fall on holidays or non-working days (respect the updated calendar)
@@ -486,6 +474,12 @@ const AllTasks = () => {
           setHistoryData(mappedData);
         } else {
           setTasks(mappedData);
+        }
+      } else {
+        if (showHistory) {
+          setHistoryData([]);
+        } else {
+          setTasks([]);
         }
       }
     } catch (err) {
@@ -1185,9 +1179,6 @@ const AllTasks = () => {
               <div className="flex flex-col items-center justify-center py-20">
                 <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500 mb-2"></div>
                 <p className="text-purple-600 text-sm font-bold uppercase tracking-wider">Loading data...</p>
-                {fetchingProgress > 0 && (
-                  <p className="text-gray-500 text-[10px] font-bold mt-1 uppercase">Fetched {fetchingProgress.toLocaleString()} Tasks</p>
-                )}
               </div>
             ) : error ? (
               <div className="py-20 text-center">
@@ -1429,7 +1420,9 @@ const AllTasks = () => {
                                                       ? <RenderDescription text={task[header.id]} audioUrl={task.audio_url} />
                                                       : isAudioUrl(task[header.id])
                                                         ? <AudioPlayer url={task[header.id]} />
-                                                        : task[header.id] || "—"}</td>
+                                                        : header.id === 'work_photo_url' || header.id === 'bill_copy_url'
+                                                          ? task[header.id] ? <a href={task[header.id]} target="_blank" rel="noopener noreferrer" className="text-purple-600 underline">View</a> : "—"
+                                                          : task[header.id] || "—"}</td>
                                 ))}
                                 {!showHistory && activeTab === "ea" && (
                                   <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800">

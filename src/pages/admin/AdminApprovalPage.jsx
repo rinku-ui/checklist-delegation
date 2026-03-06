@@ -392,9 +392,17 @@ export default function AdminApprovalPage() {
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    task.rejection_reason ? (
-                                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-100 text-red-800" title={task.rejection_reason}>
+                                                    task.status === 'rejected' || task.rejection_reason ? (
+                                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-100 text-red-800" title={task.rejection_reason || task.reason}>
                                                             Rejected
+                                                        </span>
+                                                    ) : task.status === 'extend' ? (
+                                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-yellow-100 text-yellow-800">
+                                                            Extended
+                                                        </span>
+                                                    ) : task.status === 'pending' ? (
+                                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-orange-100 text-orange-800">
+                                                            Pending Approval
                                                         </span>
                                                     ) : (
                                                         <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-green-100 text-green-800">

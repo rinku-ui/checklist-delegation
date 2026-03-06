@@ -272,41 +272,11 @@ export const fetchDelegationDataSortByDate = async () => {
 };
 
 export const fetchDelegation_DoneDataSortByDate = async () => {
-  const role = localStorage.getItem("role");
-  const username = localStorage.getItem("user-name");
-  const userAccess = localStorage.getItem("user_access");
-
   try {
-    // Fetch delegation_done records
     let query = supabase
       .from('delegation_done')
       .select('*')
       .order('created_at', { ascending: false });
-
-    // Filter by user if role is 'user'
-    if (role === 'user' && username) {
-      query = query.eq('name', username);
-    } else if (role === 'admin' && userAccess && userAccess !== 'all') {
-      // Filter by departments in user_access for admin
-      const allowedDepartments = userAccess.split(',').map(dept => dept.trim()).filter(d => d && d !== 'all');
-      if (allowedDepartments.length > 0) {
-        // First get task_ids that belong to these departments from the delegation table
-        const { data: allowedTasks, error: allowedError } = await supabase
-          .from('delegation')
-          .select('task_id')
-          .in('department', allowedDepartments);
-
-        if (!allowedError && allowedTasks) {
-          const allowedTaskIds = allowedTasks.map(t => t.task_id);
-          if (allowedTaskIds.length > 0) {
-            query = query.in('task_id', allowedTaskIds);
-          } else {
-            // If no tasks in these departments, return empty
-            return [];
-          }
-        }
-      }
-    }
 
     const { data: doneData, error } = await query;
 
@@ -315,43 +285,16 @@ export const fetchDelegation_DoneDataSortByDate = async () => {
       return [];
     }
 
-    // Fetch related delegation records to get all task details
-    if (!doneData || doneData.length === 0) {
-      return [];
-    }
+    const formattedData = (doneData || []).map(item => ({
+      ...item,
+      id: item.task_id
+    }));
 
-    const taskIds = doneData.map(d => d.task_id).filter(id => id);
-
-    let delegationData = [];
-    if (taskIds.length > 0) {
-      const { data: delData, error: delError } = await supabase
-        .from('delegation')
-        .select('*') // Fetch all fields from delegation table
-        .in('task_id', taskIds);
-
-      if (delError) {
-        console.log("Error fetching delegation details:", delError);
-      } else {
-        delegationData = delData || [];
-      }
-    }
-
-    // Merge all delegation fields with delegation_done records
-    const mergedData = doneData.map(doneItem => {
-      const delegationItem = delegationData.find(d => d.task_id === doneItem.task_id);
-      return {
-        ...delegationItem,  // All fields from delegation table (name, department, task_description, etc.)
-        ...doneItem,        // Fields from delegation_done (status, created_at, image_url, etc.)
-        id: doneItem.task_id,
-        admin_done: delegationItem?.admin_done || false
-      };
-    });
-
-    console.log("Fetched delegation history with full details:", mergedData);
-    return mergedData;
+    console.log("Fetched delegation history:", formattedData);
+    return formattedData;
 
   } catch (error) {
-    console.log("Error from Supabase", error);
+    console.log("Error from Supabase fetchDelegation_DoneDataSortByDate", error);
     return [];
   }
 };
@@ -365,7 +308,7 @@ export const updateDelegationDoneStatus = createAsyncThunk(
       // Update delegation_done admin_done status
       const { data: doneData, error: doneError } = await supabase
         .from('delegation_done')
-        .update({ status: 'done' })
+        .update({ status: 'done', admin_done: true })
         .eq('id', id)
         .select()
         .maybeSingle();
@@ -376,7 +319,7 @@ export const updateDelegationDoneStatus = createAsyncThunk(
       if (taskId) {
         const { error: mainError } = await supabase
           .from('delegation')
-          .update({ admin_done: true })
+          .update({ admin_done: true, status: 'done' })
           .eq('task_id', taskId);
 
         if (mainError) throw mainError;

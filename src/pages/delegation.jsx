@@ -287,23 +287,7 @@ function DelegationDataPage() {
     setDateFilter("all");
   }, []);
 
-  const getRowColor = useCallback((colorCode) => {
-    if (!colorCode) return "bg-white";
 
-    const code = colorCode.toString().toLowerCase();
-    switch (code) {
-      case "red":
-        return "bg-red-50 border-l-4 border-red-400";
-      case "yellow":
-        return "bg-yellow-50 border-l-4 border-yellow-400";
-      case "green":
-        return "bg-green-50 border-l-4 border-green-400";
-      case "blue":
-        return "bg-blue-50 border-l-4 border-blue-400";
-      default:
-        return "bg-white";
-    }
-  }, []);
 
   const filteredDelegationTasks = useMemo(() => {
     if (!delegation) return [];
@@ -377,12 +361,6 @@ function DelegationDataPage() {
 
     return delegation_done
       .filter((item) => {
-        const assignedUser = item.name || item.assigned_person || "";
-        const userMatch =
-          userRole === "admin" ||
-          (assignedUser && assignedUser.toLowerCase() === (username || "").toLowerCase());
-        if (!userMatch) return false;
-
         const matchesSearch = debouncedSearchTerm
           ? Object.values(item).some(
             (value) =>
@@ -432,8 +410,7 @@ function DelegationDataPage() {
     debouncedSearchTerm,
     startDate,
     endDate,
-    userRole,
-    username,
+    endDate,
   ]);
 
   const handlePageChange = useCallback((page) => {
@@ -570,11 +547,11 @@ function DelegationDataPage() {
       const checked = e.target.checked;
 
       if (checked) {
-        const allIds = delegation.map((item) => item.id);
-        setSelectedItems(new Set(allIds));
+        const visibleIds = paginatedTasks.map((item) => item.id);
+        setSelectedItems(new Set(visibleIds));
 
         const newStatusData = {};
-        allIds.forEach((id) => {
+        visibleIds.forEach((id) => {
           newStatusData[id] = "Done";
         });
         setStatusData((prev) => ({ ...prev, ...newStatusData }));
@@ -1072,16 +1049,7 @@ function DelegationDataPage() {
                             </div>
                           </td>
                           <td className="px-3 sm:px-6 py-2 sm:py-4 min-w-[200px] max-w-[300px]">
-                            <div
-                              className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words leading-relaxed"
-                              title={history.task_description}
-                            >
-                              {isAudioUrl(history.task_description) ? (
-                                <AudioPlayer url={history.task_description} />
-                              ) : (
-                                history.task_description || "—"
-                              )}
-                            </div>
+                            <RenderDescription text={history.task_description} />
                           </td>
                           <td className="px-3 sm:px-6 py-2 sm:py-4">
                             <div className="text-xs sm:text-sm font-medium text-gray-900 whitespace-normal break-words">
@@ -1091,18 +1059,23 @@ function DelegationDataPage() {
                           </td>
                           <td className="px-3 sm:px-6 py-2 sm:py-4">
                             <span
-                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full whitespace-normal ${history.status?.toLowerCase() === "done"
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${history.status === "done"
                                 ? (history.admin_done ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800")
-                                : history.status === "pending_approval"
-                                  ? "bg-orange-100 text-orange-800"
+                                : history.status === "rejected"
+                                  ? "bg-red-100 text-red-800"
                                   : history.status === "extend"
                                     ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-gray-100 text-gray-800"
+                                    : history.status === "pending"
+                                      ? "bg-orange-100 text-orange-800"
+                                      : "bg-gray-100 text-gray-800"
                                 }`}
                             >
-                              {history.status?.toLowerCase() === "done"
+                              {history.status === "done"
                                 ? (history.admin_done ? "Approved" : "Pending Approval")
-                                : (history.status === "pending_approval" ? "Pending Approval" : (history.status || "—"))}
+                                : (history.status === "pending" ? "Pending Approval" :
+                                  history.status === "rejected" ? "Rejected" :
+                                    history.status === "extend" ? "Extended" :
+                                      (history.status || "—"))}
                             </span>
                           </td>
                           <td className="px-3 sm:px-6 py-2 sm:py-4">
@@ -1193,21 +1166,18 @@ function DelegationDataPage() {
                                 : "bg-gray-100 text-gray-800"
                             }`}
                         >
-                          {history.status?.toLowerCase() === "done"
+                          {history.status === "done"
                             ? (history.admin_done ? "Approved" : "Pending Approval")
-                            : (history.status === "pending_approval" ? "Pending Approval" : (history.status || "—"))}
+                            : (history.status === "pending" ? "Pending Approval" :
+                              history.status === "rejected" ? "Rejected" :
+                                history.status === "extend" ? "Extended" :
+                                  (history.status || "—"))}
                         </span>
                       </div>
                       <div className="p-4 space-y-3">
                         <div className="space-y-1">
                           <p className="text-[10px] text-gray-400 uppercase font-semibold">Task</p>
-                          <div className="text-sm text-gray-800">
-                            {isAudioUrl(history.task_description) ? (
-                              <AudioPlayer url={history.task_description} />
-                            ) : (
-                              history.task_description || "—"
-                            )}
-                          </div>
+                          <RenderDescription text={history.task_description} />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-1">
@@ -1261,8 +1231,8 @@ function DelegationDataPage() {
                           type="checkbox"
                           className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                           checked={
-                            filteredDelegationTasks.length > 0 &&
-                            selectedItems.size === filteredDelegationTasks.length
+                            paginatedTasks.length > 0 &&
+                            paginatedTasks.every(t => selectedItems.has(t.id))
                           }
                           onChange={handleSelectAllItems}
                         />
@@ -1304,15 +1274,12 @@ function DelegationDataPage() {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {paginatedTasks.length > 0 ? (
-                      paginatedTasks.map((account, index) => {
-                        const isSelected = selectedItems.has(account.id);
-                        const rowColorClass = getRowColor(account.color_code_for);
-                        const sequenceNumber = index + 1;
+                      paginatedTasks.map((task, index) => {
+                        const isSelected = selectedItems.has(task.id);
                         return (
                           <tr
                             key={index}
-                            className={`${isSelected ? "bg-purple-50" : ""
-                              } hover:bg-gray-50 ${rowColorClass}`}
+                            className={`${isSelected ? "bg-purple-50" : ""} hover:bg-gray-50`}
                           >
                             <td className="px-2 sm:px-6 py-2 sm:py-4">
                               <input
@@ -1320,60 +1287,60 @@ function DelegationDataPage() {
                                 className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                                 checked={isSelected}
                                 onChange={(e) =>
-                                  handleCheckboxClick(e, account.id)
+                                  handleCheckboxClick(e, task.id)
                                 }
                               />
                             </td>
                             <td className="px-2 sm:px-6 py-2 sm:py-4">
                               <div className="text-[10px] font-bold">
-                                <span className={`px-2 py-0.5 rounded-full ${account.timeStatus === "Overdue" ? "bg-red-100 text-red-700" :
-                                  account.timeStatus === "Today" ? "bg-amber-100 text-amber-700" :
-                                    account.timeStatus === "Upcoming" ? "bg-blue-100 text-blue-700" :
+                                <span className={`px-2 py-0.5 rounded-full ${task.timeStatus === "Overdue" ? "bg-red-100 text-red-700" :
+                                  task.timeStatus === "Today" ? "bg-amber-100 text-amber-700" :
+                                    task.timeStatus === "Upcoming" ? "bg-blue-100 text-blue-700" :
                                       "bg-gray-100 text-gray-700"
                                   }`}>
-                                  {account.timeStatus}
+                                  {task.timeStatus}
                                 </span>
                               </div>
                             </td>
                             <td className="px-2 sm:px-6 py-2 sm:py-4">
                               <div className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words">
-                                {account.id || "—"}
+                                {task.id || "—"}
                               </div>
                             </td>
                             <td className="px-2 sm:px-6 py-2 sm:py-4 min-w-[200px] max-w-[300px]">
                               <div
                                 className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words leading-relaxed"
                               >
-                                <RenderDescription text={account.task_description} audioUrl={account.audio_url} />
+                                <RenderDescription text={task.task_description} audioUrl={task.audio_url} />
                               </div>
                             </td>
                             <td className="px-2 sm:px-6 py-2 sm:py-4">
                               <div className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words">
-                                {account.department || "—"}
+                                {task.department || "—"}
                               </div>
                             </td>
                             <td className="px-2 sm:px-6 py-2 sm:py-4">
                               <div className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words">
-                                {account.given_by || "—"}
+                                {task.given_by || "—"}
                               </div>
                             </td>
                             <td className="px-2 sm:px-6 py-2 sm:py-4">
                               <div className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words">
-                                {account.name || "—"}
+                                {task.name || "—"}
                               </div>
                             </td>
                             <td className="px-2 sm:px-6 py-2 sm:py-4 bg-green-50">
                               <div className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words">
-                                {formatDateTimeForDisplay(account.planned_date)}
+                                {formatDateTimeForDisplay(task.planned_date)}
                               </div>
                             </td>
                             <td className="px-2 sm:px-6 py-2 sm:py-4 bg-blue-50">
                               <select
                                 disabled={!isSelected}
-                                value={statusData[account.id] || ""}
+                                value={statusData[task.id] || ""}
                                 onChange={(e) =>
                                   handleStatusChange(
-                                    account.id,
+                                    task.id,
                                     e.target.value
                                   )
                                 }
@@ -1389,12 +1356,12 @@ function DelegationDataPage() {
                                 type="date"
                                 disabled={
                                   !isSelected ||
-                                  statusData[account.id] !== "Extend date"
+                                  statusData[task.id] !== "Extend date"
                                 }
-                                value={nextTargetDate[account.id] || ""}
+                                value={nextTargetDate[task.id] || ""}
                                 onChange={(e) => {
                                   handleNextTargetDateChange(
-                                    account.id,
+                                    task.id,
                                     e.target.value
                                   );
                                 }}
@@ -1405,82 +1372,73 @@ function DelegationDataPage() {
                               <textarea
                                 placeholder="Enter remarks"
                                 disabled={!isSelected}
-                                value={remarksData[account.id] || ""}
+                                value={remarksData[task.id] || ""}
                                 onChange={(e) =>
                                   setRemarksData((prev) => ({
                                     ...prev,
-                                    [account.id]: e.target.value,
+                                    [task.id]: e.target.value,
                                   }))
                                 }
-                                className="border rounded-md px-2 py-1 w-full border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed text-xs sm:text-sm resize-none whitespace-normal"
-                                rows="2"
+                                className="border border-gray-300 rounded-md px-3 py-2 w-full h-8 sm:h-auto min-h-[32px] sm:min-h-[64px] disabled:bg-gray-100 disabled:cursor-not-allowed text-xs sm:text-sm resize-none"
                               />
                             </td>
                             <td className="px-2 sm:px-6 py-2 sm:py-4 bg-orange-50">
-                              {uploadedImages[account.id] ? (
-                                <div className="flex items-center">
-                                  <img
-                                    src={URL.createObjectURL(
-                                      uploadedImages[account.id]
-                                    )}
-                                    alt="Receipt"
-                                    className="h-8 w-8 sm:h-10 sm:w-10 object-cover rounded-md mr-2 flex-shrink-0"
-                                  />
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="text-xs text-gray-500 whitespace-normal break-words">
-                                      {uploadedImages[account.id].name}
-                                    </span>
-                                    <span className="text-xs text-green-600">
-                                      Ready
-                                    </span>
-                                  </div>
+                              {uploadedImages[task.id] ? (
+                                <div className="flex items-center space-x-2 p-1 bg-green-50 rounded border border-green-200">
+                                  <span className="text-[10px] text-green-700 truncate max-w-[80px]">
+                                    {uploadedImages[task.id].name}
+                                  </span>
+                                  <button
+                                    onClick={() =>
+                                      setUploadedImages((prev) => {
+                                        const newState = { ...prev };
+                                        delete newState[task.id];
+                                        return newState;
+                                      })
+                                    }
+                                    className="text-red-500 hover:text-red-700"
+                                  >
+                                    <X size={14} />
+                                  </button>
                                 </div>
-                              ) : account.image ? (
-                                <div className="flex items-center">
+                              ) : task.image ? (
+                                <div className="flex items-center space-x-2">
                                   <img
-                                    src={account.image}
-                                    alt="Receipt"
-                                    className="h-8 w-8 sm:h-10 sm:w-10 object-cover rounded-md mr-2 flex-shrink-0"
+                                    src={task.image}
+                                    className="w-8 h-8 rounded object-cover border"
+                                    alt="preview"
                                   />
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="text-xs text-gray-500 whitespace-normal break-words">
-                                      Uploaded
-                                    </span>
-                                    <button
-                                      className="text-xs text-purple-600 hover:text-purple-800"
-                                      onClick={() =>
-                                        window.open(account.image, "_blank")
-                                      }
-                                    >
-                                      View
-                                    </button>
-                                  </div>
+                                  <button
+                                    onClick={() =>
+                                      window.open(task.image, "_blank")
+                                    }
+                                    className="text-purple-600 text-xs font-bold underline"
+                                  >
+                                    View
+                                  </button>
                                 </div>
                               ) : (
-                                <label
-                                  htmlFor={`file-upload-${account.id}`}
-                                  className={`flex items-center cursor-pointer ${account.require_attachment?.toUpperCase() ===
-                                    "YES"
-                                    ? "text-red-600 font-medium"
-                                    : "text-purple-600"
-                                    } hover:text-purple-800`}
-                                >
-                                  <Upload className="h-4 w-4 mr-1 flex-shrink-0" />
-                                  <span className="text-xs whitespace-normal break-words">
-                                    {account.require_attachment?.toUpperCase() ===
-                                      "YES"
-                                      ? "Required*"
-                                      : "Upload"}
-                                  </span>
+                                <label className="cursor-pointer group">
+                                  <div className={`flex items-center justify-center p-2 rounded-lg border-2 border-dashed transition-all ${isSelected ? "border-purple-300 group-hover:border-purple-500 bg-purple-50" : "border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed"}`}>
+                                    <Upload
+                                      size={18}
+                                      className={isSelected ? "text-purple-500" : "text-gray-400"}
+                                    />
+                                    {task.require_attachment?.toUpperCase() ===
+                                      "YES" && (
+                                        <span className="ml-1 text-[10px] text-red-500 font-bold">
+                                          *
+                                        </span>
+                                      )}
+                                  </div>
                                   <input
                                     type="file"
                                     className="hidden"
                                     accept="image/*"
-                                    onChange={(e) =>
-                                      handleImageUpload(account.id, e)
-                                    }
                                     disabled={!isSelected}
-                                    id={`file-upload-${account.id}`}
+                                    onChange={(e) =>
+                                      handleImageUpload(task.id, e)
+                                    }
                                   />
                                 </label>
                               )}
@@ -1507,52 +1465,51 @@ function DelegationDataPage() {
               {/* Mobile Regular Task Cards */}
               <div className="md:hidden space-y-4 p-4 bg-gray-50/50">
                 {paginatedTasks.length > 0 ? (
-                  paginatedTasks.map((account, index) => {
-                    const isSelected = selectedItems.has(account.id);
-                    const rowColorClass = getRowColor(account.color_code_for);
+                  paginatedTasks.map((task, index) => {
+                    const isSelected = selectedItems.has(task.id);
                     return (
-                      <div key={index} className={`bg-white rounded-xl border border-purple-100 shadow-sm overflow-hidden ${isSelected ? "ring-2 ring-purple-400" : ""} ${rowColorClass}`}>
+                      <div key={index} className={`bg-white rounded-xl border border-purple-100 shadow-sm overflow-hidden ${isSelected ? "ring-2 ring-purple-400" : ""}`}>
                         <div className="bg-purple-50/50 px-4 py-3 border-b border-purple-100 flex justify-between items-center">
                           <div className="flex items-center gap-3">
                             <input
                               type="checkbox"
                               className="h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                               checked={isSelected}
-                              onChange={(e) => handleCheckboxClick(e, account.id)}
+                              onChange={(e) => handleCheckboxClick(e, task.id)}
                             />
-                            <span className="text-xs font-bold text-purple-800 uppercase tracking-wider">#{account.id}</span>
+                            <span className="text-xs font-bold text-purple-800 uppercase tracking-wider">#{task.id}</span>
                           </div>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${account.timeStatus === "Overdue" ? "bg-red-100 text-red-700" :
-                            account.timeStatus === "Today" ? "bg-amber-100 text-amber-700" :
-                              account.timeStatus === "Upcoming" ? "bg-blue-100 text-blue-700" :
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${task.timeStatus === "Overdue" ? "bg-red-100 text-red-700" :
+                            task.timeStatus === "Today" ? "bg-amber-100 text-amber-700" :
+                              task.timeStatus === "Upcoming" ? "bg-blue-100 text-blue-700" :
                                 "bg-gray-100 text-gray-700"
                             }`}>
-                            {account.timeStatus}
+                            {task.timeStatus}
                           </span>
                         </div>
                         <div className="p-4 space-y-4">
                           <div className="space-y-1">
                             <p className="text-[10px] text-gray-400 uppercase font-semibold">Description</p>
                             <div className="text-sm text-gray-800">
-                              <RenderDescription text={account.task_description} audioUrl={account.audio_url} />
+                              <RenderDescription text={task.task_description} audioUrl={task.audio_url} />
                             </div>
                           </div>
 
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
                               <p className="text-[10px] text-gray-400 uppercase font-semibold">Department</p>
-                              <p className="text-xs font-bold text-gray-700">{account.department || "—"}</p>
+                              <p className="text-xs font-bold text-gray-700">{task.department || "—"}</p>
                             </div>
                             <div className="space-y-1">
                               <p className="text-[10px] text-gray-400 uppercase font-semibold">Given By</p>
-                              <p className="text-xs font-bold text-gray-700">{account.given_by || "—"}</p>
+                              <p className="text-xs font-bold text-gray-700">{task.given_by || "—"}</p>
                             </div>
                           </div>
 
                           <div className="pt-2 border-t border-gray-50">
                             <div className="space-y-1">
                               <p className="text-[10px] text-green-500 uppercase font-semibold">Planned Date</p>
-                              <p className="text-xs font-black text-gray-900">{formatDateTimeForDisplay(account.planned_date)}</p>
+                              <p className="text-xs font-black text-gray-900">{formatDateTimeForDisplay(task.planned_date)}</p>
                             </div>
                           </div>
 
@@ -1562,8 +1519,8 @@ function DelegationDataPage() {
                                 <p className="text-[10px] text-gray-400 uppercase font-semibold">Status</p>
                                 <select
                                   disabled={!isSelected}
-                                  value={statusData[account.id] || ""}
-                                  onChange={(e) => handleStatusChange(account.id, e.target.value)}
+                                  value={statusData[task.id] || ""}
+                                  onChange={(e) => handleStatusChange(task.id, e.target.value)}
                                   className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:ring-purple-400"
                                 >
                                   <option value="">Select</option>
@@ -1575,9 +1532,9 @@ function DelegationDataPage() {
                                 <p className="text-[10px] text-gray-400 uppercase font-semibold">Next Target</p>
                                 <input
                                   type="date"
-                                  disabled={!isSelected || statusData[account.id] !== "Extend date"}
-                                  value={nextTargetDate[account.id] || ""}
-                                  onChange={(e) => handleNextTargetDateChange(account.id, e.target.value)}
+                                  disabled={!isSelected || statusData[task.id] !== "Extend date"}
+                                  value={nextTargetDate[task.id] || ""}
+                                  onChange={(e) => handleNextTargetDateChange(task.id, e.target.value)}
                                   className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs disabled:bg-gray-50"
                                 />
                               </div>
@@ -1588,8 +1545,8 @@ function DelegationDataPage() {
                               <textarea
                                 placeholder="Enter remarks"
                                 disabled={!isSelected}
-                                value={remarksData[account.id] || ""}
-                                onChange={(e) => setRemarksData((prev) => ({ ...prev, [account.id]: e.target.value }))}
+                                value={remarksData[task.id] || ""}
+                                onChange={(e) => setRemarksData((prev) => ({ ...prev, [task.id]: e.target.value }))}
                                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-purple-400 resize-none"
                                 rows="2"
                               />
@@ -1597,23 +1554,23 @@ function DelegationDataPage() {
 
                             <div className="space-y-1">
                               <p className="text-[10px] text-gray-400 uppercase font-semibold">Attachment</p>
-                              {uploadedImages[account.id] ? (
+                              {uploadedImages[task.id] ? (
                                 <div className="flex items-center gap-2 p-2 bg-green-50 rounded border border-green-100">
                                   <Upload className="h-4 w-4 text-green-600" />
-                                  <span className="text-[10px] text-green-700 font-bold truncate flex-1">{uploadedImages[account.id].name}</span>
-                                  <button onClick={() => setUploadedImages(prev => { const next = { ...prev }; delete next[account.id]; return next; })} className="text-red-400"><X size={14} /></button>
+                                  <span className="text-[10px] text-green-700 font-bold truncate flex-1">{uploadedImages[task.id].name}</span>
+                                  <button onClick={() => setUploadedImages(prev => { const next = { ...prev }; delete next[task.id]; return next; })} className="text-red-400"><X size={14} /></button>
                                 </div>
-                              ) : account.image ? (
+                              ) : task.image ? (
                                 <div className="flex items-center gap-2 p-2 bg-purple-50 rounded border border-purple-100">
-                                  <img src={account.image} className="w-8 h-8 rounded object-cover" alt="preview" />
+                                  <img src={task.image} className="w-8 h-8 rounded object-cover" alt="preview" />
                                   <span className="text-[10px] text-purple-700 font-bold">Uploaded</span>
-                                  <button onClick={() => window.open(account.image, "_blank")} className="ml-auto text-purple-600 text-[10px] font-bold">View</button>
+                                  <button onClick={() => window.open(task.image, "_blank")} className="ml-auto text-purple-600 text-[10px] font-bold">View</button>
                                 </div>
                               ) : (
                                 <label className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-xl transition-all ${isSelected ? "border-purple-200 bg-purple-50 text-purple-600" : "border-gray-100 bg-gray-50 text-gray-300"}`}>
                                   <Upload size={16} />
-                                  <span className="text-xs font-bold">{account.require_attachment?.toUpperCase() === "YES" ? "Required*" : "Upload"}</span>
-                                  <input type="file" className="hidden" accept="image/*" disabled={!isSelected} onChange={(e) => handleImageUpload(account.id, e)} />
+                                  <span className="text-xs font-bold">{task.require_attachment?.toUpperCase() === "YES" ? "Required*" : "Upload"}</span>
+                                  <input type="file" className="hidden" accept="image/*" disabled={!isSelected} onChange={(e) => handleImageUpload(task.id, e)} />
                                 </label>
                               )}
                             </div>
