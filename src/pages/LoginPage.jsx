@@ -18,6 +18,7 @@ const LoginPage = () => {
 
   const [isLoginLoading, setIsLoginLoading] = useState(false)
   const [formData, setFormData] = useState({
+    username: "",
     password: "",
   })
 

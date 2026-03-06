@@ -26,6 +26,7 @@ import AllTasks from "./pages/admin/AllTasks"
 import HolidayListPage from "./pages/admin/HolidayListPage"         // New
 import WorkingDayCalendarPage from "./pages/admin/WorkingDayCalendarPage" // New
 import AdminApprovalPage from "./pages/admin/AdminApprovalPage" // New
+import TaskRecovery from "./pages/admin/TaskRecovery" // Temporary Recovery Tool
 
 // --- Components ---
 import RealtimeLogoutListener from "./components/RealtimeLogoutListener"
@@ -227,6 +228,15 @@ function App() {
                         element={
                             <ProtectedRoute allowedRoles={["admin"]}>
                                 <MisReport />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    <Route
+                        path="/dashboard/fix-my-blunder"
+                        element={
+                            <ProtectedRoute allowedRoles={["admin"]}>
+                                <TaskRecovery />
                             </ProtectedRoute>
                         }
                     />

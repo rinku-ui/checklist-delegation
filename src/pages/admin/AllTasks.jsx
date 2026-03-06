@@ -91,6 +91,7 @@ const AllTasks = () => {
   const [dateFilter, setDateFilter] = useState("all"); // all, today, overdue, upcoming
   const [dropdownOpen, setDropdownOpen] = useState({ dateFilter: false });
   const [lightboxImage, setLightboxImage] = useState(null); // { url, name }
+  const [fetchingProgress, setFetchingProgress] = useState(0);
 
   // Repair Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -116,19 +117,22 @@ const AllTasks = () => {
   // Use planned_date for checklist/delegation sort — task_start_date is same for all occurrences of a recurring task
   const sortDateColumn = activeTab === "repair" ? "created_at" : "planned_date";
   const [holidaysList, setHolidaysList] = useState([]);
+  const [workingDaysList, setWorkingDaysList] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
 
   // Fetch holidays and users on mount
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [holidaysRes, usersRes] = await Promise.all([
+        const [holidaysRes, usersRes, workingDaysRes] = await Promise.all([
           supabase.from('holidays').select('holiday_date'),
-          supabase.from('users').select('user_name').eq('status', 'active').order('user_name', { ascending: true })
+          supabase.from('users').select('user_name').eq('status', 'active').order('user_name', { ascending: true }),
+          supabase.from('working_day_calender').select('working_date')
         ]);
 
         if (holidaysRes.data) setHolidaysList(holidaysRes.data.map(h => h.holiday_date));
         if (usersRes.data) setAllUsers(usersRes.data.map(u => u.user_name));
+        if (workingDaysRes.data) setWorkingDaysList(workingDaysRes.data.map(w => w.working_date));
       } catch (err) {
         console.error("Error fetching initial data:", err);
       }
@@ -400,47 +404,78 @@ const AllTasks = () => {
 
       setTableHeaders(showHistory ? headers.filter(h => h.id !== "time_status") : headers);
 
-      let query = supabase.from(tableName).select("*");
+      setFetchingProgress(0);
+      let allFetchedData = [];
+      let page = 0;
+      const CHUNK_SIZE = 1000;
+      let hasMore = true;
 
-      if (userRole !== "admin") {
-        query = query.eq(nameField, username);
-      }
+      while (hasMore) {
+        let query = supabase.from(tableName).select("*");
 
-      if (showHistory) {
-        if (activeTab === "repair") {
-          // Use status until admin_done column is added
-          query = query.not("submission_date", "is", null).order("submission_date", { ascending: false });
-        } else if (activeTab === "ea") {
-          // Fetch historical records from ea_tasks_done for EA
-          query = supabase.from("ea_tasks_done").select("*").order("created_at", { ascending: false });
-        } else {
-          query = query.not(completionField, "is", null).order(completionField, { ascending: false });
+        if (userRole !== "admin") {
+          query = query.eq(nameField, username);
         }
-      } else {
-        if (activeTab === "repair") {
-          // Revert to submission_date logic until admin_done is added to avoid 400 error
-          query = query.is("submission_date", null).order(dateColumn, { ascending: false });
-        } else if (activeTab === "ea") {
-          query = query.in("status", ["pending", "extend", "extended"]).order("task_start_date", { ascending: true });
-        } else if (activeTab === "checklist" || activeTab === "delegation" || activeTab === "maintenance") {
-          // Fetch ALL pending tasks (no DB date restriction).
-          // Smart dedup in filteredPendingTasks handles upcoming dedup:
-          //   Overdue/Today → show all occurrences per day
-          //   Upcoming      → show only NEXT occurrence per task series
-          // Sorted ascending: oldest overdue first → today → next upcoming
-          query = query
-            .is(completionField, null)
-            .order('planned_date', { ascending: true });
+
+        if (showHistory) {
+          if (activeTab === "repair") {
+            query = query.not("submission_date", "is", null).order("submission_date", { ascending: false });
+          } else if (activeTab === "ea") {
+            query = supabase.from("ea_tasks_done").select("*").order("created_at", { ascending: false });
+          } else {
+            query = query.not(completionField, "is", null).order(completionField, { ascending: false });
+          }
+        } else {
+          if (activeTab === "repair") {
+            query = query.is("submission_date", null).order(dateColumn, { ascending: false });
+          } else if (activeTab === "ea") {
+            query = query.in("status", ["pending", "extend", "extended"]).order("task_start_date", { ascending: true });
+          } else if (activeTab === "checklist" || activeTab === "delegation" || activeTab === "maintenance") {
+            // Fetch ALL pending tasks (no DB date restriction).
+            // Smart dedup in filteredPendingTasks handles upcoming dedup:
+            //   Overdue/Today → show all occurrences per day
+            //   Upcoming      → show only NEXT occurrence per task series
+            // Sorted ascending: oldest overdue first → today → next upcoming
+            query = query
+              .is(completionField, null)
+              .order('planned_date', { ascending: true });
+          }
+        }
+
+        // Apply pagination for the fetch
+        const { data, error: fetchError } = await query.range(page * CHUNK_SIZE, (page + 1) * CHUNK_SIZE - 1);
+
+        if (fetchError) throw fetchError;
+
+        if (data && data.length > 0) {
+          allFetchedData = [...allFetchedData, ...data];
+          page++;
+          setFetchingProgress(allFetchedData.length);
+
+          if (data.length < CHUNK_SIZE || allFetchedData.length >= 20000) {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
         }
       }
       // END of pending tasks block (else for if showHistory)
 
-      const { data, error: fetchError } = await query;
-      if (fetchError) throw fetchError;
+      if (allFetchedData.length > 0) {
+        // Filter out tasks that fall on holidays or non-working days (respect the updated calendar)
+        const filteredData = allFetchedData.filter(item => {
+          if (activeTab === "repair") return true; // Repairs are reactive, ignore calendar
 
-      if (data) {
-        // Map task_id to id for consistency if id doesn't exist
-        const mappedData = data.map(item => ({
+          const taskDate = (item.planned_date || item.task_start_date || item.created_at)?.split('T')[0];
+          if (!taskDate) return true;
+
+          const isHoliday = holidaysList.includes(taskDate);
+          const isWorkingDay = workingDaysList.includes(taskDate);
+
+          return !isHoliday && isWorkingDay;
+        });
+
+        const mappedData = filteredData.map(item => ({
           ...item,
           id: item.id || item.task_id,
           _table: item._table || tableName,
@@ -459,7 +494,7 @@ const AllTasks = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [username, userRole, activeTab, showHistory]);
+  }, [username, userRole, activeTab, showHistory, holidaysList, workingDaysList, searchTerm, dateFilter]);
 
   useEffect(() => {
     fetchData();
@@ -929,62 +964,6 @@ const AllTasks = () => {
           if (updateError) throw updateError;
         }
 
-        // --- Handle Recurring Task Regeneration ---
-        const originalTask = tasks.find(t => (t.task_id || t.id) === id);
-        const frequency = (originalTask?.frequency || originalTask?.freq || "").toLowerCase();
-
-        if (originalTask && frequency && frequency !== "one-time" && frequency !== "no") {
-          try {
-            // KEY FIX: Calculate next occurrence from planned_date (current specific occurrence date)
-            // NOT task_start_date (original admin start date, same for all occurrences — would always generate same next date)
-            const currentOccurrenceDate = originalTask.planned_date || originalTask.task_start_date || new Date();
-            const nextDate = calculateNextDueDate(currentOccurrenceDate, frequency);
-            if (nextDate) {
-              // Construct new task object based on table type
-              let newTask = {};
-
-              if (activeTab === "checklist") {
-                newTask = {
-                  department: originalTask.department,
-                  given_by: originalTask.given_by,
-                  name: originalTask.name,
-                  task_description: originalTask.task_description,
-                  audio_url: originalTask.audio_url || null,
-                  // Both task_start_date and planned_date are set to the next occurrence date
-                  task_start_date: nextDate,
-                  planned_date: nextDate,
-                  frequency: originalTask.frequency,
-                  enable_reminder: originalTask.enable_reminder,
-                  require_attachment: originalTask.require_attachment,
-                  status: null // null = pending (matches schema default)
-                };
-              } else if (activeTab === "maintenance") {
-                newTask = {
-                  machine_name: originalTask.machine_name,
-                  given_by: originalTask.given_by,
-                  name: originalTask.name,
-                  task_description: originalTask.task_description,
-                  audio_url: originalTask.audio_url || null,
-                  task_start_date: nextDate,
-                  planned_date: nextDate,
-                  freq: originalTask.freq,
-                  enable_reminders: originalTask.enable_reminders,
-                  require_attachment: originalTask.require_attachment,
-                  company_name: originalTask.company_name,
-                  status: null
-                };
-              }
-
-              // Insert the new recurring task
-              if (Object.keys(newTask).length > 0) {
-                const { error: insertError } = await supabase.from(tableName).insert([newTask]);
-                if (insertError) console.error("Error creating next recurring task:", insertError);
-              }
-            }
-          } catch (recurError) {
-            console.error("Failed to generate next recurring task:", recurError);
-          }
-        }
       });
 
       await Promise.all(updatePromises);
@@ -1205,7 +1184,10 @@ const AllTasks = () => {
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500 mb-2"></div>
-                <p className="text-purple-600 text-sm">Loading data...</p>
+                <p className="text-purple-600 text-sm font-bold uppercase tracking-wider">Loading data...</p>
+                {fetchingProgress > 0 && (
+                  <p className="text-gray-500 text-[10px] font-bold mt-1 uppercase">Fetched {fetchingProgress.toLocaleString()} Tasks</p>
+                )}
               </div>
             ) : error ? (
               <div className="py-20 text-center">

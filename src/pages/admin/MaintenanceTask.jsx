@@ -584,7 +584,15 @@ export default function MaintenanceTask() {
             let attempts = 0;
             while (current <= endDate && attempts < 1000) {
                 attempts++;
-                if (!isHoliday(current) && isWorkingDay(current)) addEntry(current, task.workDescription);
+
+                // For other frequencies, shift to next working day if current is bad
+                let target = new Date(current);
+                while (isHoliday(target) || !isWorkingDay(target)) {
+                    target.setDate(target.getDate() + 1);
+                }
+
+                addEntry(target, task.workDescription);
+
                 if (freq === 'weekly') current = addDays(current, 7);
                 else if (freq === 'fortnight') current = addDays(current, 14);
                 else if (freq === 'monthly') current.setMonth(current.getMonth() + 1);
@@ -609,11 +617,20 @@ export default function MaintenanceTask() {
                 return;
             }
 
-            // Holiday check for one-time tasks
+            // Holiday & Working Day check for one-time tasks
             if (t.frequency === "one-time") {
-                const dateStr = t.startDate; // Already in YYYY-MM-DD
-                if (holidays.includes(dateStr)) {
-                    showToast(`Task ${i + 1}: The selected date (${dateStr}) is a holiday.`, 'error');
+                const dateStr = t.startDate;
+                const isH = holidays.includes(dateStr);
+
+                // Fetch working day status for this specific date
+                const { data: isW } = await supabase
+                    .from('working_day_calender')
+                    .select('working_date')
+                    .eq('working_date', dateStr)
+                    .single();
+
+                if (isH || !isW) {
+                    showToast(`Task ${i + 1}: The selected date (${dateStr}) is a ${isH ? 'holiday' : 'non-working day'}. Please select a different working day.`, 'error');
                     return;
                 }
             }

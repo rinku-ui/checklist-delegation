@@ -33,6 +33,12 @@ export const LoginCredentialsApi = async (formData) => {
     // Handle error or no data
     if (error) {
       console.error("❌ Login RPC Error Full Object:", error);
+
+      // 🌐 Handle DNS/ISP Blocks specifically for India users (inside the error object)
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('Network Error')) {
+        return { error: 'Connection Failed: Your ISP/DNS might be blocking Supabase (India Region issue). Please try using a VPN or switch to Cloudflare DNS (1.1.1.1).' };
+      }
+
       return { error: `Login Error: ${error.message || 'Invalid credentials'}` };
     }
 
@@ -57,6 +63,10 @@ export const LoginCredentialsApi = async (formData) => {
     return { data: userData };
   } catch (err) {
     console.error("Login Exception:", err);
+    // 🌐 Handle DNS/ISP Blocks specifically for India users
+    if (err.message === 'TypeError: Failed to fetch') {
+      return { error: 'Connection Failed: Your ISP/DNS might be blocking Supabase (India Region issue). Please try using a VPN or switch to Cloudflare DNS (1.1.1.1).' };
+    }
     return { error: 'An unexpected error occurred.' };
   }
 };

@@ -328,7 +328,15 @@ const CalendarPage = () => {
                     type: 'ea',
                     name: t.doer_name || t.name
                 }))
-            ].filter(t => t.date); // Ensure only tasks with a valid date are shown
+            ].filter(t => {
+                if (!t.date) return false;
+                if (t.type === 'repair') return true; // Repairs are reactive, ignore calendar
+
+                const isH = (holidaysRes.data || []).some(h => normalizeDate(h.holiday_date) === t.date);
+                const isW = (workingDaysRes.data || []).some(w => normalizeDate(w.working_date) === t.date);
+
+                return !isH && isW;
+            });
 
             // Sort by ascending date so tasks appear sequentially
             normalizedTasks.sort((a, b) => {

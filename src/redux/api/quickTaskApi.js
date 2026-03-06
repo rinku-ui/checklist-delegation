@@ -130,6 +130,8 @@ export const deleteChecklistTasksApi = async (tasks) => {
       .eq("department", task.department)
       .eq("name", task.name)
       .eq("task_description", task.task_description)
+      .eq("frequency", task.frequency)
+      .eq("given_by", task.given_by)
       .is("submission_date", null);
 
     if (error) throw error;
@@ -145,6 +147,8 @@ export const deleteDelegationTasksApi = async (tasks) => {
       .eq("department", task.department)
       .eq("name", task.name)
       .eq("task_description", task.task_description)
+      .eq("frequency", task.frequency)
+      .eq("given_by", task.given_by)
       .is("submission_date", null);
 
     if (error) throw error;

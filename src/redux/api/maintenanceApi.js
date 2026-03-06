@@ -321,6 +321,8 @@ export const deleteMaintenanceTasksApi = async (tasks) => {
                 .eq("part_area", task.part_area)
                 .eq("task_description", task.task_description)
                 .eq("name", task.name)
+                .eq("freq", task.freq)
+                .eq("given_by", task.given_by)
                 .is("submission_date", null);
 
             if (error) throw error;
