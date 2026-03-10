@@ -182,7 +182,6 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
                             className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm"
                         >
                             <option value="">Select Department</option>
-                            <option value="Checklist">Checklist</option>
                             {department.map((d, i) => (
                                 <option key={i} value={typeof d === 'string' ? d : d.department}>
                                     {typeof d === 'string' ? d : d.department}
@@ -394,7 +393,15 @@ export default function ChecklistTask() {
     }, [dispatch]);
 
     const updateTask = (id, updates) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-    const addTask = () => setTasks(prev => [...prev, defaultTask()]);
+    const addTask = () => setTasks(prev => {
+        const lastTask = prev[prev.length - 1];
+        return [...prev, {
+            ...defaultTask(),
+            department: lastTask?.department || "",
+            givenBy: lastTask?.givenBy || "",
+            doer: lastTask?.doer || ""
+        }];
+    });
     const removeTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
 
     const freqMap = {

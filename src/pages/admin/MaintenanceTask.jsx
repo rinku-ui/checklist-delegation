@@ -514,7 +514,15 @@ export default function MaintenanceTask() {
     }, [dispatch]);
 
     const updateTask = (id, updates) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-    const addTask = () => setTasks(prev => [...prev, defaultTask()]);
+    const addTask = () => setTasks(prev => {
+        const lastTask = prev[prev.length - 1];
+        return [...prev, {
+            ...defaultTask(),
+            givenBy: lastTask?.givenBy || "",
+            doerDepartment: lastTask?.doerDepartment || "",
+            doerName: lastTask?.doerName || ""
+        }];
+    });
     const removeTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
 
     const getLocalDateString = (date) => {

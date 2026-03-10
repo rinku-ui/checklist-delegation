@@ -342,7 +342,14 @@ export default function EATask() {
     };
 
     const addTask = () => {
-        setTasks(prev => [...prev, defaultTask()]);
+        setTasks(prev => {
+            const lastTask = prev[prev.length - 1];
+            return [...prev, {
+                ...defaultTask(),
+                doer_name: lastTask?.doer_name || DEFAULT_DOER_NAME,
+                phone_number: lastTask?.phone_number || ""
+            }];
+        });
     };
 
     const removeTask = (id) => {

@@ -234,7 +234,14 @@ export default function RepairTask() {
         : ["A", "B", "C", "D", "E", "F", "G", "H", "I", "Atlas compressor", "ELGI Compreser", "Transformers", "65/18 Pipe Extruder", "52/18 Pipe Extruder", "C/c Capping Exturder", "Polveiger machine", "Printer A", "Printer B", "Other"];
 
     const updateTask = (id, updates) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-    const addTask = () => setTasks(prev => [...prev, defaultTask()]);
+    const addTask = () => setTasks(prev => {
+        const lastTask = prev[prev.length - 1];
+        return [...prev, {
+            ...defaultTask(),
+            filledBy: lastTask?.filledBy || "",
+            assignedPerson: lastTask?.assignedPerson || ""
+        }];
+    });
     const removeTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
 
     const handleSubmitAll = async () => {
