@@ -415,8 +415,22 @@ const AllTasks = () => {
 
       let query = supabase.from(tableName).select("*");
 
-      if (userRole !== "admin") {
-        query = query.eq(nameField, username);
+      const isSuperAdmin = username === "admin";
+      if (!isSuperAdmin) {
+        let reportingUsers = [username];
+        if (userRole === "admin" || userRole === "HOD") {
+          const { data: reports } = await supabase
+            .from("users")
+            .select("user_name")
+            .eq("reported_by", username);
+          if (reports && reports.length > 0) {
+            reportingUsers = [username, ...reports.map((r) => r.user_name)];
+          }
+        }
+
+        // Checklist, Maintenance, Repair, EA all have a field for the assigned person
+        // Repair uses assigned_person, EA uses doer_name, others use name
+        query = query.in(nameField, reportingUsers);
       }
 
       if (showHistory) {
@@ -467,7 +481,7 @@ const AllTasks = () => {
           if (!taskDate) return true;
 
           const isHoliday = holidaysList.includes(taskDate);
-          
+
           // Relaxed check for EA tasks: Allow dates even if missing from working calendar
           if (activeTab === "ea") {
             return !isHoliday;
@@ -781,10 +795,40 @@ const AllTasks = () => {
       return;
     }
 
+    // =================================================================
+    // NEW LOGIC: Check for mandatory attachments across all tabs
+    // =================================================================
+    const selectedArray = Array.from(selectedItems);
+
+    for (const id of selectedArray) {
+      // Find the specific task object from your tasks state
+      const task = tasks.find((t) => t.id === id || t.task_id === id);
+
+      if (task) {
+        // Check if the task requires an attachment 
+        // (handling boolean true, or strings like "yes", "Yes", "true")
+        const isAttachmentRequired =
+          task.require_attachment === true ||
+          String(task.require_attachment).toLowerCase() === "yes" ||
+          String(task.require_attachment).toLowerCase() === "true";
+
+        // Check if the user has selected a status of "Done" or "yes"
+        // (You might not want to enforce attachment if they mark it "Not Done", but remove this extra condition if you want it strictly required on ANY submission)
+        const currentStatus = statusData[id] || ((activeTab === "checklist" || activeTab === "delegation") ? "yes" : "Done");
+        const isMarkedDone = ["done", "yes", "completed"].includes(currentStatus.toLowerCase());
+
+        // If attachment is required, status is Done, and NO image is uploaded, block submission
+        if (isAttachmentRequired && isMarkedDone && !uploadedImages[id]) {
+          showToast(`Attachment required! Please upload an image/file for Task #${id} before submitting.`, "error");
+          return; // Instantly stops the submit process
+        }
+      }
+    }
+    // =================================================================
+
     // Validate EA tasks with extended status must have extended date
     // Validate EA tasks with extended status must have extended date AND remarks
     if (activeTab === "ea") {
-      const selectedArray = Array.from(selectedItems);
       for (const id of selectedArray) {
         if (statusData[id] === "extended") {
           if (!extendedDateData[id]) {
@@ -801,6 +845,8 @@ const AllTasks = () => {
 
     setIsSubmitting(true);
     setSuccessMessage("");
+
+    // ... (Keep the rest of your try-catch submission logic unchanged)
 
     try {
       const tableName = activeTab === "checklist" ? "checklist" :
