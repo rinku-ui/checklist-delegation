@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { Users, Calendar, Save, ArrowLeft, Loader2, Mic, Square, Trash2, Plus, CheckCircle2, X, Clock } from "lucide-react";
 import { ReactMediaRecorder } from "react-media-recorder";
+import AudioPlayer from "../../components/AudioPlayer";
 import supabase from "../../SupabaseClient";
 import { useDispatch, useSelector } from "react-redux";
 import { userDetails } from "../../redux/slice/settingSlice";
@@ -285,7 +286,7 @@ function TaskCard({ task, index, total, allDoers, onUpdate, onRemove }) {
                                                 <Trash2 className="w-3 h-3" /> Remove
                                             </button>
                                         </div>
-                                        <audio src={task.recordedAudio.blobUrl} controls className="w-full h-8" />
+                                        <AudioPlayer url={task.recordedAudio.blobUrl} />
                                     </div>
                                 )}
                             </div>

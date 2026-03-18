@@ -1,7 +1,7 @@
-"use client";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2, AlertCircle, X, Edit, Save, Loader2, Play, Pause, Search, Mic, Users, Filter, Check, ChevronDown, ShieldAlert } from 'lucide-react';
+import AudioPlayer from '../../components/AudioPlayer';
 import supabase from '../../SupabaseClient';
 
 const extractAudioUrl = (text) => {
@@ -45,64 +45,6 @@ const normalizeDate = (dateVal) => {
     }
 };
 
-const AudioPlayer = ({ url }) => {
-    const [isPlaying, setIsPlaying] = useState(false);
-    const audioRef = useRef(null);
-
-    const togglePlay = (e) => {
-        if (e) e.stopPropagation();
-        if (isPlaying) {
-            audioRef.current.pause();
-        } else {
-            audioRef.current.play();
-        }
-        setIsPlaying(!isPlaying);
-    };
-
-    useEffect(() => {
-        const audio = audioRef.current;
-        if (!audio) return;
-
-        const handleEnded = () => setIsPlaying(false);
-        audio.addEventListener('ended', handleEnded);
-        return () => audio.removeEventListener('ended', handleEnded);
-    }, []);
-
-    return (
-        <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] mt-2 ${isPlaying
-            ? 'bg-blue-50 border-blue-200 shadow-sm scale-[1.02]'
-            : 'bg-white border-gray-100 hover:border-blue-100 hover:shadow-xs'
-            }`}>
-            <button
-                onClick={togglePlay}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-700'
-                    : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:scale-110'
-                    }`}
-            >
-                {isPlaying ? (
-                    <Pause size={14} className="text-white fill-white" />
-                ) : (
-                    <Play size={14} className="text-white fill-white ml-0.5" />
-                )}
-            </button>
-            <div className="flex flex-col">
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${isPlaying ? 'text-blue-700' : 'text-gray-400'}`}>
-                    {isPlaying ? 'Playing...' : 'Voice Note'}
-                </span>
-                {isPlaying && (
-                    <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
-                        <div className="w-0.5 h-full bg-blue-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
-                        <div className="w-0.5 h-2/3 bg-blue-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
-                        <div className="w-0.5 h-full bg-blue-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
-                        <div className="w-0.5 h-2/3 bg-blue-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
-                    </div>
-                )}
-            </div>
-            <audio ref={audioRef} src={url} className="hidden" />
-        </div>
-    );
-};
 
 const getHindiDay = (day) => {
     const dayMap = {

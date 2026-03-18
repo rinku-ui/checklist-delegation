@@ -415,9 +415,9 @@ const AllTasks = () => {
 
       let query = supabase.from(tableName).select("*");
 
-      const currentUsername = (username || "").toLowerCase();
+      const currentUsername = (username || "");
       const currentUserRole = (userRole || "").toLowerCase();
-      const isSuperAdmin = currentUsername === "admin";
+      const isSuperAdmin = currentUsername.toLowerCase() === "admin";
       
       if (!isSuperAdmin) {
         let reportingUsers = [currentUsername];
@@ -427,7 +427,7 @@ const AllTasks = () => {
             .select("user_name")
             .eq("reported_by", username);
           if (reports && reports.length > 0) {
-            reportingUsers = [currentUsername, ...reports.map((r) => (r.user_name || "").toLowerCase())];
+            reportingUsers = [currentUsername, ...reports.map((r) => (r.user_name || ""))];
           }
         }
 
@@ -485,13 +485,9 @@ const AllTasks = () => {
 
           const isHoliday = holidaysList.includes(taskDate);
 
-          // Relaxed check for EA tasks: Allow dates even if missing from working calendar
-          if (activeTab === "ea") {
-            return !isHoliday;
-          }
-
-          const isWorkingDay = workingDaysList.includes(taskDate);
-          return !isHoliday && isWorkingDay;
+          // Remove strict working day check to align with Dashboard and ensure 
+          // all assigned tasks are visible to doers. 
+          return !isHoliday;
         });
 
         const mappedData = filteredData.map(item => ({

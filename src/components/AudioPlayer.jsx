@@ -3,14 +3,12 @@ import { Play, Pause } from "lucide-react";
 
 /**
  * Shared AudioPlayer component to handle voice notes and other audio recordings.
- * Includes a cache-buster to prevent net::ERR_CACHE_OPERATION_NOT_SUPPORTED errors.
  */
 const AudioPlayer = ({ url, className = "" }) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [hasInteracted, setHasInteracted] = useState(false);
     const audioRef = useRef(null);
 
-    // 🛡️ Add cache-buster to prevent net::ERR_CACHE_OPERATION_NOT_SUPPORTED
     const cacheBustedUrl = useMemo(() => {
         if (!url) return url;
         if (url.startsWith('blob:')) return url;
@@ -23,7 +21,6 @@ const AudioPlayer = ({ url, className = "" }) => {
 
         if (!hasInteracted) {
             setHasInteracted(true);
-            // The audio element won't be in the DOM yet, so we'll handle play in useEffect
             return;
         }
 
@@ -43,7 +40,7 @@ const AudioPlayer = ({ url, className = "" }) => {
             });
             setIsPlaying(true);
         }
-    }, [hasInteracted, isPlaying]);
+    }, [hasInteracted]);
 
     useEffect(() => {
         const audio = audioRef.current;
@@ -65,13 +62,13 @@ const AudioPlayer = ({ url, className = "" }) => {
     }, [hasInteracted]);
 
     return (
-        <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] shadow-sm bg-white border-gray-100 hover:border-indigo-100 hover:shadow-md ${isPlaying ? 'bg-indigo-50/80 border-indigo-200 scale-[1.02]' : ''} ${className}`}>
+        <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-all duration-300 min-w-[140px] shadow-sm bg-white border-gray-100 hover:border-violet-100 hover:shadow-md ${isPlaying ? 'bg-violet-50/80 border-violet-200 scale-[1.02]' : ''} ${className}`}>
             <button
                 type="button"
                 onClick={togglePlay}
                 className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isPlaying
                     ? 'bg-gradient-to-r from-rose-500 to-pink-600'
-                    : 'bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-110'
+                    : 'bg-gradient-to-r from-violet-500 to-fuchsia-600 hover:scale-110 active:scale-95'
                     }`}
             >
                 {isPlaying ? (
@@ -81,15 +78,15 @@ const AudioPlayer = ({ url, className = "" }) => {
                 )}
             </button>
             <div className="flex flex-col">
-                <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-indigo-700' : 'text-gray-400'}`}>
+                <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isPlaying ? 'text-violet-700' : 'text-gray-400'}`}>
                     {isPlaying ? 'Playing...' : 'Voice Note'}
                 </span>
                 {isPlaying && (
                     <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
-                        <div className="w-0.5 h-full bg-indigo-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
-                        <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
-                        <div className="w-0.5 h-full bg-indigo-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
-                        <div className="w-0.5 h-2/3 bg-indigo-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
+                        <div className="w-0.5 h-full bg-violet-400 animate-bounce" style={{ animationDuration: '0.6s' }}></div>
+                        <div className="w-0.5 h-2/3 bg-violet-500 animate-bounce" style={{ animationDuration: '0.8s' }}></div>
+                        <div className="w-0.5 h-full bg-violet-600 animate-bounce" style={{ animationDuration: '0.4s' }}></div>
+                        <div className="w-0.5 h-2/3 bg-violet-500 animate-bounce" style={{ animationDuration: '0.7s' }}></div>
                     </div>
                 )}
             </div>
