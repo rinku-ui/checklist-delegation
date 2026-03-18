@@ -18,7 +18,7 @@ export const fetchDashboardDataApi = async (
 
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-    const role = localStorage.getItem('role');
+    const role = (localStorage.getItem('role') || "").toUpperCase();
     const username = localStorage.getItem('user-name');
     const today = new Date().toISOString().split('T')[0];
 
@@ -33,7 +33,7 @@ export const fetchDashboardDataApi = async (
       .range(from, to);
 
     // Apply role-based filtering first
-    if (role === 'user' && username) {
+    if (role === 'USER' && username) {
       query = query.eq('name', username);
     } else if (role === 'HOD' && username) {
       const { data: reports } = await supabase
@@ -52,7 +52,7 @@ export const fetchDashboardDataApi = async (
 
 
     // Apply staff filter if provided and not "all" (for admin/HOD users)
-    if (staffFilter && staffFilter !== 'all' && (role === 'admin' || role === 'HOD')) {
+    if (staffFilter && staffFilter !== 'all' && (role === 'ADMIN' || role === 'HOD')) {
       query = query.eq('name', staffFilter);
     }
 
@@ -139,7 +139,7 @@ export const fetchDashboardDataApi = async (
 
 export const getDashboardDataCount = async (dashboardType, staffFilter = null, taskView = 'recent', departmentFilter = null) => {
   try {
-    const role = localStorage.getItem('role');
+    const role = (localStorage.getItem('role') || "").toUpperCase();
     const username = localStorage.getItem('user-name');
     const today = new Date().toISOString().split('T')[0];
 
@@ -148,7 +148,7 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = null, t
       .select('*', { count: 'exact', head: true });
 
     // Apply role-based filtering
-    if (role === 'user' && username) {
+    if (role === 'USER' && username) {
       query = query.eq('name', username);
     } else if (role === 'HOD' && username) {
       const { data: reports } = await supabase
@@ -160,7 +160,7 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = null, t
     }
 
     // Apply staff filter
-    if (staffFilter && staffFilter !== 'all' && (role === 'admin' || role === 'HOD')) {
+    if (staffFilter && staffFilter !== 'all' && (role === 'ADMIN' || role === 'HOD')) {
       query = query.eq('name', staffFilter);
     }
 
@@ -309,7 +309,7 @@ export const fetchStaffTasksDataApi = async (dashboardType, staffFilter = null, 
   try {
     console.log('Fetching staff tasks data:', { dashboardType, staffFilter, departmentFilter, page, limit, selectedMonth });
 
-    const role = localStorage.getItem('role');
+    const role = (localStorage.getItem('role') || "").toUpperCase();
     const username = localStorage.getItem('user-name');
 
     // Use selected month or current month as default
@@ -347,12 +347,19 @@ export const fetchStaffTasksDataApi = async (dashboardType, staffFilter = null, 
       .not('name', 'is', null);
 
     // Apply role-based filtering
-    if (role === 'user' && username) {
+    if (role === 'USER' && username) {
       query = query.eq('name', username);
+    } else if (role === 'HOD' && username) {
+      const { data: reports } = await supabase
+        .from("users")
+        .select("user_name")
+        .eq("reported_by", username);
+      const reportingUsers = [username, ...(reports?.map(r => r.user_name) || [])];
+      query = query.in('name', reportingUsers);
     }
 
     // Apply staff filter if provided
-    if (staffFilter && staffFilter !== 'all' && role === 'admin') {
+    if (staffFilter && staffFilter !== 'all' && (role === 'ADMIN' || role === 'HOD')) {
       query = query.eq('name', staffFilter);
     }
 
@@ -480,7 +487,7 @@ export const fetchStaffTasksDataApi = async (dashboardType, staffFilter = null, 
 
 export const getStaffTasksCountApi = async (dashboardType, staffFilter = null, departmentFilter = null, selectedMonth = null) => {
   try {
-    const role = localStorage.getItem('role');
+    const role = (localStorage.getItem('role') || "").toUpperCase();
     const username = localStorage.getItem('user-name');
 
     // Use selected month or current month as default
@@ -507,12 +514,19 @@ export const getStaffTasksCountApi = async (dashboardType, staffFilter = null, d
       .not('name', 'is', null);
 
     // Apply role-based filtering
-    if (role === 'user' && username) {
+    if (role === 'USER' && username) {
       query = query.eq('name', username);
+    } else if (role === 'HOD' && username) {
+      const { data: reports } = await supabase
+        .from("users")
+        .select("user_name")
+        .eq("reported_by", username);
+      const reportingUsers = [username, ...(reports?.map(r => r.user_name) || [])];
+      query = query.in('name', reportingUsers);
     }
 
     // Apply staff filter
-    if (staffFilter && staffFilter !== 'all' && role === 'admin') {
+    if (staffFilter && staffFilter !== 'all' && (role === 'ADMIN' || role === 'HOD')) {
       query = query.eq('name', staffFilter);
     }
 
@@ -560,11 +574,19 @@ export const getCurrentMonthDateRange = () => {
 
 export const getTotalUsersCountApi = async (departmentFilter = null) => {
   try {
+    const role = (localStorage.getItem('role') || "").toUpperCase();
+    const username = localStorage.getItem('user-name');
+
     let query = supabase
       .from('users')
       .select('user_name, department', { count: 'exact', head: true })
       .not('user_name', 'is', null)
       .not('user_name', 'eq', '');
+
+    // Apply role-based filtering
+    if (role === 'HOD' && username) {
+      query = query.or(`reported_by.eq.${username},user_name.eq.${username}`);
+    }
 
     // Apply department filter if provided and not "all"
     if (departmentFilter && departmentFilter !== 'all') {

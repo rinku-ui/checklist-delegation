@@ -105,18 +105,20 @@ export const fetchUniqueDoerNameDataApi = async (department) => {
       return [];
     }
 
-    const role = localStorage.getItem('role');
-    const username = localStorage.getItem('user-name');
+    const role = (localStorage.getItem('role') || "").toUpperCase();
+    const username = (localStorage.getItem('user-name') || "").toLowerCase();
 
     // Filter unique by user_name just in case there are duplicates
     const uniqueUsers = [];
     const seenNames = new Set();
 
     data?.forEach(user => {
-      if (user.user_name && !seenNames.has(user.user_name)) {
+      const uName = (user.user_name || "").toLowerCase();
+      if (uName && !seenNames.has(uName)) {
         // Apply HOD filtering: only show themselves or their reports
         if (role === 'HOD' && username) {
-            if (user.reported_by !== username && user.user_name !== username) {
+            const reportedBy = (user.reported_by || "").toLowerCase();
+            if (reportedBy !== username && uName !== username) {
                 return;
             }
         }
@@ -128,7 +130,7 @@ export const fetchUniqueDoerNameDataApi = async (department) => {
           leave_end_date: user.leave_end_date,
           reported_by: user.reported_by
         });
-        seenNames.add(user.user_name);
+        seenNames.add(uName);
       }
     });
 

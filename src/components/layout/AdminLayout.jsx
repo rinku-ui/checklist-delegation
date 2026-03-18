@@ -57,6 +57,22 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
     const cachedImage = localStorage.getItem("profile_image");
     setProfileImage(cachedImage || "");
 
+      // Fetch reporting users for HOD role check
+      let reportingUsers = [storedUsername?.toLowerCase()];
+      const currentUserRole = (localStorage.getItem("role") || "").toLowerCase();
+      if (currentUserRole === "hod") {
+          const fetchReportingUsers = async () => {
+              const { data: reports } = await supabase
+                  .from("users")
+                  .select("user_name")
+                  .eq("reported_by", storedUsername);
+              if (reports) {
+                  reportingUsers = [storedUsername.toLowerCase(), ...reports.map(r => (r.user_name || "").toLowerCase())];
+              }
+          };
+          fetchReportingUsers();
+      }
+
     // Sync with database to get the latest image
     const syncProfileImage = async () => {
       try {
@@ -83,7 +99,8 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
     console.log("AdminLayout - Profile Image URL (Cached):", cachedImage);
 
     // Check if this is the super admin (username = 'admin')
-    setIsSuperAdmin(storedUsername === "admin");
+    const normalizedUsername = (storedUsername || "").toLowerCase();
+    setIsSuperAdmin(normalizedUsername === "admin");
   }, [navigate]);
 
   // Set initial submenu state based on current location
@@ -120,7 +137,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
       icon: Zap,
       active: location.pathname === "/dashboard/quick-task",
       // Show for super admin OR HOD
-      showFor: (isSuperAdmin || userRole === "HOD") ? ["admin", "HOD"] : [],
+      showFor: (isSuperAdmin || userRole.toLowerCase() === "hod") ? ["admin", "HOD"] : [],
     },
     {
       href: "/dashboard/assign-task",
@@ -209,17 +226,21 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
     
     return routes
       .filter((route) => {
+        const userRoleNormalized = (userRole || "user").toLowerCase();
+        const usernameNormalized = (username || "").toLowerCase();
+        
         // If it's the Setting or Holiday page, only show for super admin (admin username)
         if (route.label === "Settings" || route.label === "Holiday") {
-          return username === "admin";
+          return usernameNormalized === "admin";
         }
-        return route.showFor.includes(userRole);
+        return route.showFor.some(role => role.toLowerCase() === userRoleNormalized);
       })
       .map(route => {
         if (route.subItems) {
+          const userRoleNormalized = (userRole || "user").toLowerCase();
           return {
             ...route,
-            subItems: route.subItems.filter(sub => sub.showFor.includes(userRole))
+            subItems: route.subItems.filter(sub => sub.showFor.some(role => role.toLowerCase() === userRoleNormalized))
           };
         }
         return route;
@@ -330,11 +351,11 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-blue-700 truncate">
                     {username || "User"}{" "}
-                    {userRole === "admin"
+                    {userRole.toLowerCase() === "admin"
                       ? isSuperAdmin
                         ? "(Super Admin)"
                         : "(Admin)"
-                      : userRole === "HOD"
+                      : userRole.toLowerCase() === "hod"
                         ? "(HOD)"
                         : ""}
                   </p>
@@ -656,7 +677,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
             <span className="text-[10px] mt-1 font-bold">Tasks</span>
           </Link>
 
-          {(userRole === "admin" || userRole === "HOD") && (
+          {(userRole?.toUpperCase() === "ADMIN" || userRole?.toUpperCase() === "HOD") && (
             <div className="relative -mt-12">
               <Link
                 to="/dashboard/assign-task"
@@ -725,7 +746,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
                     </h3>
                     <div className="flex justify-center flex-wrap gap-2">
                       <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] px-3 py-1 bg-indigo-50 rounded-full border border-indigo-100/50">
-                        {userRole === "admin" ? (isSuperAdmin ? "Super Admin" : "Administrator") : userRole === "HOD" ? "HOD / Supervisor" : "Staff"}
+                        {userRole?.toLowerCase() === "admin" ? (isSuperAdmin ? "Super Admin" : "Administrator") : userRole?.toLowerCase() === "hod" ? "HOD / Supervisor" : "Staff"}
                       </span>
                     </div>
                   </div>

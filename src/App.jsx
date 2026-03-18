@@ -33,14 +33,14 @@ import { MagicToastProvider } from "./context/MagicToastContext"
 
 // --- Auth Wrapper ---
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-    const username = localStorage.getItem("user-name")
-    const role = localStorage.getItem("role")
+    const username = (localStorage.getItem("user-name") || "").toLowerCase();
+    const role = (localStorage.getItem("role") || "").toLowerCase();
 
     if (!username) {
         return <Navigate to="/login" replace />
     }
 
-    if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+    if (allowedRoles.length > 0 && !allowedRoles.map(r => r.toLowerCase()).includes(role)) {
         return <Navigate to="/dashboard/admin" replace />
     }
 
@@ -48,8 +48,8 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 }
 
 const SuperAdminRoute = ({ children }) => {
-    const username = localStorage.getItem("user-name")
-    const role = localStorage.getItem("role")
+    const username = (localStorage.getItem("user-name") || "").toLowerCase();
+    const role = (localStorage.getItem("role") || "").toLowerCase();
 
     if (!username || username !== "admin" || role !== "admin") {
         return <Navigate to="/dashboard/admin" replace />

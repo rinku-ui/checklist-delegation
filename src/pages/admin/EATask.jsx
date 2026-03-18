@@ -27,7 +27,7 @@ const defaultTask = () => ({
     id: Date.now() + Math.random(),
     doer_name: DEFAULT_DOER_NAME,
     phone_number: "",
-    given_by: (localStorage.getItem("role") === "HOD" || (localStorage.getItem("role") === "admin" && localStorage.getItem("user-name") !== "admin")) ? localStorage.getItem("user-name") : "",
+    given_by: (localStorage.getItem("role")?.toUpperCase() === "HOD" || (localStorage.getItem("role")?.toLowerCase() === "admin" && localStorage.getItem("user-name")?.toLowerCase() !== "admin")) ? localStorage.getItem("user-name") : "",
     planned_date: "",
     planned_time: "09:00",
     task_description: "",
@@ -65,11 +65,12 @@ function TaskCard({ task, index, total, allDoers, onUpdate, onRemove }) {
             if (d.status === 'inactive') return false;
 
             // HOD Restriction
-            const currentU = localStorage.getItem("user-name");
-            const currentR = localStorage.getItem("role");
-            if (currentR === "HOD" || (currentR === "admin" && currentU !== "admin")) {
-                // HOD can see themselves and their reports
-                if (d.user_name !== currentU && d.reported_by !== currentU) return false;
+            const currentU = (localStorage.getItem("user-name") || "").toLowerCase();
+            const currentR = (localStorage.getItem("role") || "").toLowerCase();
+            if (currentR === "hod" || (currentR === "admin" && currentU !== "admin")) {
+                const dName = (d.user_name || d.name || "").toLowerCase();
+                const reportedBy = (d.reported_by || "").toLowerCase();
+                if (dName !== currentU && reportedBy !== currentU) return false;
             }
 
             // Leave filter
@@ -130,8 +131,8 @@ function TaskCard({ task, index, total, allDoers, onUpdate, onRemove }) {
                         name="given_by"
                         value={task.given_by}
                         onChange={(e) => onUpdate(task.id, { given_by: e.target.value })}
-                        disabled={localStorage.getItem("role") === "HOD" || (localStorage.getItem("role") === "admin" && localStorage.getItem("user-name") !== "admin")}
-                        className={`w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all text-sm ${(localStorage.getItem("role") === "HOD" || (localStorage.getItem("role") === "admin" && localStorage.getItem("user-name") !== "admin")) ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        disabled={(localStorage.getItem("role")?.toUpperCase() === "HOD" || (localStorage.getItem("role")?.toLowerCase() === "admin" && localStorage.getItem("user-name")?.toLowerCase() !== "admin"))}
+                        className={`w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all text-sm ${(localStorage.getItem("role")?.toUpperCase() === "HOD" || (localStorage.getItem("role")?.toLowerCase() === "admin" && localStorage.getItem("user-name")?.toLowerCase() !== "admin")) ? 'opacity-70 cursor-not-allowed' : ''}`}
                         placeholder="Enter assigner name"
                     />
                 </div>

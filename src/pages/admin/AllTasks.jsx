@@ -415,16 +415,19 @@ const AllTasks = () => {
 
       let query = supabase.from(tableName).select("*");
 
-      const isSuperAdmin = username === "admin";
+      const currentUsername = (username || "").toLowerCase();
+      const currentUserRole = (userRole || "").toLowerCase();
+      const isSuperAdmin = currentUsername === "admin";
+      
       if (!isSuperAdmin) {
-        let reportingUsers = [username];
-        if (userRole === "admin" || userRole === "HOD") {
+        let reportingUsers = [currentUsername];
+        if (currentUserRole === "admin" || currentUserRole === "hod") {
           const { data: reports } = await supabase
             .from("users")
             .select("user_name")
             .eq("reported_by", username);
           if (reports && reports.length > 0) {
-            reportingUsers = [username, ...reports.map((r) => r.user_name)];
+            reportingUsers = [currentUsername, ...reports.map((r) => (r.user_name || "").toLowerCase())];
           }
         }
 

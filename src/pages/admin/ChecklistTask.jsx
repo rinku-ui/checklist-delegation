@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    ClipboardList, Calendar, X, Mic, Square, Trash2, Plus, Save, Loader2, CheckCircle2, Clock, FileCheck
+    ClipboardList, Calendar, X, Mic, Square, Trash2, Plus, Save, Loader2, CheckCircle2, Clock, FileCheck, Play, Pause
 } from "lucide-react";
 import { ReactMediaRecorder } from "react-media-recorder";
 import AdminLayout from "../../components/layout/AdminLayout";
@@ -146,11 +146,11 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
             }
 
             // HOD Restriction
-            const currentU = localStorage.getItem("user-name");
-            const currentR = localStorage.getItem("role");
-            if (currentR === "HOD" || (currentR === "admin" && currentU !== "admin")) {
-                const dName = user.user_name || user.name;
-                const reportedBy = user.reported_by;
+            const currentU = (localStorage.getItem("user-name") || "").toLowerCase();
+            const currentR = (localStorage.getItem("role") || "").toLowerCase();
+            if (currentR === "hod" || (currentR === "admin" && currentU !== "admin")) {
+                const dName = (user.user_name || user.name || "").toLowerCase();
+                const reportedBy = (user.reported_by || "").toLowerCase();
                 if (dName !== currentU && reportedBy !== currentU) return false;
             }
 
@@ -208,8 +208,8 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
                             name="givenBy"
                             value={task.givenBy}
                             onChange={handleChange}
-                            disabled={localStorage.getItem("role") === "HOD" || (localStorage.getItem("role") === "admin" && localStorage.getItem("user-name") !== "admin")}
-                            className={`w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm ${(localStorage.getItem("role") === "HOD" || (localStorage.getItem("role") === "admin" && localStorage.getItem("user-name") !== "admin")) ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            disabled={(localStorage.getItem("role")?.toUpperCase() === "HOD" || (localStorage.getItem("role")?.toLowerCase() === "admin" && localStorage.getItem("user-name")?.toLowerCase() !== "admin"))}
+                            className={`w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm ${(localStorage.getItem("role")?.toUpperCase() === "HOD" || (localStorage.getItem("role")?.toLowerCase() === "admin" && localStorage.getItem("user-name")?.toLowerCase() !== "admin")) ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
                             <option value="">Select Assign From</option>
                             {givenBy.map((g, i) => <option key={i} value={g}>{g}</option>)}
@@ -392,7 +392,7 @@ export default function ChecklistTask() {
     const [tasks, setTasks] = useState([
         { 
             ...defaultTask(), 
-            givenBy: (localStorage.getItem("role") === "HOD" || (localStorage.getItem("role") === "admin" && localStorage.getItem("user-name") !== "admin")) ? localStorage.getItem("user-name") : "" 
+            givenBy: (localStorage.getItem("role")?.toUpperCase() === "HOD" || (localStorage.getItem("role")?.toLowerCase() === "admin" && localStorage.getItem("user-name")?.toLowerCase() !== "admin")) ? localStorage.getItem("user-name") : "" 
         }
     ]);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -415,7 +415,7 @@ export default function ChecklistTask() {
         return [...prev, {
             ...defaultTask(),
             department: lastTask?.department || "",
-            givenBy: (localStorage.getItem("role") === "HOD" || (localStorage.getItem("role") === "admin" && localStorage.getItem("user-name") !== "admin")) ? localStorage.getItem("user-name") : (lastTask?.givenBy || ""),
+            givenBy: (localStorage.getItem("role")?.toUpperCase() === "HOD" || (localStorage.getItem("role")?.toLowerCase() === "admin" && localStorage.getItem("user-name")?.toLowerCase() !== "admin")) ? localStorage.getItem("user-name") : (lastTask?.givenBy || ""),
             doer: lastTask?.doer || ""
         }];
     });

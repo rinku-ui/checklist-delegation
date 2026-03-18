@@ -58,10 +58,10 @@ const defaultTask = () => ({
 });
 
 // Single Maintenance Task Card
-function MaintenanceTaskCard({
+const MaintenanceTaskCard = ({
     task, index, total, department, doerName, givenBy,
     customDropdowns, onUpdate, onRemove, dispatch
-}) {
+}) => {
     const [lightboxImage, setLightboxImage] = useState(null); // { url, name }
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -97,11 +97,11 @@ function MaintenanceTaskCard({
             }
 
             // HOD Restriction
-            const currentU = localStorage.getItem("user-name");
-            const currentR = localStorage.getItem("role");
-            if (currentR === "HOD" || (currentR === "admin" && currentU !== "admin")) {
-                const dName = user.user_name || user.name;
-                const reportedBy = user.reported_by;
+            const currentU = (localStorage.getItem("user-name") || "").toLowerCase();
+            const currentR = (localStorage.getItem("role") || "").toLowerCase();
+            if (currentR === "hod" || (currentR === "admin" && currentU !== "admin")) {
+                const dName = (user.user_name || user.name || "").toLowerCase();
+                const reportedBy = (user.reported_by || "").toLowerCase();
                 if (dName !== currentU && reportedBy !== currentU) return false;
             }
 
@@ -187,8 +187,8 @@ function MaintenanceTaskCard({
                             name="givenBy"
                             value={task.givenBy}
                             onChange={handleChange}
-                            disabled={localStorage.getItem("role") === "HOD" || (localStorage.getItem("role") === "admin" && localStorage.getItem("user-name") !== "admin")}
-                            className={`w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all text-sm ${(localStorage.getItem("role") === "HOD" || (localStorage.getItem("role") === "admin" && localStorage.getItem("user-name") !== "admin")) ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            disabled={(localStorage.getItem("role")?.toUpperCase() === "HOD" || (localStorage.getItem("role")?.toLowerCase() === "admin" && localStorage.getItem("user-name")?.toLowerCase() !== "admin"))}
+                            className={`w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 focus:bg-white transition-all text-sm ${(localStorage.getItem("role")?.toUpperCase() === "HOD" || (localStorage.getItem("role")?.toLowerCase() === "admin" && localStorage.getItem("user-name")?.toLowerCase() !== "admin")) ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
                             <option value="">Select Assign From</option>
                             {givenBy.map((g, i) => { const val = typeof g === 'object' ? (g.given_by || g.name) : g; return <option key={i} value={val}>{val}</option>; })}
@@ -535,7 +535,7 @@ export default function MaintenanceTask() {
         const lastTask = prev[prev.length - 1];
         return [...prev, {
             ...defaultTask(),
-            givenBy: (localStorage.getItem("role") === "HOD" || (localStorage.getItem("role") === "admin" && localStorage.getItem("user-name") !== "admin")) ? localStorage.getItem("user-name") : (lastTask?.givenBy || ""),
+            givenBy: (localStorage.getItem("role")?.toUpperCase() === "HOD" || (localStorage.getItem("role")?.toLowerCase() === "admin" && localStorage.getItem("user-name")?.toLowerCase() !== "admin")) ? localStorage.getItem("user-name") : (lastTask?.givenBy || ""),
             doerDepartment: lastTask?.doerDepartment || "",
             doerName: lastTask?.doerName || ""
         }];

@@ -640,7 +640,8 @@ export default function AdminDashboard() {
 
       // Fetch reporting users for HOD role check
       let reportingUsers = [username?.toLowerCase()];
-      if (userRole === "hod") {
+      const currentUserRole = (localStorage.getItem("role") || "").toLowerCase();
+      if (currentUserRole === "hod") {
           const { data: reports } = await supabase
               .from("users")
               .select("user_name")

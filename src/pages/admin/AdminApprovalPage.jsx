@@ -78,20 +78,23 @@ export default function AdminApprovalPage() {
         
         // Filter tasks if not super admin
         let filteredData = data || [];
-        if (username !== "admin") {
-            let reportingUsers = [username];
-            if (userRole === "admin" || userRole === "HOD") {
+        const currentUsername = (username || "").toLowerCase();
+        const currentUserRole = (userRole || "").toLowerCase();
+        
+        if (currentUsername !== "admin") {
+            let reportingUsers = [currentUsername];
+            if (currentUserRole === "admin" || currentUserRole === "hod") {
                 const { data: reports } = await supabase
                     .from("users")
                     .select("user_name")
                     .eq("reported_by", username);
                 if (reports && reports.length > 0) {
-                    reportingUsers = [username, ...reports.map((r) => r.user_name)];
+                    reportingUsers = [currentUsername, ...reports.map((r) => (r.user_name || "").toLowerCase())];
                 }
             }
             
-            filteredData = filteredData.filter(task => {
-                const doerName = task.doer_name || task.name || task.filled_by;
+            filteredData = (data || []).filter(task => {
+                const doerName = (task.doer_name || task.name || task.filled_by || "").toLowerCase();
                 return reportingUsers.includes(doerName);
             });
         }
