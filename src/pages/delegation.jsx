@@ -342,10 +342,21 @@ function DelegationDataPage() {
             matchesDateFilter = plannedDate < today;
             break;
           case "today":
-            matchesDateFilter = plannedDate.getTime() === today.getTime();
+            if (task.status === "extend") {
+              // Extended tasks show in Today until the date arrives (stays in Today on that date too)
+              matchesDateFilter = plannedDate >= today;
+            } else {
+              // Non-extended tasks show in Today only on the exact date
+              matchesDateFilter = plannedDate.getTime() === today.getTime();
+            }
             break;
           case "upcoming":
-            matchesDateFilter = plannedDate >= tomorrow;
+            if (task.status === "extend") {
+              // Extended tasks are already counted in Today, so exclude from Upcoming
+              matchesDateFilter = false;
+            } else {
+              matchesDateFilter = plannedDate >= tomorrow;
+            }
             break;
           default:
             matchesDateFilter = true;
@@ -361,7 +372,8 @@ function DelegationDataPage() {
 
         if (pDate < today) {
           timeStatus = "Overdue";
-        } else if (pDate.getTime() === today.getTime()) {
+        } else if (task.status === "extend" || pDate.getTime() === today.getTime()) {
+          // If extended, we label it as Today until the deadline passes
           timeStatus = "Today";
         } else {
           timeStatus = "Upcoming";
@@ -1272,11 +1284,14 @@ function DelegationDataPage() {
                       <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         Name
                       </th>
+                      <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        Last Activity
+                      </th>
                       <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-green-50">
                         Planned Date
                       </th>
                       <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-blue-50">
-                        Status
+                        Select Status
                       </th>
                       <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-indigo-50">
                         Next Target
@@ -1346,6 +1361,11 @@ function DelegationDataPage() {
                             <td className="px-2 sm:px-6 py-2 sm:py-4">
                               <div className="text-xs sm:text-sm text-gray-900 whitespace-normal break-words">
                                 {task.name || "—"}
+                              </div>
+                            </td>
+                            <td className="px-2 sm:px-6 py-2 sm:py-4">
+                              <div className="text-[10px] text-purple-600 font-bold whitespace-nowrap">
+                                {task.submission_date ? formatDateTimeForDisplay(task.submission_date) : "New Task"}
                               </div>
                             </td>
                             <td className="px-2 sm:px-6 py-2 sm:py-4 bg-green-50">
@@ -1525,10 +1545,14 @@ function DelegationDataPage() {
                             </div>
                           </div>
 
-                          <div className="pt-2 border-t border-gray-50">
+                          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
                             <div className="space-y-1">
                               <p className="text-[10px] text-green-500 uppercase font-semibold">Planned Date</p>
                               <p className="text-xs font-black text-gray-900">{formatDateTimeForDisplay(task.planned_date)}</p>
+                            </div>
+                            <div className="space-y-1 text-right">
+                              <p className="text-[10px] text-purple-600 uppercase font-semibold">Last Activity</p>
+                              <p className="text-[10px] font-bold text-gray-900">{task.submission_date ? formatDateTimeForDisplay(task.submission_date) : "New Task"}</p>
                             </div>
                           </div>
 
