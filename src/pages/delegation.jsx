@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import {
   CheckCircle2,
   Upload,
@@ -366,20 +366,29 @@ function DelegationDataPage() {
       return matchesSearch && matchesDateFilter;
     }).map(task => {
       let timeStatus = "Not Submitted";
-      if (task.planned_date || task.task_start_date) {
-        const pDate = new Date(task.planned_date || task.task_start_date);
+      const taskDateStr = (task.status === "extend" && task.next_extend_date)
+        ? task.next_extend_date
+        : (task.planned_date || task.task_start_date);
+
+      if (taskDateStr) {
+        const pDate = new Date(taskDateStr);
         pDate.setHours(0, 0, 0, 0);
 
         if (pDate < today) {
           timeStatus = "Overdue";
-        } else if (task.status === "extend" || pDate.getTime() === today.getTime()) {
-          // If extended, we label it as Today until the deadline passes
+        } else if (pDate.getTime() === today.getTime() || (task.status === "extend" && pDate >= today)) {
+          // Keep extended tasks in "Today" if they are due today or in the future?
+          // Wait, the user said "extended but need to show that aal before upcoming task in the group of todays".
+          // This implies extended tasks should be grouped with Today.
           timeStatus = "Today";
         } else {
           timeStatus = "Upcoming";
         }
       }
       return { ...task, timeStatus };
+    }).sort((a, b) => {
+      const priority = { "Overdue": 0, "Today": 1, "Upcoming": 2 };
+      return (priority[a.timeStatus] ?? 3) - (priority[b.timeStatus] ?? 3);
     });
   }, [delegation, debouncedSearchTerm, dateFilter, userRole, username]);
 
@@ -1337,11 +1346,29 @@ function DelegationDataPage() {
                     {paginatedTasks.length > 0 ? (
                       paginatedTasks.map((task, index) => {
                         const isSelected = selectedItems.has(task.id);
+                        const showHeader = index === 0 || task.timeStatus !== paginatedTasks[index - 1].timeStatus;
+                        
                         return (
-                          <tr
-                            key={index}
-                            className={`${isSelected ? "bg-purple-50" : ""} hover:bg-gray-50`}
-                          >
+                          <Fragment key={index}>
+                            {showHeader && (
+                              <tr className="bg-gray-100/50">
+                                <td colSpan={13} className="px-6 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${
+                                      task.timeStatus === "Overdue" ? "bg-red-500" :
+                                      task.timeStatus === "Today" ? "bg-amber-500" :
+                                      "bg-blue-500"
+                                    }`} />
+                                    <span className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500">
+                                      {task.timeStatus} Tasks
+                                    </span>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                            <tr
+                              className={`${isSelected ? "bg-purple-50" : ""} hover:bg-gray-50`}
+                            >
                             <td className="px-2 sm:px-6 py-2 sm:py-4">
                               <input
                                 type="checkbox"
@@ -1512,8 +1539,9 @@ function DelegationDataPage() {
                               )}
                             </td>
                           </tr>
-                        );
-                      })
+                        </Fragment>
+                      );
+                    })
                     ) : (
                       <tr>
                         <td
@@ -1535,8 +1563,25 @@ function DelegationDataPage() {
                 {paginatedTasks.length > 0 ? (
                   paginatedTasks.map((task, index) => {
                     const isSelected = selectedItems.has(task.id);
+                    const showHeader = index === 0 || task.timeStatus !== paginatedTasks[index - 1].timeStatus;
+                    
                     return (
-                      <div key={index} className={`bg-white rounded-xl border border-purple-100 shadow-sm overflow-hidden ${isSelected ? "ring-2 ring-purple-400" : ""}`}>
+                      <Fragment key={index}>
+                        {showHeader && (
+                          <div className={`mt-4 mb-2 px-3 py-1 rounded-full w-fit text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${
+                            task.timeStatus === "Overdue" ? "bg-red-50 text-red-600 border border-red-100" :
+                            task.timeStatus === "Today" ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                            "bg-blue-50 text-blue-600 border border-blue-100"
+                          }`}>
+                             <div className={`w-1.5 h-1.5 rounded-full ${
+                              task.timeStatus === "Overdue" ? "bg-red-500" :
+                              task.timeStatus === "Today" ? "bg-amber-500" :
+                              "bg-blue-500"
+                            }`} />
+                            {task.timeStatus} Tasks
+                          </div>
+                        )}
+                        <div key={index} className={`bg-white rounded-xl border border-purple-100 shadow-sm overflow-hidden ${isSelected ? "ring-2 ring-purple-400" : ""}`}>
                         <div className="bg-purple-50/50 px-4 py-3 border-b border-purple-100 flex justify-between items-center">
                           <div className="flex items-center gap-3">
                             <input
@@ -1649,8 +1694,9 @@ function DelegationDataPage() {
                           </div>
                         </div>
                       </div>
-                    )
-                  })
+                    </Fragment>
+                  )
+                })
                 ) : (
                   <div className="text-center py-20 bg-white rounded-xl border border-dashed border-gray-200">
                     <Search size={40} className="text-gray-100 mx-auto mb-3" />
