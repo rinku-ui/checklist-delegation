@@ -279,8 +279,9 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
                         <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Planned Date <span className="text-red-500">*</span></label>
                         <button
                             type="button"
-                            onClick={() => onUpdate(task.id, { showCalendar: !task.showCalendar })}
-                            className="w-full px-3 py-2.5 text-left border border-gray-200 rounded-lg bg-gray-50 hover:bg-white focus:ring-2 focus:ring-purple-500 transition-all flex items-center justify-between text-xs"
+                            onClick={() => !task.dateLocked && onUpdate(task.id, { showCalendar: !task.showCalendar })}
+                            className={`w-full px-3 py-2.5 text-left border border-gray-200 rounded-lg bg-gray-50 hover:bg-white focus:ring-2 focus:ring-purple-500 transition-all flex items-center justify-between text-xs ${task.dateLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            disabled={task.dateLocked}
                         >
                             <span className={task.date ? "text-gray-800" : "text-gray-400"}>
                                 {task.date ? formatDate(task.date) : "Select"}
@@ -306,18 +307,19 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
                             onChange={handleChange}
                             className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 focus:ring-2 focus:ring-purple-500 outline-none transition-all text-sm"
                         />
-                    </div>
-                    <div>
+                    </div>                    <div>
                         <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Frequency</label>
                         <select
                             name="frequency"
                             value={task.frequency}
                             onChange={handleChange}
-                            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-xs"
+                            disabled={task.frequencyLocked}
+                            className={`w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 focus:ring-2 focus:ring-purple-500 outline-none transition-all text-xs ${task.frequencyLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
-                            {FREQUENCY_OPTIONS.map(f => <option key={f}>{f}</option>)}
+                            {FREQUENCY_OPTIONS.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
                         </select>
                     </div>
+
                     <div>
                         <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide flex items-center gap-1">
                             <Clock className="w-3 h-3" /> Duration <span className="text-red-500">*</span>
@@ -389,6 +391,29 @@ export default function ChecklistTask() {
         dispatch(uniqueDepartmentData());
         dispatch(uniqueGivenByData());
         dispatch(customDropdownDetails());
+
+        // Handle URL parameters for pre-filling
+        const params = new URLSearchParams(window.location.search);
+        const dateParam = params.get('date');
+        const typeParam = params.get('type');
+
+        if (dateParam) {
+            // Use T00:00:00 to ensure date is parsed as local time correctly
+            const parsedDate = new Date(dateParam + 'T00:00:00');
+            setTasks(prev => {
+                const newTasks = [...prev];
+                if (newTasks.length > 0) {
+                    newTasks[0] = {
+                        ...newTasks[0],
+                        date: isNaN(parsedDate.getTime()) ? null : parsedDate,
+                        frequency: typeParam === 'delegation' ? "One Time (No Recurrence)" : newTasks[0].frequency,
+                        dateLocked: true,
+                        frequencyLocked: typeParam === 'delegation' // Lock frequency only for delegation (one-time)
+                    };
+                }
+                return newTasks;
+            });
+        }
     }, [dispatch]);
 
     const updateTask = (id, updates) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));

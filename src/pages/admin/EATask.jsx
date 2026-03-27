@@ -188,18 +188,19 @@ function TaskCard({ task, index, total, allDoers, onUpdate, onRemove }) {
                         </label>
                         <button
                             type="button"
-                            onClick={() => onUpdate(task.id, { showCalendar: !task.showCalendar })}
-                            className="w-full px-3 py-2.5 text-left border border-gray-200 rounded-lg bg-gray-50 hover:bg-white focus:ring-2 focus:ring-purple-500 transition-all flex items-center justify-between text-sm"
+                            onClick={() => !task.dateLocked && onUpdate(task.id, { showCalendar: !task.showCalendar })}
+                            className={`w-full px-3 py-2.5 text-left border border-gray-200 rounded-lg bg-gray-50 hover:bg-white focus:ring-2 focus:ring-purple-500 transition-all flex items-center justify-between text-sm ${task.dateLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            disabled={task.dateLocked}
                         >
                             <span className={task.planned_date ? "text-gray-800" : "text-gray-400"}>
-                                {task.planned_date ? formatDateLong(new Date(task.planned_date)) : "Select date"}
+                                {task.planned_date ? formatDateLong(new Date(task.planned_date + 'T00:00:00')) : "Select date"}
                             </span>
                             <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
                         </button>
                         {task.showCalendar && (
                             <div className="absolute top-full left-0 mt-1 z-50">
                                 <CalendarComponent
-                                    date={task.planned_date ? new Date(task.planned_date) : null}
+                                    date={task.planned_date ? new Date(task.planned_date + 'T00:00:00') : null}
                                     onChange={(date) => onUpdate(task.id, { planned_date: formatDateISO(date), showCalendar: false })}
                                     onClose={() => onUpdate(task.id, { showCalendar: false })}
                                 />
@@ -318,6 +319,24 @@ export default function EATask() {
         fetchHolidays();
         fetchUniqueDoers();
         dispatch(userDetails());
+
+        // Handle URL parameters for pre-filling
+        const params = new URLSearchParams(window.location.search);
+        const dateParam = params.get('date');
+
+        if (dateParam) {
+            setTasks(prev => {
+                const newTasks = [...prev];
+                if (newTasks.length > 0) {
+                    newTasks[0] = {
+                        ...newTasks[0],
+                        planned_date: dateParam,
+                        dateLocked: true
+                    };
+                }
+                return newTasks;
+            });
+        }
     }, [dispatch]);
 
     useEffect(() => {

@@ -676,9 +676,17 @@ export default function AdminDashboard() {
           const taskStartDate = parseTaskStartDate(task.planned_date || task.task_start_date || task.created_at);
           const completionDate = task.submission_date ? parseTaskStartDate(task.submission_date) : null;
 
+          // Robust completion check across all categories
+          const statusLower = (task.status || "").toLowerCase();
+          const isCompleted = (task.submission_date !== null) || 
+                              (statusLower === 'yes') || 
+                              (statusLower.includes('done')) || 
+                              (statusLower.includes('completed')) || 
+                              (dashboardType === 'delegation' && task.admin_done === true);
+
           // Determine task status accurately
           let status;
-          if (completionDate) {
+          if (isCompleted) {
             status = "completed";
           } else if (taskStartDate && taskStartDate < todayStart) {
             // Past date, no submission = overdue

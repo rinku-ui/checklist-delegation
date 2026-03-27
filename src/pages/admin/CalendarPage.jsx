@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../../components/layout/AdminLayout';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2, AlertCircle, X, Edit, Save, Loader2, Play, Pause, Search, Mic, Users, Filter, Check, ChevronDown, ShieldAlert } from 'lucide-react';
+import { Plus, ClipboardList, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2, AlertCircle, X, Edit, Save, Loader2, Play, Pause, Search, Mic, Users, Filter, Check, ChevronDown, ShieldAlert } from 'lucide-react';
 import AudioPlayer from '../../components/AudioPlayer';
 import supabase from '../../SupabaseClient';
 
@@ -68,13 +69,21 @@ const CalendarPage = () => {
 
     // Modal & Edit State
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedDate, setSelectedDate] = useState(null);
     const [selectedTasks, setSelectedTasks] = useState([]);
+    const [selectedDate, setSelectedDate] = useState(null);
     const [isHolidayDate, setIsHolidayDate] = useState(false);
+    const [showAssignTaskTypePopup, setShowAssignTaskTypePopup] = useState(false);
+    const [expandedTaskId, setExpandedTaskId] = useState(null);
     const [holidayName, setHolidayName] = useState('');
     const [editingTaskId, setEditingTaskId] = useState(null);
     const [editForm, setEditForm] = useState({ status: '', remark: '' });
     const [isUpdating, setIsUpdating] = useState(false);
+    const [userProfiles, setUserProfiles] = useState({}); // Map of username -> profile_url
+    const [selectedImage, setSelectedImage] = useState(null); // Full-screen image URL
+    const navigate = useNavigate();
+
+    const userRole = (localStorage.getItem('role') || '').toLowerCase();
+    const canAssign = ['admin', 'hod'].includes(userRole);
 
     // Filter State
     const [allUsers, setAllUsers] = useState([]);
@@ -153,7 +162,7 @@ const CalendarPage = () => {
             const username = localStorage.getItem('user-name');
             let query = supabase
                 .from('users')
-                .select('user_name, reported_by')
+                .select('user_name, reported_by, profile_image')
                 .eq('status', 'active')
                 .order('user_name', { ascending: true });
             
@@ -163,7 +172,14 @@ const CalendarPage = () => {
 
             const { data, error } = await query;
             if (error) throw error;
-            if (data) setAllUsers(data.map(u => u.user_name));
+            if (data) {
+                setAllUsers(data.map(u => u.user_name));
+                const profileMap = {};
+                data.forEach(u => {
+                    if (u.profile_image) profileMap[u.user_name] = u.profile_image;
+                });
+                setUserProfiles(profileMap);
+            }
         } catch (err) {
             console.error('Error fetching users:', err);
         }
@@ -328,6 +344,18 @@ const CalendarPage = () => {
         setHolidayName(holiday?.holiday_name || (isOffDay ? 'Off Day' : ''));
         setIsModalOpen(true);
         setEditingTaskId(null); // Reset editing state
+        setExpandedTaskId(null); // Reset expanded state
+    };
+
+    const handleAssignTask = (type) => {
+        if (!selectedDate) return;
+        if (type === 'delegation') {
+            navigate(`/dashboard/checklist?date=${selectedDate}&type=delegation`);
+        } else if (type === 'ea') {
+            navigate(`/dashboard/ea-task?date=${selectedDate}`);
+        }
+        setShowAssignTaskTypePopup(false);
+        setIsModalOpen(false);
     };
 
     const handleEditClick = (task) => {
@@ -638,129 +666,287 @@ const CalendarPage = () => {
                 </div>
             </div>
 
-            {/* Professional Modal Design */}
+            {/* Professional Modal Design - All Tasks List */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-[2px] animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
                         {/* Modal Header */}
-                        <div className="px-6 py-4 bg-gray-900 text-white flex justify-between items-center shrink-0">
+                        <div className="px-6 py-5 bg-white border-b border-gray-100 flex justify-between items-center shrink-0">
                             <div>
-                                <h2 className="text-lg font-bold uppercase tracking-widest flex items-center gap-2">
-                                    <Clock size={20} /> {isHolidayDate ? 'Public Holiday' : 'Daily Task Log'}
+                                <h2 className="text-base font-black text-gray-900 uppercase tracking-tighter flex items-center gap-2">
+                                    <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                                        <Clock size={18} />
+                                    </div>
+                                    {isHolidayDate ? 'Public Holiday' : 'Daily Operations'}
                                 </h2>
-                                <p className="text-[10px] font-medium uppercase opacity-70 mt-0.5 tracking-wider">
-                                    {new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mt-1 tracking-widest flex items-center gap-1.5">
+                                    <CalendarIcon size={10} /> {new Date(selectedDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                                 </p>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white">
-                                <X size={24} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {canAssign && !isHolidayDate && (
+                                    <button
+                                        onClick={() => setShowAssignTaskTypePopup(true)}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 uppercase tracking-widest"
+                                    >
+                                        <Plus size={14} /> Assign Task
+                                    </button>
+                                )}
+                                <button 
+                                    onClick={() => setIsModalOpen(false)} 
+                                    className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Modal Body */}
-                        <div className="p-6 overflow-y-auto space-y-4 bg-gray-50/50">
+                        <div className="p-6 overflow-y-auto space-y-4 bg-white">
                             {isHolidayDate ? (
-                                <div className="py-12 px-6 text-center space-y-2 bg-white border border-red-100 rounded-xl">
-                                    <ShieldAlert size={48} className="text-red-500 mx-auto mb-2" />
-                                    <h3 className="text-2xl font-bold text-red-700 uppercase">{holidayName}</h3>
-                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">General Holiday - Operations Suspended</p>
+                                <div className="py-12 px-6 text-center space-y-3 bg-red-50/30 border border-red-100 rounded-2xl">
+                                    <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                                        <ShieldAlert size={32} />
+                                    </div>
+                                    <h3 className="text-xl font-black text-red-900 uppercase tracking-tight">{holidayName}</h3>
+                                    <p className="text-[10px] font-black text-red-400 uppercase tracking-[0.2em]">Operations Suspended</p>
                                 </div>
                             ) : selectedTasks.length === 0 ? (
-                                <div className="py-20 text-center bg-white border border-gray-200 rounded-xl">
-                                    <CalendarIcon size={40} className="text-gray-100 mx-auto mb-3" />
-                                    <p className="text-sm font-bold text-gray-300 uppercase tracking-widest">No scheduled tasks found for this date</p>
+                                <div className="py-24 text-center">
+                                    <div className="w-20 h-20 bg-gray-50 border border-gray-100 text-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <CalendarIcon size={32} />
+                                    </div>
+                                    <p className="text-xs font-black text-gray-300 uppercase tracking-widest">No activities scheduled</p>
                                 </div>
                             ) : (
-                                <div className="space-y-4">
-                                    {selectedTasks.map((task) => (
-                                        <div key={task.id} className="bg-white border border-gray-200 rounded-lg p-5 flex flex-col shadow-sm relative overflow-hidden group">
-                                            <div className={`absolute top-0 left-0 w-1.5 h-full opacity-100 ${task.cat === 'CK' ? 'bg-blue-600' :
-                                                task.cat === 'MT' ? 'bg-orange-600' :
-                                                    task.cat === 'RP' ? 'bg-red-600' :
-                                                        'bg-purple-600'
-                                                }`}></div>
-
-                                            <div className="pl-3">
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase px-2 py-0.5 bg-gray-50 rounded border border-gray-100">ID: {task.id}</span>
-                                                        <span className={`text-[10px] font-bold px-3 py-1 bg-white border rounded-full uppercase tracking-wider ${task.type === 'checklist' ? 'text-blue-600 border-blue-100' : 'text-purple-600 border-purple-100'}`}>
-                                                            {task.type}
-                                                        </span>
+                                <div className="divide-y divide-gray-50 border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm">
+                                    {selectedTasks.map((task) => {
+                                        const isExpanded = expandedTaskId === task.id;
+                                        const taskTitle = task.title || '';
+                                        const audioUrl = extractAudioUrl(taskTitle);
+                                        const cleanedTitle = typeof taskTitle === 'string' 
+                                            ? taskTitle.replace(/Voice Note Link:?\s*/i, '').replace(audioUrl || '', '').trim()
+                                            : '';
+                                        
+                                        return (
+                                            <div key={task.id} className={`transition-all ${isExpanded ? 'bg-gray-50/30' : 'hover:bg-gray-50'}`}>
+                                                {/* Compact Row Header */}
+                                                <div 
+                                                    onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                                                    className="p-4 flex items-center gap-4 cursor-pointer group"
+                                                >
+                                                    <div className={`w-1.5 h-8 rounded-full flex-shrink-0 ${task.cat === 'CK' ? 'bg-blue-600' : task.cat === 'MT' ? 'bg-orange-600' : task.cat === 'RP' ? 'bg-red-600' : 'bg-purple-600'}`}></div>
+                                                    
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                            <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">#{task.id}</span>
+                                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${task.type === 'checklist' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                                                                {task.type}
+                                                            </span>
+                                                        </div>
+                                                        <h4 className={`text-xs font-black text-gray-900 uppercase truncate transition-colors ${isExpanded ? 'text-blue-600' : 'group-hover:text-gray-900'}`}>
+                                                            {cleanedTitle || 'Instruction Received (Audio)'}
+                                                        </h4>
                                                     </div>
-                                                    <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider border ${['completed', 'yes', 'Done', 'Approved'].includes(task.status) ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
-                                                        {task.status || 'Pending'}
-                                                    </span>
+
+                                                    <div className="text-right flex items-center gap-3">
+                                                        <div className="hidden sm:block">
+                                                            <p className="text-[8px] font-black text-gray-400 uppercase leading-none mb-1">Operator</p>
+                                                            <p className="text-[10px] font-bold text-gray-700 uppercase">{task.name || 'Unassigned'}</p>
+                                                        </div>
+                                                        <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden border border-gray-200">
+                                                            {userProfiles[task.name] ? (
+                                                                <img src={userProfiles[task.name]} className="w-full h-full object-cover" alt="" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center bg-blue-600 text-white text-[9px] font-black">
+                                                                    {task.name ? task.name.substring(0, 2).toUpperCase() : 'UA'}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <ChevronDown className={`text-gray-300 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-blue-600' : ''}`} size={16} />
+                                                    </div>
                                                 </div>
 
-                                                <div className="mb-4">
-                                                    {(() => {
-                                                        const audioUrl = extractAudioUrl(task.title);
-                                                        const cleanedTitle = task.title.replace(/Voice Note Link:?\s*/i, '').replace(audioUrl || '', '').trim();
-                                                        return (
-                                                            <>
-                                                                {audioUrl && (
-                                                                    <div className="mb-3">
-                                                                        <h4 className="text-[10px] font-bold text-blue-600 uppercase mb-2 flex items-center gap-2">
-                                                                            <Play size={12} className="fill-blue-600" /> Audio Instruction
-                                                                        </h4>
-                                                                        <AudioPlayer url={audioUrl} />
+                                                {/* Expanded Details */}
+                                                {isExpanded && (
+                                                    <div className="px-10 pb-6 pt-2 animate-in slide-in-from-top-2 duration-300">
+                                                        <div className="space-y-5">
+                                                            {/* Audio Brief if available */}
+                                                            {audioUrl && (
+                                                                <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-2xl">
+                                                                    <div className="flex items-center gap-2 mb-3">
+                                                                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                                                                        <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Audio Briefing</span>
                                                                     </div>
-                                                                )}
-                                                                {cleanedTitle && (
-                                                                    <h4 className="text-lg font-bold text-gray-900 uppercase leading-snug tracking-tight">
+                                                                    <AudioPlayer url={audioUrl} />
+                                                                </div>
+                                                            )}
+
+                                                            {/* Full Title (not truncated) */}
+                                                            {cleanedTitle && (
+                                                                <div>
+                                                                    <p className="text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest">Full Instruction</p>
+                                                                    <h4 className="text-sm font-black text-gray-900 uppercase leading-relaxed tracking-tight">
                                                                         {cleanedTitle}
                                                                     </h4>
-                                                                )}
-                                                            </>
-                                                        );
-                                                    })()}
-                                                </div>
+                                                                </div>
+                                                            )}
 
-                                                <div className="grid grid-cols-2 gap-6 py-4 border-t border-gray-100">
-                                                    <div>
-                                                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Assigned Person</p>
-                                                        <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
-                                                            <div className="w-6 h-6 rounded bg-gray-100 flex items-center justify-center text-[10px] text-gray-600 font-bold border border-gray-200">
-                                                                {task.name ? task.name.charAt(0) : 'U'}
+                                                            {/* Meta Info Grid */}
+                                                            <div className="grid grid-cols-2 gap-8 py-5 border-y border-gray-100">
+                                                                <div>
+                                                                    <p className="text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest">Operator Name</p>
+                                                                    <div className="flex items-center gap-3 font-bold text-gray-800 text-xs uppercase">
+                                                                        <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] overflow-hidden border-2 border-white shadow-sm">
+                                                                            {userProfiles[task.name] ? (
+                                                                                <img src={userProfiles[task.name]} className="w-full h-full object-cover" alt="" />
+                                                                            ) : (
+                                                                                task.name ? task.name.substring(0, 2).toUpperCase() : 'UA'
+                                                                            )}
+                                                                        </div>
+                                                                        {task.name || 'Unassigned'}
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest">Department Unit</p>
+                                                                    <div className="text-xs font-black text-purple-600 uppercase">
+                                                                        {task.department || 'General Operations'}
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                            {task.name || 'Unassigned'}
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Component Type</p>
-                                                        <div className="flex items-center gap-2 text-sm font-bold text-gray-800 uppercase">
-                                                            <div className={`w-3 h-3 rounded-full ${task.cat === 'CK' ? 'bg-blue-600' : 'bg-orange-600'}`}></div>
-                                                            {task.type} Level
-                                                        </div>
-                                                    </div>
-                                                </div>
 
-                                                {(task.remark || task.remarks) && (
-                                                    <div className="mt-4 pt-4 border-t border-gray-100">
-                                                        <h4 className="text-[10px] font-bold text-blue-500 uppercase mb-2">Performance Remarks</h4>
-                                                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 italic text-gray-700 text-sm font-medium leading-relaxed">
+                                                            {/* Evidence Photos */}
                                                             {(() => {
-                                                                const remarkText = task.remark || task.remarks;
-                                                                const audioUrl = extractAudioUrl(remarkText);
+                                                                const proofs = [];
+                                                                if (task.work_photo_url) proofs.push({ url: task.work_photo_url, label: 'Job Execution' });
+                                                                if (task.bill_copy_url) proofs.push({ url: task.bill_copy_url, label: 'Invoice' });
+                                                                const commonImg = task.image || task.image_url || task.img_url || task.uploaded_image_url;
+                                                                if (commonImg && !proofs.some(p => p.url === commonImg)) {
+                                                                    proofs.push({ url: commonImg, label: 'Work Evidence' });
+                                                                }
+                                                                
+                                                                if (proofs.length === 0) return null;
+                                                                
                                                                 return (
-                                                                    <>
-                                                                        {audioUrl && <AudioPlayer url={audioUrl} />}
-                                                                        <p className="mt-2 text-gray-600">
-                                                                            "{remarkText.replace(/Voice Note Link:?\s*/i, '').replace(audioUrl || '', '').trim()}"
+                                                                    <div className="space-y-4">
+                                                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                                                            <ShieldAlert size={12} className="text-blue-500" /> Evidence Archives
                                                                         </p>
-                                                                    </>
+                                                                        <div className="grid grid-cols-2 xs:grid-cols-3 gap-3">
+                                                                            {proofs.map((proof, idx) => (
+                                                                                <div 
+                                                                                    key={idx} 
+                                                                                    onClick={() => setSelectedImage(proof.url)}
+                                                                                    className="relative aspect-square rounded-2xl overflow-hidden border border-gray-100 shadow-sm cursor-zoom-in hover:scale-[1.02] transition-all bg-gray-50 group"
+                                                                                >
+                                                                                    <img src={proof.url} className="w-full h-full object-cover" alt={proof.label} />
+                                                                                    <div className="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-[2px] p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                        <p className="text-[8px] font-black text-white uppercase truncate">{proof.label}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
                                                                 );
                                                             })()}
+
+                                                            {/* Remarks Section */}
+                                                            {(task.remark || task.remarks) && (
+                                                                <div className="p-5 bg-gray-50 border border-gray-100 rounded-2xl">
+                                                                    <p className="text-[9px] font-black text-gray-400 uppercase mb-3 tracking-widest flex items-center gap-2">
+                                                                        <ShieldAlert size={12} className="text-orange-500" /> Final Assessment Feedback
+                                                                    </p>
+                                                                    <p className="text-xs font-bold text-gray-600 italic leading-relaxed">
+                                                                        "{ (task.remark || task.remarks).replace(/Voice Note Link:?\s*/i, '').trim() }"
+                                                                    </p>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Action Status Badge */}
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[9px] font-black text-gray-400 uppercase">System Status:</span>
+                                                                <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider ${['completed', 'yes', 'Done', 'Approved'].includes(task.status) ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                                                    {task.status || 'Awaiting Input'}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 )}
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Task Type Selection Pop-up - Clean Professional Design */}
+            {showAssignTaskTypePopup && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-gray-100 p-8">
+                        <div className="text-center mb-8">
+                            <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
+                                <Plus size={24} />
+                            </div>
+                            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">New Assignment</h3>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Select task protocol for {selectedDate}</p>
+                        </div>
+                        
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => handleAssignTask('delegation')}
+                                className="w-full bg-gray-50 hover:bg-blue-600 text-gray-900 hover:text-white p-5 rounded-3xl flex items-center gap-4 transition-all group border border-gray-100 hover:border-blue-600"
+                            >
+                                <div className="p-3 bg-white text-blue-600 rounded-2xl shadow-sm group-hover:bg-blue-500 group-hover:text-white transition-all">
+                                    <ClipboardList size={20} />
+                                </div>
+                                <div className="text-left">
+                                    <h4 className="text-sm font-black uppercase leading-tight mb-0.5">Task Delegation</h4>
+                                    <p className="text-[9px] font-bold opacity-60 uppercase tracking-wider">One-time operational</p>
+                                </div>
+                                <ChevronRight className="ml-auto opacity-20 group-hover:opacity-100 transition-all font-black" size={16} />
+                            </button>
+
+                            <button
+                                onClick={() => handleAssignTask('ea')}
+                                className="w-full bg-gray-50 hover:bg-purple-600 text-gray-900 hover:text-white p-5 rounded-3xl flex items-center gap-4 transition-all group border border-gray-100 hover:border-purple-600"
+                            >
+                                <div className="p-3 bg-white text-purple-600 rounded-2xl shadow-sm group-hover:bg-purple-500 group-hover:text-white transition-all">
+                                    <Users size={20} />
+                                </div>
+                                <div className="text-left">
+                                    <h4 className="text-sm font-black uppercase leading-tight mb-0.5">EA Task Assignment</h4>
+                                    <p className="text-[9px] font-bold opacity-60 uppercase tracking-wider">Executive assistance</p>
+                                </div>
+                                <ChevronRight className="ml-auto opacity-20 group-hover:opacity-100 transition-all font-black" size={16} />
+                            </button>
+
+                            <button 
+                                onClick={() => setShowAssignTaskTypePopup(false)}
+                                className="w-full mt-4 py-4 text-[10px] font-black text-gray-400 hover:text-gray-900 uppercase tracking-[0.2em] transition-colors"
+                            >
+                                Close Selection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Final Image Preview Modal */}
+            {selectedImage && (
+                <div 
+                    className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div className="relative max-w-4xl w-full h-full flex items-center justify-center">
+                        <img src={selectedImage} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="Evidence" />
+                        <button 
+                            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all"
+                            onClick={() => setSelectedImage(null)}
+                        >
+                            <X size={24} />
+                        </button>
                     </div>
                 </div>
             )}

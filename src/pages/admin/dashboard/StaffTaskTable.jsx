@@ -239,7 +239,7 @@ export default function StaffTasksTable({
               </thead>
               <tbody className="bg-white divide-y divide-gray-50">
                 {staffMembers.map((staff, index) => {
-                  const score = staff.ontime_score;
+                  const score = staff.completion_score;
                   const scoreColor = score >= 80 ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
                     score >= 50 ? 'bg-amber-100 text-amber-800 border-amber-200' :
                       'bg-rose-100 text-rose-800 border-rose-200';

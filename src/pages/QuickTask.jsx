@@ -498,7 +498,7 @@ export default function QuickTask() {
     });
     // Deduplicate strictly by task_description + name (API already deduped, this is a safety net)
     return searched.filter(task => {
-      const key = `${(task.department || '').trim()}::${(task.task_description || '').trim()}::${(task.name || '').trim()}`;
+      const key = `${(task.department || '').trim()}::${(task.task_description || '').trim()}::${(task.name || '').trim()}::${(task.frequency || '').trim()}::${(task.task_start_date || task.created_at || '').trim()}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -533,7 +533,7 @@ export default function QuickTask() {
     });
     // Deduplicate strictly by task_description + name (API already deduped, this is a safety net)
     const unique = searched.filter(task => {
-      const key = `${(task.department || '').trim()}::${(task.task_description || '').trim()}::${(task.name || '').trim()}`;
+      const key = `${(task.department || '').trim()}::${(task.task_description || '').trim()}::${(task.name || '').trim()}::${(task.frequency || '').trim()}::${(task.created_at || '').trim()}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -565,7 +565,7 @@ export default function QuickTask() {
     // Deduplicate by task_description + name
     const seen = new Set();
     const unique = searched.filter(task => {
-      const key = `${(task.machine_name || '').trim()}::${(task.part_name || '').trim()}::${(task.part_area || '').trim()}::${(task.task_description || '').trim()}::${(task.name || '').trim()}`;
+      const key = `${(task.machine_name || '').trim()}::${(task.part_name || '').trim()}::${(task.part_area || '').trim()}::${(task.task_description || '').trim()}::${(task.name || '').trim()}::${(task.freq || task.frequency || '').trim()}::${(task.task_start_date || task.created_at || '').trim()}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 const CalendarComponent = ({ date, onChange, onClose }) => {
-    const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [currentMonth, setCurrentMonth] = useState(date && !isNaN(new Date(date).getTime()) ? new Date(date) : new Date());
 
     const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
     const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();

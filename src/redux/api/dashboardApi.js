@@ -235,6 +235,7 @@ export const countPendingOrDelayTaskApi = async (dashboardType, staffFilter = nu
         .from('delegation')
         .select('*', { count: 'exact', head: true })
         .is('submission_date', null)
+        .not('status', 'eq', 'done')
         .gte(dateColumn, `${today}T00:00:00`)
         .lte(dateColumn, `${today}T23:59:59`);
     } else {
@@ -242,6 +243,9 @@ export const countPendingOrDelayTaskApi = async (dashboardType, staffFilter = nu
         .from('checklist')
         .select('*', { count: 'exact', head: true })
         .is('submission_date', null)
+        .not('status', 'eq', 'yes')
+        .not('status', 'ilike', '%done%')
+        .not('status', 'ilike', '%completed%')
         .gte(dateColumn, `${today}T00:00:00`)
         .lte(dateColumn, `${today}T23:59:59`);
     }
@@ -397,11 +401,12 @@ export const fetchStaffTasksDataApi = async (dashboardType, staffFilter = null, 
 
       // Check if task is completed
       // Generic completion check: has submission_date AND (if delegation) is approved
-      const isCompleted = dashboardType === 'checklist'
-        ? (task.submission_date !== null || task.status === 'yes' || task.status === 'Completed')
-        : (dashboardType === 'delegation'
-          ? (task.submission_date !== null && task.admin_done === true)
-          : task.submission_date !== null);
+      const statusLower = (task.status || "").toLowerCase();
+      const isCompleted = (task.submission_date !== null) || 
+                          (statusLower === 'yes') || 
+                          (statusLower.includes('done')) || 
+                          (statusLower.includes('completed')) || 
+                          (dashboardType === 'delegation' && task.admin_done === true);
 
       if (isCompleted) {
         summary[key].total_completed_tasks++;
@@ -468,8 +473,8 @@ export const fetchStaffTasksDataApi = async (dashboardType, staffFilter = null, 
       };
     });
 
-    // Sort by on-time score descending (Top performers first)
-    staffResults.sort((a, b) => b.ontime_score - a.ontime_score || b.total_completed_tasks - a.total_completed_tasks);
+    // Sort by completion score descending (Top performers first)
+    staffResults.sort((a, b) => b.completion_score - a.completion_score || b.total_completed_tasks - a.total_completed_tasks);
 
     // Apply pagination
     const from = (page - 1) * limit;
@@ -1157,15 +1162,15 @@ export const countCompleteTaskApi = async (dashboardType, staffFilter = null, de
       query = supabase
         .from('delegation')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'done')
-        .eq('admin_done', true) // Only count as complete if admin approved
+        .or('status.eq.done,submission_date.not.is.null')
+        .eq('admin_done', true)
         .gte(dateColumn, start)
         .lte(dateColumn, end);
     } else {
       query = supabase
-        .from(dashboardType) // more generic
+        .from(dashboardType)
         .select('*', { count: 'exact', head: true })
-        .not('submission_date', 'is', null)
+        .or('submission_date.not.is.null,status.eq.yes,status.ilike.%done%,status.ilike.%completed%')
         .gte(dateColumn, start)
         .lte(dateColumn, end);
     }
@@ -1219,15 +1224,19 @@ export const countOverDueORExtendedTaskApi = async (dashboardType, staffFilter =
         .from('delegation')
         .select('*', { count: 'exact', head: true })
         .is('submission_date', null)
-        .lt(dateColumn, todayStart)  // Overdue: started before today
-        .gte(dateColumn, start);     // Current month: from 1st of month
+        .not('status', 'eq', 'done')
+        .lt(dateColumn, todayStart)
+        .gte(dateColumn, start);
     } else {
       query = supabase
-        .from(dashboardType) // more generic
+        .from(dashboardType)
         .select('*', { count: 'exact', head: true })
         .is('submission_date', null)
-        .lt(dateColumn, todayStart)  // Overdue: started before today
-        .gte(dateColumn, start);     // Current month: from 1st of month
+        .not('status', 'eq', 'yes')
+        .not('status', 'ilike', '%done%')
+        .not('status', 'ilike', '%completed%')
+        .lt(dateColumn, todayStart)
+        .gte(dateColumn, start);
     }
 
     // Apply filters
