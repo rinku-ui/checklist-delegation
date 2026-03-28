@@ -5,16 +5,8 @@ import { useDispatch, useSelector } from "react-redux"
 import { maintenanceData, maintenanceHistoryData, updateMaintenance } from "../../redux/slice/maintenanceSlice"
 import { Search, History, ArrowLeft, CheckCircle2, X, Upload, Save, Loader2, Play, Pause } from "lucide-react"
 import { useRef } from "react"
-import AudioPlayer from "../../components/AudioPlayer"
+import RenderDescription from "../../components/RenderDescription"
 
-const isAudioUrl = (url) => {
-    if (!url || typeof url !== 'string') return false;
-    return url.startsWith('http') && (
-        url.includes('audio-recordings') ||
-        url.includes('voice-notes') ||
-        url.match(/\.(mp3|wav|ogg|webm|m4a|aac)(\?.*)?$/i)
-    );
-};
 
 export default function MaintenanceDataPage({ showLayout = true }) {
     const [searchTerm, setSearchTerm] = useState("")
@@ -213,16 +205,12 @@ export default function MaintenanceDataPage({ showLayout = true }) {
                                         <td className="px-3 py-4 text-sm text-gray-600 whitespace-nowrap align-top">{item.given_by || "-"}</td>
                                         <td className="px-3 py-4 text-sm text-gray-600 whitespace-nowrap align-top">{item.name || "-"}</td>
                                         <td className="px-3 py-4 text-sm text-gray-800 align-top min-w-[250px]">
-                                            <div className="whitespace-normal break-words leading-relaxed">
-                                                {item.task_description && !isAudioUrl(item.task_description) && (
-                                                    <div className="mb-2">{item.task_description}</div>
-                                                )}
-                                                {item.audio_url ? (
-                                                    <AudioPlayer url={item.audio_url} />
-                                                ) : isAudioUrl(item.task_description) ? (
-                                                    <AudioPlayer url={item.task_description} />
-                                                ) : null}
-                                            </div>
+                                            <RenderDescription 
+                                                text={item.task_description} 
+                                                audioUrl={item.audio_url} 
+                                                instructionUrl={item.instruction_attachment_url} 
+                                                instructionType={item.instruction_attachment_type} 
+                                            />
                                         </td>
                                         <td className="px-3 py-4 text-sm text-gray-600 whitespace-nowrap align-top bg-yellow-50">
                                             {item.task_start_date ? new Date(item.task_start_date).toLocaleString('en-IN', {
@@ -275,16 +263,10 @@ export default function MaintenanceDataPage({ showLayout = true }) {
                                         {/* Remarks */}
                                         <td className="px-3 py-4 align-top">
                                             {showHistory ? (
-                                                <span className="text-sm text-gray-500 italic block min-w-[150px]">
-                                                    {item.remarks && !isAudioUrl(item.remarks) && (
-                                                        <div className="mb-1">{item.remarks}</div>
-                                                    )}
-                                                    {item.audio_url ? (
-                                                        <AudioPlayer url={item.audio_url} />
-                                                    ) : isAudioUrl(item.remarks) ? (
-                                                        <AudioPlayer url={item.remarks} />
-                                                    ) : null}
-                                                </span>
+                                                <RenderDescription 
+                                                    text={item.remarks} 
+                                                    audioUrl={item.audio_url} 
+                                                />
                                             ) : (
                                                 <textarea
                                                     rows={1}

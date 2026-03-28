@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    ClipboardList, Calendar, X, Mic, Square, Trash2, Plus, Save, Loader2, CheckCircle2, Clock, FileCheck, Play, Pause
+    ClipboardList, Calendar, X, Mic, Square, Trash2, Plus, Save, Loader2, CheckCircle2, Clock, FileCheck, Play, Pause, ExternalLink
 } from "lucide-react";
 import { ReactMediaRecorder } from "react-media-recorder";
 import AdminLayout from "../../components/layout/AdminLayout";
@@ -53,6 +53,13 @@ const isAudioUrl = (url) => {
         url.includes('voice-notes') ||
         url.match(/\.(mp3|wav|ogg|webm|m4a|aac)(\?.*)?$/i)
     );
+};
+
+const getYouTubeId = (url) => {
+    if (!url || typeof url !== 'string') return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
 };
 
 
@@ -201,50 +208,68 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
                             <option value="link">Web Link</option>
                         </select>
                     </div>
-                    {task.references && task.references.map((ref, i) => (
-                        <div key={ref.id} className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row gap-2 sm:items-center mt-2 group relative">
-                            <span className="text-[10px] font-bold text-blue-700 flex-shrink-0 uppercase tracking-wider w-16">
-                                {ref.type}:
-                            </span>
-                            {ref.type === 'image' ? (
-                                <div className="flex-1 flex items-center gap-2">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                            const newRefs = [...task.references];
-                                            newRefs[i].file = e.target.files[0];
+                    {task.references && task.references.map((ref, i) => {
+                        const ytId = getYouTubeId(ref.link);
+                        return (
+                            <div key={ref.id} className={`p-2.5 border rounded-xl flex flex-col sm:flex-row gap-2 sm:items-center mt-2 group relative transition-all ${ytId ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-blue-50 border-blue-200'}`}>
+                                <span className={`text-[10px] font-black flex-shrink-0 uppercase tracking-widest w-20 flex items-center gap-1.5 ${ytId ? 'text-red-700' : 'text-blue-700'}`}>
+                                    {(ytId || ref.type === 'video') && <Play size={10} fill="currentColor" />}
+                                    {ytId || ref.type === 'video' ? 'Video:' : `${ref.type}:`}
+                                </span>
+                                {ref.type === 'image' ? (
+                                    <div className="flex-1 flex items-center gap-2">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => {
+                                                const newRefs = [...task.references];
+                                                newRefs[i].file = e.target.files[0];
+                                                onUpdate(task.id, { references: newRefs });
+                                            }}
+                                            className="text-[10px] w-full text-blue-700 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer uppercase tracking-wider"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 flex items-center gap-2">
+                                        <input
+                                            type="url"
+                                            placeholder="https://"
+                                            value={ref.link}
+                                            onChange={(e) => {
+                                                const newRefs = [...task.references];
+                                                newRefs[i].link = e.target.value;
+                                                onUpdate(task.id, { references: newRefs });
+                                            }}
+                                            className={`flex-1 w-full px-3 py-1.5 text-xs font-medium bg-white border rounded-lg outline-none transition-all ${ytId ? 'border-red-200 focus:ring-2 focus:ring-red-100 text-red-900' : 'border-blue-200 focus:ring-2 focus:ring-blue-100 text-blue-900'}`}
+                                        />
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-1">
+                                    {ref.link && (
+                                        <button
+                                            type="button"
+                                            onClick={() => window.open(ref.link, '_blank')}
+                                            className={`p-1.5 rounded-lg transition-all ${ytId ? 'text-red-400 hover:bg-red-100 hover:text-red-600' : 'text-blue-400 hover:bg-blue-100 hover:text-blue-600'}`}
+                                            title="External Preview"
+                                        >
+                                            <ExternalLink size={14} />
+                                        </button>
+                                    )}
+                                    <button 
+                                        type="button" 
+                                        onClick={() => {
+                                            const newRefs = task.references.filter(r => r.id !== ref.id);
                                             onUpdate(task.id, { references: newRefs });
                                         }}
-                                        className="text-[10px] w-full text-blue-700 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-bold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer"
-                                    />
+                                        className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                                        title="Remove Reference"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
                                 </div>
-                            ) : (
-                                <input
-                                    type="url"
-                                    placeholder="https://"
-                                    value={ref.link}
-                                    onChange={(e) => {
-                                        const newRefs = [...task.references];
-                                        newRefs[i].link = e.target.value;
-                                        onUpdate(task.id, { references: newRefs });
-                                    }}
-                                    className="flex-1 w-full px-2 py-1 text-xs text-blue-800 bg-white border border-blue-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
-                                />
-                            )}
-                            <button 
-                                type="button" 
-                                onClick={() => {
-                                    const newRefs = task.references.filter(r => r.id !== ref.id);
-                                    onUpdate(task.id, { references: newRefs });
-                                }}
-                                className="text-red-400 hover:text-red-600 p-1 rounded-md transition-colors"
-                                title="Remove Reference"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                    ))}
+                            </div>
+                        );
+                    })}
                     <ReactMediaRecorder
                         audio
                         onStop={(blobUrl, blob) => onUpdate(task.id, { recordedAudio: { blobUrl, blob } })}

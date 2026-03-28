@@ -299,7 +299,9 @@ export const updateMaintenanceTaskApi = async (updatedTask, originalTask) => {
             freq: updatedTask.freq,
             duration: updatedTask.duration || null,
             status: updatedTask.status,
-            remarks: updatedTask.remarks
+            remarks: updatedTask.remarks,
+            instruction_attachment_url: updatedTask.instruction_attachment_url,
+            instruction_attachment_type: updatedTask.instruction_attachment_type
         });
 
         if (originalTask) {

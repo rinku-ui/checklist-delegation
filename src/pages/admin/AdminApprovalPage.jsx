@@ -12,6 +12,7 @@ import { sendTaskRejectionNotification, sendAdminExtensionRemarkNotification } f
 import AudioPlayer from "../../components/AudioPlayer";
 import { useMagicToast } from "../../context/MagicToastContext";
 import supabase from "../../SupabaseClient";
+import RenderDescription from "../../components/RenderDescription";
 
 // Helper to extract audio URL from text
 const extractAudioUrl = (text) => {
@@ -585,28 +586,12 @@ export default function AdminApprovalPage() {
                                                 <div className="text-[10px] text-gray-500 font-medium uppercase tracking-tight">By: {task.given_by || '-'}</div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="text-sm text-gray-900 max-w-xs break-words">
-                                                    {(() => {
-                                                        const desc = task.task_description || task.issue_description;
-                                                        const audioUrl = task.audio_url || extractAudioUrl(desc);
-
-                                                        let cleanText = desc || '';
-                                                        if (audioUrl && desc && typeof desc === 'string' && desc.includes(audioUrl)) {
-                                                            cleanText = desc.replace(audioUrl, '').replace(/Voice Note Link:?\s*/i, '').replace(/Voice Note:?\s*/i, '').trim();
-                                                        }
-
-                                                        if (!cleanText && !audioUrl) return <span className="text-gray-400 italic">No description</span>;
-
-                                                        return (
-                                                            <div className="space-y-2">
-                                                                {audioUrl && <AudioPlayer url={audioUrl} />}
-                                                                {cleanText && (
-                                                                    <div className="whitespace-pre-wrap leading-relaxed">{cleanText}</div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                </div>
+                                                    <RenderDescription 
+                                                        text={task.task_description || task.issue_description} 
+                                                        audioUrl={task.audio_url} 
+                                                        instructionUrl={task.instruction_attachment_url} 
+                                                        instructionType={task.instruction_attachment_type} 
+                                                    />
                                                 {(task.machine_name || task.part_name) && (
                                                     <div className="text-[10px] text-indigo-600 font-bold mt-1.5 uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded inline-block">
                                                         Machine: {task.machine_name} {task.part_name ? `(${task.part_name})` : ''}
@@ -808,26 +793,12 @@ export default function AdminApprovalPage() {
 
                                     {/* Task Content */}
                                     <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 space-y-2">
-                                        {(() => {
-                                            const desc = task.task_description || task.issue_description;
-                                            const audioUrl = task.audio_url || extractAudioUrl(desc);
-
-                                            let cleanText = desc || '';
-                                            if (audioUrl && desc && typeof desc === 'string' && desc.includes(audioUrl)) {
-                                                cleanText = desc.replace(audioUrl, '').replace(/Voice Note Link:?\s*/i, '').replace(/Voice Note:?\s*/i, '').trim();
-                                            }
-
-                                            if (!cleanText && !audioUrl) return <p className="text-xs text-gray-400 italic">No description</p>;
-
-                                            return (
-                                                <div className="space-y-2">
-                                                    {audioUrl && <AudioPlayer url={audioUrl} />}
-                                                    {cleanText && (
-                                                        <p className="text-xs text-gray-800 leading-normal font-medium">{cleanText}</p>
-                                                    )}
-                                                </div>
-                                            );
-                                        })()}
+                                        <RenderDescription 
+                                            text={task.task_description || task.issue_description} 
+                                            audioUrl={task.audio_url} 
+                                            instructionUrl={task.instruction_attachment_url} 
+                                            instructionType={task.instruction_attachment_type} 
+                                        />
 
                                         {(task.machine_name || task.part_name) && (
                                             <div className="flex flex-wrap gap-1 mt-1">

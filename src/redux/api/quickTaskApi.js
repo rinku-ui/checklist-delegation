@@ -192,6 +192,8 @@ export const updateChecklistTaskApi = async (updatedTask, originalTask) => {
       frequency: updatedTask.frequency,
       duration: updatedTask.duration || null,
       require_attachment: updatedTask.require_attachment,
+      instruction_attachment_url: updatedTask.instruction_attachment_url,
+      instruction_attachment_type: updatedTask.instruction_attachment_type,
       remark: updatedTask.remark,
       admin_done: false
     });
@@ -229,6 +231,8 @@ export const updateDelegationTaskApi = async (updatedTask, originalTask) => {
       duration: updatedTask.duration || null,
       enable_reminder: updatedTask.enable_reminder,
       require_attachment: updatedTask.require_attachment,
+      instruction_attachment_url: updatedTask.instruction_attachment_url,
+      instruction_attachment_type: updatedTask.instruction_attachment_type,
       remarks: updatedTask.remarks
     });
 
