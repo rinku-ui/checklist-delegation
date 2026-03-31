@@ -72,9 +72,8 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
     // Filter doers based on task date and leave status
     const getFilteredDoers = () => {
         if (!doerName || !Array.isArray(doerName)) return [];
-        if (!task.date) return doerName;
-
-        const taskD = new Date(task.date);
+        
+        const taskD = task.date ? new Date(task.date) : new Date();
         taskD.setHours(0, 0, 0, 0);
 
         return doerName.filter(user => {
@@ -94,22 +93,19 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
                 }
             }
 
-            // HOD Restriction
-            const currentU = (localStorage.getItem("user-name") || "").toLowerCase();
-            const currentR = (localStorage.getItem("role") || "").toLowerCase();
-            if (currentR === "hod" || (currentR === "admin" && currentU !== "admin")) {
-                const dName = (user.user_name || user.name || "").toLowerCase();
-                const reportedBy = (user.reported_by || "").toLowerCase();
-                if (dName !== currentU && reportedBy !== currentU) return false;
-            }
-
-            // Self-Assignment Permission Check
-            const canSelfAssign = localStorage.getItem("can_self_assign") === "true";
-            const isSuperAdmin = currentU === "admin";
+            // HOD Restriction & Reporting Group Filter
+            const currentU = (localStorage.getItem("user-name") || "").toLowerCase().trim();
+            const currentR = (localStorage.getItem("role") || "").toLowerCase().trim();
             
-            if (!isSuperAdmin && !canSelfAssign) {
-              const dName = (user.user_name || user.name || "").toLowerCase();
-              if (dName === currentU) return false;
+            if (currentR === "hod") {
+                const dName = (user.user_name || user.name || "").toLowerCase().trim();
+                const reportedBy = (user.reported_by || "").toLowerCase().trim();
+                
+                // Only show themselves OR their direct reports
+                if (dName !== currentU && reportedBy !== currentU) return false;
+                
+                // If it's themselves, check for explicit self-assign rights
+                if (dName === currentU && !user.can_self_assign) return false;
             }
 
             return true;

@@ -22,10 +22,11 @@ export const fetchUniqueDepartmentDataApi = async () => {
       .filter(dept => dept && dept.trim() !== "")
     )].sort();
 
-    if (role === 'HOD' && userAccess && userAccess !== 'all') {
-      const allowedDepts = userAccess.split(',').map(d => d.trim().toLowerCase());
-      uniqueDepartments = uniqueDepartments.filter(d => allowedDepts.includes(d.toLowerCase()));
-    }
+    // HODs should see all departments now per user request
+    // if (role === 'HOD' && userAccess && userAccess !== 'all') {
+    //   const allowedDepts = userAccess.split(',').map(d => d.trim().toLowerCase());
+    //   uniqueDepartments = uniqueDepartments.filter(d => allowedDepts.includes(d.toLowerCase()));
+    // }
 
     console.log("✅ Unique departments found:", uniqueDepartments);
     return uniqueDepartments;
@@ -90,7 +91,7 @@ export const fetchUniqueDoerNameDataApi = async (department) => {
 
     let query = supabase
       .from("users")
-      .select("user_name, user_access, status, leave_date, leave_end_date, reported_by")
+      .select("user_name, user_access, status, leave_date, leave_end_date, reported_by, can_self_assign")
       .order("user_name", { ascending: true });
 
     if (department) {
@@ -121,6 +122,11 @@ export const fetchUniqueDoerNameDataApi = async (department) => {
             if (reportedBy !== username && uName !== username) {
                 return;
             }
+
+            // If it's the HOD themselves, check if they have self-assign rights
+            if (uName === username && !user.can_self_assign) {
+                return;
+            }
         }
 
         uniqueUsers.push({
@@ -128,7 +134,8 @@ export const fetchUniqueDoerNameDataApi = async (department) => {
           status: user.status,
           leave_date: user.leave_date,
           leave_end_date: user.leave_end_date,
-          reported_by: user.reported_by
+          reported_by: user.reported_by,
+          can_self_assign: user.can_self_assign
         });
         seenNames.add(uName);
       }

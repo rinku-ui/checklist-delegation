@@ -38,14 +38,13 @@ const defaultTask = () => ({
 function RepairTaskCard({ task, index, total, givenBy, userData, machineOptions, onUpdate, onRemove }) {
     const handleChange = (e) => onUpdate(task.id, { [e.target.name]: e.target.value });
 
-    // Filter doers based on today's date (since repairs are immediate)
+    // Filter doers based on user status, leave, and HOD permissions
     const getFilteredDoers = () => {
         if (!userData || !Array.isArray(userData)) return [];
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
         return userData.filter(u => {
-
             // If they are on leave, check the dates
             if ((u.status === 'on leave' || u.status === 'on_leave') && u.leave_date && u.leave_end_date) {
                 const leaveS = new Date(u.leave_date);
@@ -60,22 +59,19 @@ function RepairTaskCard({ task, index, total, givenBy, userData, machineOptions,
                 return false; // Skip inactive and other non-active statuses
             }
 
-            // HOD Restriction
-            const currentU = (localStorage.getItem("user-name") || "").toLowerCase();
-            const currentR = (localStorage.getItem("role") || "").toLowerCase();
-            if (currentR === "hod" || (currentR === "admin" && currentU !== "admin")) {
-                const dName = (u.user_name || u.name || "").toLowerCase();
-                const reportedBy = (u.reported_by || "").toLowerCase();
-                if (dName !== currentU && reportedBy !== currentU) return false;
-            }
-
-            // Self-Assignment Permission Check
-            const canSelfAssign = localStorage.getItem("can_self_assign") === "true";
-            const isSuperAdmin = currentU === "admin";
+            // HOD Restriction & Reporting Group Filter
+            const currentU = (localStorage.getItem("user-name") || "").toLowerCase().trim();
+            const currentR = (localStorage.getItem("role") || "").toLowerCase().trim();
             
-            if (!isSuperAdmin && !canSelfAssign) {
-              const dName = (u.user_name || u.name || "").toLowerCase();
-              if (dName === currentU) return false;
+            if (currentR === "hod") {
+                const dName = (u.user_name || u.name || "").toLowerCase().trim();
+                const reportedBy = (u.reported_by || "").toLowerCase().trim();
+                
+                // Only show themselves OR their direct reports
+                if (dName !== currentU && reportedBy !== currentU) return false;
+                
+                // If it's themselves, check for explicit self-assign rights
+                if (dName === currentU && !u.can_self_assign) return false;
             }
 
             return true;

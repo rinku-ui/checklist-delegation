@@ -119,7 +119,8 @@ export const createUserApi = async (newUser) => {
       leave_date: newUser.leave_date || null,
       leave_end_date: newUser.leave_end_date || null,
       remark: newUser.remark || null,
-      reported_by: newUser.reported_by
+      reported_by: newUser.reported_by,
+      can_self_assign: newUser.can_self_assign || false
     };
 
     // Add designation if provided
@@ -167,7 +168,8 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
       user_access: updatedUser.user_access,
       department: updatedUser.department,
       profile_image: updatedUser.profile_image,
-      reported_by: updatedUser.reported_by
+      reported_by: updatedUser.reported_by,
+      can_self_assign: updatedUser.can_self_assign ?? false
     };
 
     // Only include Designation if explicitly set
