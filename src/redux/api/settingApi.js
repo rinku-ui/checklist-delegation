@@ -98,7 +98,6 @@ export const createUserApi = async (newUser) => {
       number: newUser.phone,
       employee_id: newUser.employee_id,
       role: newUser.role,
-      status: newUser.status,
       user_access: newUser.user_access,
       department: newUser.department,
       profile_image: newUser.profile_image || null,
@@ -125,7 +124,7 @@ export const createUserApi = async (newUser) => {
 
     return data;
   } catch (error) {
-    // console.log("Error from Supabase:", error);
+    console.error("Error from Supabase:", error);
   }
 };
 
@@ -138,7 +137,6 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
       number: updatedUser.number,
       employee_id: updatedUser.employee_id,
       role: updatedUser.role,
-      status: updatedUser.status,
       user_access: updatedUser.user_access,
       department: updatedUser.department,
       profile_image: updatedUser.profile_image,
@@ -178,7 +176,8 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
     if (error) {
       if (error.code === 'PGRST204' || error.code === '42703' || error.message?.toLowerCase().includes('designation')) {
         console.warn("⚠️ Designation update failed, retrying without designation field. Error:", error.message);
-        const { designation, ...fallbackData } = updateData;
+        const fallbackData = { ...updateData };
+        delete fallbackData.designation;
         const retry = await supabase.from("users").update(fallbackData).eq("id", id).select().maybeSingle();
         data = retry.data;
         error = retry.error;
@@ -348,7 +347,7 @@ export const fetchGivenByDataApi = async () => {
         try {
           const parsed = JSON.parse(name);
           name = parsed.given_by || parsed.name || name;
-        } catch (error) { 
+        } catch { 
           // Ignore parse errors, use original value
         }
       }
