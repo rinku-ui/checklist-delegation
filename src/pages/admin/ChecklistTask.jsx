@@ -448,19 +448,24 @@ export default function ChecklistTask() {
         const dateParam = params.get('date');
         const typeParam = params.get('type');
 
-        if (dateParam) {
-            // Use T00:00:00 to ensure date is parsed as local time correctly
-            const parsedDate = new Date(dateParam + 'T00:00:00');
+        if (dateParam || typeParam === 'delegation') {
             setTasks(prev => {
                 const newTasks = [...prev];
                 if (newTasks.length > 0) {
-                    newTasks[0] = {
-                        ...newTasks[0],
-                        date: isNaN(parsedDate.getTime()) ? null : parsedDate,
-                        frequency: typeParam === 'delegation' ? "One Time (No Recurrence)" : newTasks[0].frequency,
-                        dateLocked: true,
-                        frequencyLocked: typeParam === 'delegation' // Lock frequency only for delegation (one-time)
-                    };
+                    const updates = {};
+                    
+                    if (dateParam) {
+                        const parsedDate = new Date(dateParam + 'T00:00:00');
+                        updates.date = isNaN(parsedDate.getTime()) ? null : parsedDate;
+                        updates.dateLocked = true;
+                    }
+
+                    if (typeParam === 'delegation') {
+                        updates.frequency = "One Time (No Recurrence)";
+                        updates.frequencyLocked = true;
+                    }
+
+                    newTasks[0] = { ...newTasks[0], ...updates };
                 }
                 return newTasks;
             });
@@ -520,7 +525,11 @@ export default function ChecklistTask() {
 
         const workingDaySet = new Set(workingData?.map(d => d.working_date) || []);
         const isHoliday = (d) => holidays.includes(getLocalDateString(d));
-        const isWorkingDay = (d) => workingDaySet.has(getLocalDateString(d));
+        const isWorkingDay = (d) => {
+            const dateStr = getLocalDateString(d);
+            if (workingDaySet.has(dateStr)) return true;
+            return d.getDay() !== 0; // Fallback: not Sunday
+        };
         const toLocalISO = (d) => `${getLocalDateString(d)}T${time}:00`;
         const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
 
@@ -602,10 +611,15 @@ export default function ChecklistTask() {
                 if (t.frequency === "One Time (No Recurrence)") {
                     const dateStr = formatDateISO(t.date);
                     const isH = holidays.includes(dateStr);
-                    const { data: isW } = await supabase.from('working_day_calender').select('working_date').eq('working_date', dateStr).single();
+                    const { data: isW } = await supabase.from('working_day_calender').select('working_date').eq('working_date', dateStr).maybeSingle();
 
-                    if (isH || !isW) {
-                        return { success: false, message: `Task ${i + 1}: The selected date (${dateStr}) is a ${isH ? 'holiday' : 'non-working day'}. Please select a different working day.` };
+                    let isWorkingDay = !!isW;
+                    if (!isWorkingDay) {
+                        const dayOfWeek = new Date(t.date).getDay();
+                        if (dayOfWeek !== 0) isWorkingDay = true;
+                    }
+                    if (isH || !isWorkingDay) {
+                        return { success: false, message: `Task ${i + 1}: The selected date (${dateStr}) is a ${isH ? 'holiday' : 'Sunday (non-working day)'}. Please select a different working day.` };
                     }
                 }
                 return { success: true };
@@ -732,10 +746,10 @@ export default function ChecklistTask() {
                             const ext = ref.file.name.split('.').pop();
                             const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
                             const { error: uploadError } = await supabase.storage
-                                .from('task-instructions')
+                                .from('Checklist Delegation Image')
                                 .upload(fileName, ref.file, { upsert: false });
                             if (uploadError) throw new Error(`Reference Upload Error: ${uploadError.message}`);
-                            const { data: publicUrlData } = supabase.storage.from('task-instructions').getPublicUrl(fileName);
+                            const { data: publicUrlData } = supabase.storage.from('Checklist Delegation Image').getPublicUrl(fileName);
                             
                             resultsUrls.push(publicUrlData.publicUrl);
                             resultsTypes.push(ref.type);

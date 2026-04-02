@@ -5,10 +5,10 @@ import { motion } from 'framer-motion'
 
 export default function TaskManagementTabs({ activeTab, setActiveTab }) {
     const tabs = [
-        { id: 'checklist', label: 'Checklist', icon: ClipboardCheck, color: 'text-purple-600', activeColor: 'bg-purple-600' },
-        { id: 'maintenance', label: 'Maintenance', icon: Hammer, color: 'text-blue-600', activeColor: 'bg-blue-600' },
-        { id: 'repair', label: 'Repair', icon: Wrench, color: 'text-orange-600', activeColor: 'bg-orange-600' },
-        { id: 'ea', label: 'EA', icon: Users, color: 'text-green-600', activeColor: 'bg-green-600' },
+        // { id: 'checklist', label: 'Checklist', icon: ClipboardCheck, color: 'text-purple-600', activeColor: 'bg-purple-600' },
+        // { id: 'maintenance', label: 'Maintenance', icon: Hammer, color: 'text-blue-600', activeColor: 'bg-blue-600' },
+        // { id: 'repair', label: 'Repair', icon: Wrench, color: 'text-orange-600', activeColor: 'bg-orange-600' },
+        // { id: 'ea', label: 'EA', icon: Users, color: 'text-green-600', activeColor: 'bg-green-600' },
     ]
 
     return (

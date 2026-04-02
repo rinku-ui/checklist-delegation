@@ -154,13 +154,13 @@ export const updateChecklistData = async (submissionData) => {
           const filePath = `task-${item.taskId}/${fileName}`;
 
           // 3. Upload to Supabase storage
-          const { error: uploadError } = await supabase.storage
-            .from('checklist')
-            .upload(filePath, file, {
-              cacheControl: '3600',
-              contentType: item.image.type,
-              upsert: false
-            });
+          const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('Checklist Delegation Image')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            contentType: item.image.type,
+            upsert: false
+          });
 
           if (uploadError) throw uploadError;
 

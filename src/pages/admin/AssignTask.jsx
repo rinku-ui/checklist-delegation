@@ -26,38 +26,49 @@ export default function AssignTask() {
       ring: "hover:ring-purple-200"
     },
     {
-      id: "maintenance",
-      label: "Maintenance Schedule",
-      subLabel: "Preventive Care",
-      icon: Wrench,
-      path: "/dashboard/maintenance",
+      id: "delegation",
+      label: "Task Delegation",
+      subLabel: "Assign One-time Tasks",
+      icon: ClipboardList,
+      path: "/dashboard/checklist?type=delegation",
       color: "text-purple-600",
       bg: "bg-purple-50",
       border: "hover:border-purple-500",
       ring: "hover:ring-purple-200"
     },
-    {
-      id: "repair",
-      label: "Repair Tickets",
-      subLabel: "Issue Resolution",
-      icon: Hammer,
-      path: "/dashboard/repair",
-      color: "text-purple-600",
-      bg: "bg-purple-50",
-      border: "hover:border-purple-500",
-      ring: "hover:ring-purple-200"
-    },
-    {
-      id: "ea",
-      label: "EA Tasks",
-      subLabel: "Executive Assistant",
-      icon: Users,
-      path: "/dashboard/ea-task",
-      color: "text-purple-600",
-      bg: "bg-purple-50",
-      border: "hover:border-purple-500",
-      ring: "hover:ring-purple-200"
-    }
+    // {
+    //   id: "maintenance",
+    //   label: "Maintenance Schedule",
+    //   subLabel: "Preventive Care",
+    //   icon: Wrench,
+    //   path: "/dashboard/maintenance",
+    //   color: "text-purple-600",
+    //   bg: "bg-purple-50",
+    //   border: "hover:border-purple-500",
+    //   ring: "hover:ring-purple-200"
+    // },
+    // {
+    //   id: "repair",
+    //   label: "Repair Tickets",
+    //   subLabel: "Issue Resolution",
+    //   icon: Hammer,
+    //   path: "/dashboard/repair",
+    //   color: "text-purple-600",
+    //   bg: "bg-purple-50",
+    //   border: "hover:border-purple-500",
+    //   ring: "hover:ring-purple-200"
+    // },
+    // {
+    //   id: "ea",
+    //   label: "EA Tasks",
+    //   subLabel: "Executive Assistant",
+    //   icon: Users,
+    //   path: "/dashboard/ea-task",
+    //   color: "text-purple-600",
+    //   bg: "bg-purple-50",
+    //   border: "hover:border-purple-500",
+    //   ring: "hover:ring-purple-200"
+    // }
   ];
 
   return (

@@ -66,9 +66,9 @@ const Setting = () => {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    console.log("Setting Component - userData:", userData);
-    console.log("Setting Component - loading:", loading);
-    console.log("Setting Component - error:", error);
+    // console.log("Setting Component - userData:", userData);
+    // console.log("Setting Component - loading:", loading);
+    // console.log("Setting Component - error:", error);
   }, [userData, loading, error]);
 
 
@@ -113,7 +113,7 @@ const Setting = () => {
       // Back-off logic if entirely failing
       if (encountered400 && allLogs.length === 0) {
         if (lastSyncError.current.status !== 400) {
-          console.log('ℹ️ Device APIs unreachable (400). Sync paused for 30 minutes.');
+          // console.log('ℹ️ Device APIs unreachable (400). Sync paused for 30 minutes.');
         }
         lastSyncError.current = { status: 400, timestamp: now };
         return;
@@ -121,7 +121,7 @@ const Setting = () => {
 
       // Clear back-off if we got any data
       if (allLogs.length > 0 && lastSyncError.current.status === 400) {
-        console.log('✅ Device sync partially or fully restored.');
+        // console.log('✅ Device sync partially or fully restored.');
         lastSyncError.current = { status: null, timestamp: 0 };
       }
 
@@ -482,7 +482,10 @@ const Setting = () => {
     Designation: '',
     profile_image: '',
     reported_by: '',
-    can_self_assign: false
+    can_self_assign: false,
+    leave_date: '',
+    leave_end_date: '',
+    remark: ''
   });
 
   const [deptForm, setDeptForm] = useState({
@@ -553,7 +556,7 @@ const Setting = () => {
     };
 
     try {
-      console.log("Creating user with payload:", newUser);
+      // console.log("Creating user with payload:", newUser);
       await dispatch(createUser(newUser)).unwrap();
 
       // If the new user has the same name as current logged in user (unlikely but safe)
@@ -594,7 +597,7 @@ const Setting = () => {
       status: userForm.status,
       user_access: userForm.user_access || userForm.department,
       department: userForm.department,
-      Designation: userForm.Designation || null,
+      designation: userForm.designation || null,
       profile_image: imageUrl,
       leave_date: userForm.leave_date || null,
       leave_end_date: userForm.leave_end_date || null,
@@ -604,12 +607,12 @@ const Setting = () => {
     };
 
     try {
-      console.log("Updating user with image:", imageUrl);
+      // console.log("Updating user with image:", imageUrl);
       await dispatch(updateUser({ id: currentUserId, updatedUser })).unwrap();
 
       // Critical: Update localStorage if the edited user is the current logged-in user
       if (updatedUser.user_name === localStorage.getItem("user-name")) {
-        console.log("Updating current user's localStorage image");
+        // console.log("Updating current user's localStorage image");
         localStorage.setItem("profile_image", imageUrl || "");
         // Refresh to update all layouts immediately
         window.location.reload();
@@ -846,8 +849,8 @@ const Setting = () => {
       department: user.department || '',
       user_access: user.user_access || '',
       role: user.role || 'user',
-      status: user.status || 'active',
-      Designation: user.Designation || '',
+      status: user.status === true ? 'active' : (user.leave_date ? 'on_leave' : 'inactive'),
+      designation: user.designation || '',
       profile_image: user.profile_image || '',
       leave_date: user.leave_date ? user.leave_date.split('T')[0] : '',
       leave_end_date: user.leave_end_date ? user.leave_end_date.split('T')[0] : '',
@@ -915,7 +918,7 @@ const Setting = () => {
       givenBy: '',
       role: 'user',
       status: 'active',
-      Designation: '',
+      designation: '',
       profile_image: '',
       leave_date: '',
       leave_end_date: '',
@@ -1004,7 +1007,7 @@ const Setting = () => {
                 { id: 'users', label: 'Users', icon: User },
                 { id: 'departments', label: 'Departments', icon: Building, action: () => { dispatch(departmentDetails()); dispatch(givenByDetails()); } },
                 { id: 'leave', label: 'Leave', icon: Calendar },
-                { id: 'categories', label: 'Machines', icon: Settings },
+                // { id: 'categories', label: 'Machines', icon: Settings },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1038,7 +1041,7 @@ const Setting = () => {
                 <RefreshCw size={20} className={isRefreshing ? 'animate-spin' : ''} />
               </button>
 
-              {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'categories') && (
+              {(activeTab === 'users' || activeTab === 'departments' /* || activeTab === 'categories' */) && (
                 <button
                   onClick={() => {
                     if (activeTab === 'categories') {
@@ -1459,7 +1462,7 @@ const Setting = () => {
                             user.user_name && (
                               !usernameFilter || user.user_name.toLowerCase().includes(usernameFilter.toLowerCase()))
                           );
-                        console.log("Setting Page - Filtered Users COUNT:", filtered.length);
+                        // console.log("Setting Page - Filtered Users COUNT:", filtered.length);
                         return filtered;
                       })().map((user, index) => (
                         <tr key={`user-${user?.id || index}`} className="hover:bg-gray-50">
@@ -1488,31 +1491,35 @@ const Setting = () => {
                             <div className="text-sm text-gray-900">{user?.department || '—'}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-purple-700 font-bold">{user?.Designation || '—'}</div>
+                            <div className="text-sm text-purple-700 font-bold">{user?.designation || '—'}</div>
                           </td>
-
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col">
                               <div className="flex items-center">
-                                <span className={`px-2 py-1 inline-flex text-[10px] leading-4 font-bold rounded-full uppercase tracking-wider ${getStatusColor(user?.status)}`}>
-                                  {user?.status === 'on_leave' ? 'On Leave' : user?.status}
-                                </span>
-                                {user?.status === 'active' && (
-                                  <span className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-sm shadow-green-200" title="Live Status"></span>
-                                )}
+                                {(() => {
+                                  let displayStatus = user?.status === true ? 'active' : 'inactive';
+                                  if (user?.status === false && user?.leave_date) {
+                                    displayStatus = 'on_leave';
+                                  }
+                                  return (
+                                    <>
+                                      <span className={`px-2 py-1 inline-flex text-[10px] leading-4 font-bold rounded-full uppercase tracking-wider ${getStatusColor(displayStatus)}`}>
+                                        {displayStatus === 'on_leave' ? 'On Leave' : displayStatus}
+                                      </span>
+                                      {displayStatus === 'active' && (
+                                        <span className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-sm shadow-green-200" title="Live Status"></span>
+                                      )}
+                                    </>
+                                  );
+                                })()}
                               </div>
-                              {(user?.status === 'on leave' || user?.status === 'on_leave') && user?.leave_date && (
+                              {user?.status === false && user?.leave_date && (
                                 <div className="flex flex-col mt-1 space-y-0.5">
                                   <span className="text-[10px] text-amber-700 font-bold flex items-center gap-1">
                                     <Calendar size={10} />
                                     {new Date(user.leave_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                                     {user.leave_end_date ? ` - ${new Date(user.leave_end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
                                   </span>
-                                  {user.remark && (
-                                    <span className="text-[9px] text-gray-400 italic font-medium truncate max-w-[120px]" title={user.remark}>
-                                      {user.remark}
-                                    </span>
-                                  )}
                                 </div>
                               )}
                             </div>
@@ -1798,7 +1805,7 @@ const Setting = () => {
         )}
 
         {/* Machines Tab (Machine Management) */}
-        {activeTab === 'categories' && (
+        {/* {activeTab === 'categories' && (
           <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-purple-100">
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-8 py-6 flex justify-between items-center border-b border-purple-100">
               <div>
@@ -1849,7 +1856,6 @@ const Setting = () => {
 
                   return (
                     <>
-                      {/* Desktop View */}
                       <div className="hidden md:block">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
@@ -1938,7 +1944,6 @@ const Setting = () => {
                         </table>
                       </div>
 
-                      {/* Mobile View */}
                       <div className="md:hidden space-y-4 p-4 bg-gray-50/50">
                         {machineNames.map((machineName, idx) => {
                           const data = machinesByName[machineName];
@@ -2022,7 +2027,7 @@ const Setting = () => {
               </div>
             </div>
           </div>
-        )}
+        )} */}
 
 
         {/* User Modal */}
@@ -2188,10 +2193,11 @@ const Setting = () => {
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
                       >
                         <option value="">No Supervisor (Direct Admin)</option>
-                        {userData && userData.length > 0 && userData
-                          .filter(u => u.user_name !== userForm.username && u.user_name !== 'admin')
+                        {userData && [...userData]
+                          .filter(u => u && u.user_name && u.user_name !== userForm.username)
+                          .sort((a, b) => a.user_name.localeCompare(b.user_name))
                           .map((u, i) => (
-                            <option key={i} value={u.user_name}>{u.user_name}</option>
+                            <option key={u.id || i} value={u.user_name}>{u.user_name}</option>
                           ))
                         }
                       </select>
@@ -2217,14 +2223,13 @@ const Setting = () => {
                       </select>
                     </div>
 
-                    {/* Designation Field — shown for both new and edit */}
                     <div className="space-y-2">
-                      <label htmlFor="Designation" className="block text-sm font-bold text-gray-700 ml-1">Designation</label>
+                      <label htmlFor="designation" className="block text-sm font-bold text-gray-700 ml-1">Designation</label>
                       <input
                         type="text"
-                        name="Designation"
-                        id="Designation"
-                        value={userForm.Designation}
+                        name="designation"
+                        id="designation"
+                        value={userForm.designation}
                         onChange={handleUserInputChange}
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
                         placeholder="e.g. Senior Technician, Supervisor..."

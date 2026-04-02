@@ -106,7 +106,7 @@ const AllTasks = () => {
       try {
         const [holidaysRes, usersRes, workingDaysRes] = await Promise.all([
           supabase.from('holidays').select('holiday_date'),
-          supabase.from('users').select('user_name').eq('status', 'active').order('user_name', { ascending: true }),
+          supabase.from('users').select('user_name').eq('status', true).order('user_name', { ascending: true }),
           supabase.from('working_day_calender').select('working_date')
         ]);
 
@@ -470,6 +470,7 @@ const AllTasks = () => {
         const mappedData = filteredData.map(item => ({
           ...item,
           id: item.id || item.task_id,
+          _task_id: item.task_id, // preserve the original UUID task_id for updates
           _table: item._table || tableName,
           department: item.department || (activeTab === "ea" ? "EA" : "-")
         }));
@@ -682,7 +683,7 @@ const AllTasks = () => {
   }, []);
 
   const uploadFile = async (id, file) => {
-    const bucketName = activeTab;
+    const bucketName = 'Checklist Delegation Image';
     const fileName = `${id}_${Date.now()}_${file.name}`;
     const { data, error: uploadError } = await supabase.storage.from(bucketName).upload(fileName, file);
 
@@ -727,9 +728,9 @@ const AllTasks = () => {
       if (updateForm.workPhoto) {
         const fileExt = updateForm.workPhoto.name.split('.').pop();
         const fileName = `work_${selectedUpdateTask.id}_${Date.now()}.${fileExt}`;
-        const { data, error } = await supabase.storage.from('repair').upload(fileName, updateForm.workPhoto);
+        const { data, error } = await supabase.storage.from('Checklist Delegation Image').upload(fileName, updateForm.workPhoto);
         if (error) throw error;
-        const { data: { publicUrl } } = supabase.storage.from('repair').getPublicUrl(fileName);
+        const { data: { publicUrl } } = supabase.storage.from('Checklist Delegation Image').getPublicUrl(fileName);
         workPhotoUrl = publicUrl;
       }
 
@@ -737,9 +738,9 @@ const AllTasks = () => {
       if (updateForm.billCopy) {
         const fileExt = updateForm.billCopy.name.split('.').pop();
         const fileName = `bill_${selectedUpdateTask.id}_${Date.now()}.${fileExt}`;
-        const { data, error } = await supabase.storage.from('repair').upload(fileName, updateForm.billCopy);
+        const { data, error } = await supabase.storage.from('Checklist Delegation Image').upload(fileName, updateForm.billCopy);
         if (error) throw error;
-        const { data: { publicUrl } } = supabase.storage.from('repair').getPublicUrl(fileName);
+        const { data: { publicUrl } } = supabase.storage.from('Checklist Delegation Image').getPublicUrl(fileName);
         billCopyUrl = publicUrl;
       }
 
@@ -932,17 +933,22 @@ const AllTasks = () => {
           const updates = {
             [completionField]: new Date(new Date().getTime() + (330 * 60000)).toISOString().replace('Z', '+05:30'),
             [remarksField]: remarksData[id] || null,
-            status: statusData[id] || ((activeTab === "checklist" || activeTab === "delegation") ? "yes" : "Done"),
+            status: statusData[id] || "done",
             admin_done: false
           };
           if (imageUrl) {
             updates[imageField] = imageUrl;
           }
 
-          // Checklist and Delegation tables use `task_id`, all others use `id`
+          // Checklist and Delegation tables use `task_id` (UUID), all others use `id`
           const idKey = (activeTab === 'checklist' || activeTab === 'delegation') ? 'task_id' : 'id';
+          // For checklist/delegation, use the preserved UUID _task_id to avoid 400 errors from integer id
+          const taskObj = tasks.find(t => t.id === id);
+          const idValue = (activeTab === 'checklist' || activeTab === 'delegation')
+            ? (taskObj?._task_id || taskObj?.task_id || id)
+            : id;
 
-          const { error: updateError } = await supabase.from(tableName).update(updates).eq(idKey, id);
+          const { error: updateError } = await supabase.from(tableName).update(updates).eq(idKey, idValue);
           if (updateError) throw updateError;
         }
 
@@ -1087,6 +1093,7 @@ const AllTasks = () => {
                         )}
                       </div>
 
+                      {/* Urgent WhatsApp button - commented out
                       <button
                         onClick={handleSendUrgentWhatsApp}
                         disabled={selectedItems.size === 0 || isSubmitting}
@@ -1095,6 +1102,7 @@ const AllTasks = () => {
                         <BellRing className="h-4 w-4" />
                         <span className="hidden md:inline">Urgent</span>
                       </button>
+                      */}
 
                       {activeTab !== "repair" && (
                         <button
@@ -1353,8 +1361,8 @@ const AllTasks = () => {
                                                     </>
                                                   ) : (
                                                     <>
-                                                      <option value={(activeTab === 'checklist' || activeTab === 'delegation') ? 'yes' : 'Done'}>Done</option>
-                                                      <option value={(activeTab === 'checklist' || activeTab === 'delegation') ? 'no' : 'Not Done'}>Not Done</option>
+                                                      <option value="done">Done</option>
+                                                      <option value="not done">Not Done</option>
                                                     </>
                                                   )}
                                                 </select>
@@ -1584,8 +1592,8 @@ const AllTasks = () => {
                                       </>
                                     ) : (
                                       <>
-                                        <option value={(activeTab === 'checklist' || activeTab === 'delegation') ? 'yes' : 'Done'}>Done</option>
-                                        <option value={(activeTab === 'checklist' || activeTab === 'delegation') ? 'no' : 'Not Done'}>Not Done</option>
+                                        <option value={(activeTab === 'checklist' || activeTab === 'delegation') ? 'yes' : 'done'}>Done</option>
+                                        <option value={(activeTab === 'checklist' || activeTab === 'delegation') ? 'no' : 'not done'}>Not Done</option>
                                       </>
                                     )}
                                   </select>

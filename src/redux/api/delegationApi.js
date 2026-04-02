@@ -56,7 +56,7 @@ export const insertDelegationDoneAndUpdate = createAsyncThunk(
 
               // Upload to Supabase storage using 'checklist' bucket as 'delegation' bucket doesn't exist
               const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('checklist')
+                .from('Checklist Delegation Image')
                 .upload(fileName, taskImage);
 
               if (uploadError) {
@@ -64,7 +64,7 @@ export const insertDelegationDoneAndUpdate = createAsyncThunk(
               } else {
                 // Get public URL from 'checklist' bucket
                 const { data: { publicUrl } } = supabase.storage
-                  .from('checklist')
+                  .from('Checklist Delegation Image')
                   .getPublicUrl(fileName);
 
                 imageUrl = publicUrl;

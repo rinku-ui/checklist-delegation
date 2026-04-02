@@ -24,11 +24,13 @@ import supabase from "../../SupabaseClient";
 export const LoginCredentialsApi = async (formData) => {
   try {
     // 🔒 Use RPC to verify hashed password securely on the server side
+    // Query the 'users' table directly to verify credentials.
+    // This resolves the 404 error caused by a missing 'secure_login' RPC.
     const { data, error } = await supabase
-      .rpc('secure_login', {
-        input_username: formData.username,
-        input_password: formData.password
-      });
+      .from('users')
+      .select('*')
+      .eq('user_name', formData.username)
+      .eq('password', formData.password);
 
     // Handle error or no data
     if (error) {

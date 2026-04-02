@@ -224,11 +224,11 @@ export const updateMaintenanceData = async (submissionData) => {
                     const file = new File([blob], item.image.name, { type: item.image.type });
                     const fileExt = item.image.name.split('.').pop();
                     const fileName = `mnt_${Date.now()}_${crypto.randomUUID()}.${fileExt}`;
-                    const { error: uploadError } = await supabase.storage.from('maintenance').upload(fileName, file);
+                    const { error: uploadError } = await supabase.storage.from('Checklist Delegation Image').upload(fileName, file);
 
                     if (uploadError) throw uploadError;
 
-                    const { data: { publicUrl } } = supabase.storage.from('maintenance').getPublicUrl(fileName);
+                    const { data: { publicUrl } } = supabase.storage.from('Checklist Delegation Image').getPublicUrl(fileName);
                     imageUrl = publicUrl;
 
                 } catch (uploadError) {

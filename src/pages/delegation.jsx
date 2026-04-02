@@ -889,6 +889,7 @@ function DelegationDataPage() {
 
                 {!showHistory && (
                   <>
+                    {/* Urgent WhatsApp button - commented out
                     <button
                       onClick={handleSendUrgentWhatsApp}
                       disabled={selectedItems.size === 0 || isSubmitting}
@@ -899,6 +900,7 @@ function DelegationDataPage() {
                       <span className="hidden sm:inline">Urgent WhatsApp</span>
                       <span className="sm:hidden">Urgent</span>
                     </button>
+                    */}
 
                     <button
                       onClick={handleSubmit}

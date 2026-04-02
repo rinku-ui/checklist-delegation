@@ -9,7 +9,7 @@ import { LoginCredentialsApi } from "../redux/api/loginApi"
 import { useMagicToast } from "../context/MagicToastContext"
 import supabase from "../SupabaseClient"
 import { sendPasswordResetOTP } from "../services/whatsappService"
-import { KeyRound, ShieldCheck, User as UserIcon, ArrowLeft, RefreshCw, Smartphone } from "lucide-react"
+import { KeyRound, ShieldCheck, User as UserIcon, ArrowLeft, RefreshCw, Smartphone, Eye, EyeOff } from "lucide-react"
 
 const LoginPage = () => {
   const navigate = useNavigate()
@@ -25,6 +25,7 @@ const LoginPage = () => {
 
   // Forgot Password State
   const [showForgotModal, setShowForgotModal] = useState(false)
+  const [showPassword, setShowPassword] = useState(false);
   const [forgotStep, setForgotStep] = useState('username') // 'username', 'otp', 'reset'
   const [forgotData, setForgotData] = useState({
     username: "",
@@ -107,16 +108,25 @@ const LoginPage = () => {
               <i className="fas fa-key h-4 w-4 mr-2"></i>
               Password
             </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="Enter your password"
-              required
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="relative">
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                required
+                value={formData.password}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
 
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 -mx-4 -mb-4 mt-4 rounded-b-lg flex flex-col gap-3">

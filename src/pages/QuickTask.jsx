@@ -145,9 +145,10 @@ export default function QuickTask() {
       } else if (activeTab === 'delegation') {
         dispatch(resetDelegationPagination());
         dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, dateFilter, nameFilter: searchTerm }));
-      } else if (activeTab === 'maintenance') {
-        dispatch(maintenanceData({ page: 1, frequency: freqFilter, searchTerm: searchTerm }));
       }
+      /* else if (activeTab === 'maintenance') {
+        dispatch(maintenanceData({ page: 1, frequency: freqFilter, searchTerm: searchTerm }));
+      } */
     }, 500);
 
     return () => clearTimeout(handler);
@@ -258,8 +259,8 @@ export default function QuickTask() {
         task_start_date: task.task_start_date || '',
         frequency: task.frequency || '',
         duration: task.duration || '',
-        enable_reminder: task.enable_reminder || '',
-        require_attachment: task.require_attachment || '',
+        enable_reminder: task.enable_reminder ?? false,
+        require_attachment: task.require_attachment ?? false,
         instruction_attachment_url: instructionUrls,
         instruction_attachment_type: instructionTypes,
         remark: task.remark || '',
@@ -290,13 +291,13 @@ export default function QuickTask() {
           const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
           
           const { error: uploadError } = await supabase.storage
-            .from('task-instructions')
+            .from('Checklist Delegation Image')
             .upload(fileName, urlOrFile, { upsert: false });
           
           if (uploadError) throw uploadError;
           
           const { data: publicUrlData } = supabase.storage
-            .from('task-instructions')
+            .from('Checklist Delegation Image')
             .getPublicUrl(fileName);
           
           return publicUrlData.publicUrl;
@@ -573,9 +574,9 @@ export default function QuickTask() {
       if (task.frequency) freqs.add(task.frequency.toLowerCase());
     });
     // Maintenance uses 'freq'
-    maintenance.forEach(task => {
+    /* maintenance.forEach(task => {
       if (task.freq) freqs.add(task.freq.toLowerCase());
-    });
+    }); */
     return Array.from(freqs).sort();
   }, [quickTask, delegationTasks, maintenance]);
 
@@ -672,9 +673,7 @@ export default function QuickTask() {
                 <p className="text-purple-600 text-[11px] font-bold uppercase tracking-wider opacity-80">
                   {activeTab === 'checklist'
                     ? `Showing ${quickTask.length} checklist tasks`
-                    : activeTab === 'maintenance'
-                      ? `Showing ${filteredMaintenance.length} maintenance tasks`
-                      : `Showing delegation tasks`}
+                    : `Showing delegation tasks`}
                 </p>
               </div>
 
@@ -694,7 +693,7 @@ export default function QuickTask() {
               {[
                 { id: 'checklist', label: 'Checklist' },
                 { id: 'delegation', label: 'Delegation' },
-                { id: 'maintenance', label: 'Maintenance' }
+                // { id: 'maintenance', label: 'Maintenance' }
               ].map(tab => (
                 <button
                   key={tab.id}

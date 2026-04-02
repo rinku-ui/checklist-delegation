@@ -8,7 +8,7 @@ export const fetchUniqueDepartmentDataApi = async () => {
     const { data, error } = await supabase
       .from("users")
       .select("user_access")
-      .eq("status", "active")
+      .eq("status", true)
       .not("user_access", "is", null);
 
     if (error) throw error;

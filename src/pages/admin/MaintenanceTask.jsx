@@ -597,7 +597,11 @@ export default function MaintenanceTask() {
 
         const workingDaySet = new Set(workingData?.map(d => d.working_date) || []);
         const isHoliday = (d) => holidays.includes(getLocalDateString(d));
-        const isWorkingDay = (d) => workingDaySet.has(getLocalDateString(d));
+        const isWorkingDay = (d) => {
+            const dateStr = getLocalDateString(d);
+            if (workingDaySet.has(dateStr)) return true;
+            return d.getDay() !== 0; // Fallback: not Sunday
+        };
         const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
 
         if (freq === 'daily' || freq === 'alternate-day') {
@@ -652,10 +656,15 @@ export default function MaintenanceTask() {
                 if (t.frequency === "one-time") {
                     const dateStr = t.startDate;
                     const isH = holidays.includes(dateStr);
-                    const { data: isW } = await supabase.from('working_day_calender').select('working_date').eq('working_date', dateStr).single();
+                    const { data: isW } = await supabase.from('working_day_calender').select('working_date').eq('working_date', dateStr).maybeSingle();
 
-                    if (isH || !isW) {
-                        return { success: false, message: `Task ${i + 1}: The selected date (${dateStr}) is a ${isH ? 'holiday' : 'non-working day'}. Please select a different working day.` };
+                    let isWorkingDay = !!isW;
+                    if (!isWorkingDay) {
+                        const dayOfWeek = new Date(t.startDate).getDay();
+                        if (dayOfWeek !== 0) isWorkingDay = true;
+                    }
+                    if (isH || !isWorkingDay) {
+                        return { success: false, message: `Task ${i + 1}: The selected date (${dateStr}) is a ${isH ? 'holiday' : 'Sunday (non-working day)'}. Please select a different working day.` };
                     }
                 }
                 return { success: true };

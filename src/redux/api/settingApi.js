@@ -18,7 +18,7 @@ export const fetchUserDetailsApi = async () => {
       .from("users")
       .select('*', { count: 'exact', head: true });
 
-    console.log("📊 Total rows in users table:", count, "Error:", countError);
+    // console.log("📊 Total rows in users table:", count, "Error:", countError);
 
     const { data, error } = await supabase
       .from("users")
@@ -29,10 +29,10 @@ export const fetchUserDetailsApi = async () => {
       return [];
     }
 
-    console.log("✅ Fetched users successfully:", data?.length, "rows");
+    // console.log("✅ Fetched users successfully:", data?.length, "rows");
     return data || [];
   } catch (error) {
-    console.log("Error from Supabase", error);
+    // console.log("Error from Supabase", error);
     return [];
   }
 };
@@ -79,33 +79,19 @@ export const fetchDepartmentDataApi = async () => {
       given_by: d.given_by || ""
     }));
 
-    console.log("fetch successfully", formatted);
+    // console.log("fetch successfully", formatted);
     return formatted;
   } catch (error) {
-    console.log("error from supabase", error);
+    // console.log("error from supabase", error);
     return [];
   }
 };
 export const createUserApi = async (newUser) => {
   try {
-    // Step 1: Get the current highest ID
-    const { data: maxIdData, error: maxIdError } = await supabase
-      .from("users")
-      .select("id")
-      .order("id", { ascending: false })
-      .limit(1);
+    // Removed manual ID generation to let Supabase handle identity column
 
-    if (maxIdError) {
-      console.error("Error fetching last ID:", maxIdError);
-      return;
-    }
-
-    const lastId = maxIdData?.[0]?.id || 0;
-    const newId = lastId + 1;
-
-    // Step 2: Insert user with new ID
+    // Step 2: Insert user
     const insertData = {
-      id: newId,
       user_name: newUser.username,
       password: newUser.password,
       email_id: newUser.email,
@@ -116,17 +102,14 @@ export const createUserApi = async (newUser) => {
       user_access: newUser.user_access,
       department: newUser.department,
       profile_image: newUser.profile_image || null,
+      remark: newUser.remark || null,
       leave_date: newUser.leave_date || null,
       leave_end_date: newUser.leave_end_date || null,
-      remark: newUser.remark || null,
       reported_by: newUser.reported_by,
-      can_self_assign: newUser.can_self_assign || false
+      can_self_assign: newUser.can_self_assign || false,
+      designation: newUser.designation || null,
+      status: newUser.status === 'active' // Map string to boolean
     };
-
-    // Add designation if provided
-    if (newUser.Designation) {
-      insertData.Designation = newUser.Designation;
-    }
 
     let { data, error } = await supabase
       .from("users")
@@ -134,24 +117,15 @@ export const createUserApi = async (newUser) => {
       .select()
       .maybeSingle();
 
-    // Fallback if Designation column doesn't exist
-    if (error && (error.code === 'PGRST204' || error.message?.includes('Designation') || error.code === '42703')) {
-      console.warn("⚠️ Column 'Designation' likely missing, retrying without it:", error.message);
-      const { Designation, ...fallbackData } = insertData;
-      const retry = await supabase.from("users").insert([fallbackData]).select().maybeSingle();
-      data = retry.data;
-      error = retry.error;
-    }
-
     if (error) {
-      console.log("Error when posting data:", error);
+      console.error("Error when posting data:", error);
     } else {
-      console.log("Posted successfully", data);
+      // console.log("Posted successfully", data);
     }
 
     return data;
   } catch (error) {
-    console.log("Error from Supabase:", error);
+    // console.log("Error from Supabase:", error);
   }
 };
 
@@ -169,12 +143,13 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
       department: updatedUser.department,
       profile_image: updatedUser.profile_image,
       reported_by: updatedUser.reported_by,
-      can_self_assign: updatedUser.can_self_assign ?? false
+      can_self_assign: updatedUser.can_self_assign ?? false,
+      status: updatedUser.status === 'active' // Map string to boolean
     };
 
-    // Only include Designation if explicitly set
-    if ('Designation' in updatedUser && updatedUser.Designation !== undefined) {
-      updateData.Designation = updatedUser.Designation || null;
+    // Only include designation if explicitly set
+    if ('designation' in updatedUser && updatedUser.designation !== undefined) {
+      updateData.designation = updatedUser.designation || null;
     }
 
     // Only update password if a new one is provided
@@ -190,7 +165,7 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
       }
     });
 
-    console.log("🚀 Attempting to update user ID:", id, "with data:", updateData);
+    // console.log("🚀 Attempting to update user ID:", id, "with data:", updateData);
 
     let { data, error } = await supabase
       .from("users")
@@ -199,15 +174,15 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
       .select()
       .maybeSingle();
 
-    // If 400 error (column not found or invalid column reference)
-    // PGRST204: column not found in select
-    // 42703: column does not exist in update
-    if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.toLowerCase().includes('Designation'.toLowerCase()))) {
-      console.warn("⚠️ Designation update failed, retrying without Designation field. Error:", error.message);
-      const { Designation, ...fallbackData } = updateData;
-      const retry = await supabase.from("users").update(fallbackData).eq("id", id).select().maybeSingle();
-      data = retry.data;
-      error = retry.error;
+    // Check for column errors
+    if (error) {
+      if (error.code === 'PGRST204' || error.code === '42703' || error.message?.toLowerCase().includes('designation')) {
+        console.warn("⚠️ Designation update failed, retrying without designation field. Error:", error.message);
+        const { designation, ...fallbackData } = updateData;
+        const retry = await supabase.from("users").update(fallbackData).eq("id", id).select().maybeSingle();
+        data = retry.data;
+        error = retry.error;
+      }
     }
 
     if (error) {
@@ -215,7 +190,7 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
       throw error;
     }
 
-    console.log("✅ Update successful:", data);
+    // console.log("✅ Update successful:", data);
     return data;
   } catch (error) {
     console.error("❌ Exception in updateUserDataApi:", error);
@@ -238,7 +213,7 @@ export const createDepartmentApi = async (newDept) => {
     if (error) throw error;
     return data;
   } catch (error) {
-    console.log("Error creating department:", error);
+    // console.log("Error creating department:", error);
     throw error;
   }
 };
@@ -258,7 +233,7 @@ export const updateDepartmentDataApi = async ({ id, updatedDept }) => {
     if (error) throw error;
     return data;
   } catch (error) {
-    console.log("Error updating department:", error);
+    // console.log("Error updating department:", error);
     throw error;
   }
 };
@@ -487,7 +462,7 @@ export const uploadProfileImageApi = async (file, userId) => {
     console.log("🚀 Uploading to Supabase Storage:", filePath);
 
     const { error: uploadError } = await supabase.storage
-      .from('profiles')
+      .from('Checklist Delegation Image')
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: true
@@ -499,7 +474,7 @@ export const uploadProfileImageApi = async (file, userId) => {
     }
 
     const { data: { publicUrl } } = supabase.storage
-      .from('profiles')
+      .from('Checklist Delegation Image')
       .getPublicUrl(filePath);
 
     console.log("✅ Profile Image Public URL:", publicUrl);
@@ -516,13 +491,13 @@ export const uploadPartImageApi = async (file) => {
     const fileName = `part_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('parts')
+      .from('Checklist Delegation Image')
       .upload(fileName, file, { cacheControl: '3600', upsert: false });
 
     if (uploadError) throw uploadError;
 
     const { data: { publicUrl } } = supabase.storage
-      .from('parts')
+      .from('Checklist Delegation Image')
       .getPublicUrl(fileName);
 
     console.log('✅ Part image uploaded:', publicUrl);

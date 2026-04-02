@@ -163,7 +163,7 @@ const CalendarPage = () => {
             let query = supabase
                 .from('users')
                 .select('user_name, reported_by, profile_image')
-                .eq('status', 'active')
+                .eq('status', true)
                 .order('user_name', { ascending: true });
             
             if (role === 'HOD' && username) {

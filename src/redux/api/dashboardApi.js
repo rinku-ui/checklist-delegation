@@ -657,7 +657,7 @@ export const getStaffNamesByDepartmentApi = async (departmentFilter = null) => {
       .select('user_name, user_access, status, reported_by')
       .not('user_name', 'is', null)
       .not('user_name', 'eq', '')
-      .eq('status', 'active'); 
+      .eq('status', true); 
 
     const { data, error } = await query;
 

@@ -1136,8 +1136,8 @@ export default function AdminDashboard() {
   return (
     <AdminLayout>
       <div className="space-y-4">
-        {/* Sticky Only Task Management Tabs */}
-        <div className="sticky top-0 z-30 bg-white/60 backdrop-blur-xl py-2 border-b border-gray-100/50 shadow-sm transition-all duration-300">
+        {/* Sticky Only Task Management Tabs - All tabs hidden by request */}
+        {/* <div className="sticky top-0 z-30 bg-white/60 backdrop-blur-xl py-2 border-b border-gray-100/50 shadow-sm transition-all duration-300">
           <div className="max-w-7xl mx-auto">
             <TaskManagementTabs
               activeTab={mainTab === 'default' ? 'checklist' : mainTab}
@@ -1162,7 +1162,7 @@ export default function AdminDashboard() {
               }}
             />
           </div>
-        </div>
+        </div> */}
 
         {/* Dashboard Header stays in flow (scrolls away) */}
         <DashboardHeader
@@ -1206,7 +1206,7 @@ export default function AdminDashboard() {
           />
         )}
 
-        {mainTab === "maintenance" && (
+        {/* {mainTab === "maintenance" && (
           <MaintenanceView stats={displayStats} tasks={departmentData.allTasks} />
         )}
 
@@ -1216,7 +1216,7 @@ export default function AdminDashboard() {
 
         {mainTab === "ea" && (
           <EAView />
-        )}
+        )} */}
       </div>
     </AdminLayout>
   )
