@@ -367,7 +367,13 @@ function TaskCard({ task, index, total, department, doerName, givenBy, dispatch,
                             disabled={task.frequencyLocked}
                             className={`w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 focus:ring-2 focus:ring-purple-500 outline-none transition-all text-xs ${task.frequencyLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
-                            {FREQUENCY_OPTIONS.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
+                            {(() => {
+                                const params = new URLSearchParams(window.location.search);
+                                const isDelegation = params.get('type') === 'delegation';
+                                return FREQUENCY_OPTIONS
+                                    .filter(opt => isDelegation || opt !== "One Time (No Recurrence)")
+                                    .map((opt, i) => <option key={i} value={opt}>{opt}</option>);
+                            })()}
                         </select>
                     </div>
 
@@ -447,6 +453,10 @@ export default function ChecklistTask() {
         const params = new URLSearchParams(window.location.search);
         const dateParam = params.get('date');
         const typeParam = params.get('type');
+
+        if (typeParam !== 'delegation') {
+            setTasks(prev => prev.map(t => ({ ...t, frequency: "Daily" })));
+        }
 
         if (dateParam || typeParam === 'delegation') {
             setTasks(prev => {

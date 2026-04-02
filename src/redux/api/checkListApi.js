@@ -166,7 +166,7 @@ export const updateChecklistData = async (submissionData) => {
 
           // 4. Get public URL
           const { data: { publicUrl } } = supabase.storage
-            .from('checklist')
+            .from('Checklist Delegation Image')
             .getPublicUrl(filePath);
 
           if (!publicUrl) throw new Error('Failed to generate public URL');

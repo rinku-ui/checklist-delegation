@@ -102,7 +102,7 @@ const maintenanceSlice = createSlice({
         });
 
         // Update
-        builder.addCase(updateMaintenance.fulfilled, (state, action) => {
+        builder.addCase(updateMaintenance.fulfilled, () => {
             // We can filter out updated items from 'maintenance' state locally to update UI immediately
             // or rely on reload. 
             // Let's rely on reload or refetch as per existing patterns.

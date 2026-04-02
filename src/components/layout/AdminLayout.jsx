@@ -1,5 +1,5 @@
 "use client";
-import aceLogo from "../../assets/Ace_Logoo.jpg";
+import aceLogo from "../../assets/logo.png";
 
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -78,21 +78,21 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
     const cachedImage = localStorage.getItem("profile_image");
     setProfileImage(cachedImage || "");
 
-      // Fetch reporting users for HOD role check
-      let reportingUsers = [storedUsername?.toLowerCase()];
-      const currentUserRole = (localStorage.getItem("role") || "").toLowerCase();
-      if (currentUserRole === "hod") {
-          const fetchReportingUsers = async () => {
-              const { data: reports } = await supabase
-                  .from("users")
-                  .select("user_name")
-                  .eq("reported_by", storedUsername);
-              if (reports) {
-                  reportingUsers = [storedUsername.toLowerCase(), ...reports.map(r => (r.user_name || "").toLowerCase())];
-              }
-          };
-          fetchReportingUsers();
-      }
+    // Fetch reporting users for HOD role check
+    let reportingUsers = [storedUsername?.toLowerCase()];
+    const currentUserRole = (localStorage.getItem("role") || "").toLowerCase();
+    if (currentUserRole === "hod") {
+      const fetchReportingUsers = async () => {
+        const { data: reports } = await supabase
+          .from("users")
+          .select("user_name")
+          .eq("reported_by", storedUsername);
+        if (reports) {
+          reportingUsers = [storedUsername.toLowerCase(), ...reports.map(r => (r.user_name || "").toLowerCase())];
+        }
+      };
+      fetchReportingUsers();
+    }
 
     // Sync with database to get the latest image
     const syncProfileImage = async () => {
@@ -176,7 +176,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
     },
     {
       href: "/dashboard/task",
-      label: "Task",
+      label: "Checklist",
       icon: CalendarCheck,
       active: location.pathname === "/dashboard/task",
       showFor: ["admin", "HOD", "user"],
@@ -191,7 +191,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
     {
       label: "Holiday",
       icon: CalendarIcon, // Or a specific holiday icon
-      showFor: (isSuperAdmin || userRole.toLowerCase() === "admin") ? ["admin"] : [], 
+      showFor: (isSuperAdmin || userRole.toLowerCase() === "admin") ? ["admin"] : [],
       isSubmenu: true,
       isOpen: isHolidaySubmenuOpen,
       setIsOpen: setIsHolidaySubmenuOpen,
@@ -244,20 +244,20 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode, showLa
   const getAccessibleRoutes = () => {
     const userRole = localStorage.getItem("role") || "user";
     const username = localStorage.getItem("user-name");
-    
+
     return routes
       .filter((route) => {
         const userRoleNormalized = (userRole || "user").toLowerCase();
         const usernameNormalized = (username || "").toLowerCase();
-        
+
         // If it's the Setting page, only show for super admin (admin username)
         if (route.label === "Settings") {
           return usernameNormalized === "admin";
         }
-        
+
         // Holiday submenu logic handled by showFor in routes
         if (route.label === "Holiday") {
-            return isSuperAdmin || userRoleNormalized === "admin";
+          return isSuperAdmin || userRoleNormalized === "admin";
         }
         return route.showFor.some(role => role.toLowerCase() === userRoleNormalized);
       })

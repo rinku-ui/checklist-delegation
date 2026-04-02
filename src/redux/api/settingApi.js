@@ -213,7 +213,7 @@ export const createDepartmentApi = async (newDept) => {
     if (error) throw error;
     return data;
   } catch (error) {
-    // console.log("Error creating department:", error);
+    console.error("Error creating department:", error);
     throw error;
   }
 };
@@ -233,7 +233,7 @@ export const updateDepartmentDataApi = async ({ id, updatedDept }) => {
     if (error) throw error;
     return data;
   } catch (error) {
-    // console.log("Error updating department:", error);
+    console.error("Error updating department:", error);
     throw error;
   }
 };
@@ -308,7 +308,7 @@ export const deleteUserByIdApi = async (id) => {
     console.log("User deleted successfully:", data);
     return data;
   } catch (error) {
-    console.log("Error from Supabase:", error);
+    console.error("Error deleting user from Supabase:", error);
     throw error;
   }
 };
@@ -348,7 +348,9 @@ export const fetchGivenByDataApi = async () => {
         try {
           const parsed = JSON.parse(name);
           name = parsed.given_by || parsed.name || name;
-        } catch (e) { }
+        } catch (error) { 
+          // Ignore parse errors, use original value
+        }
       }
       return { id: d.id, given_by: name };
     });

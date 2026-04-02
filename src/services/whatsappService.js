@@ -570,13 +570,6 @@ export const sendTaskAssignmentNotification = async (taskDetails) => {
 };
 
 /**
- * DEPRECATED - use sendTaskAssignmentNotification
- */
-const formatTaskMessage = (taskDetails) => {
-    return "Please use specific notification functions";
-};
-
-/**
  * Send task reminder notification
  * @param {Object} taskDetails - Task details
  * @returns {Promise<boolean>} - Success status
