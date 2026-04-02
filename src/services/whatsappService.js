@@ -79,9 +79,12 @@ const sendWhatsAppMessage = async (phoneNumber, message) => {
             return false;
         }
 
-        // If API credentials are not configured, log to console instead
-        if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID || !WHATSAPP_PRODUCT_ID) {
-            console.log('📱 WhatsApp Message (API not configured):');
+        // If API credentials are not configured or are demo keys, log to console instead
+        const isNotConfigured = !WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID || !WHATSAPP_PRODUCT_ID;
+        const isDemo = WHATSAPP_ACCESS_TOKEN === 'DEMO_ACCESS_TOKEN' || WHATSAPP_PHONE_NUMBER_ID === 'DEMO_PHONE_ID' || WHATSAPP_PRODUCT_ID === 'DEMO_PRODUCT_ID';
+
+        if (isNotConfigured || isDemo) {
+            console.log('📱 WhatsApp Message (Demo/Mock mode):');
             console.log(`To: +${formattedPhone}`);
             console.log(`Message: ${message}`);
             console.log('---');
@@ -134,9 +137,12 @@ const sendWhatsAppVoiceMessage = async (phoneNumber, audioUrl) => {
             return false;
         }
 
-        // Development fallback
-        if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID || !WHATSAPP_PRODUCT_ID) {
-            console.log('🎤 WhatsApp Voice Message (API not configured):');
+        // Development fallback for unconfigured or demo keys
+        const isNotConfigured = !WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID || !WHATSAPP_PRODUCT_ID;
+        const isDemo = WHATSAPP_ACCESS_TOKEN === 'DEMO_ACCESS_TOKEN' || WHATSAPP_PHONE_NUMBER_ID === 'DEMO_ID' || WHATSAPP_PRODUCT_ID === 'DEMO_ID';
+
+        if (isNotConfigured || isDemo) {
+            console.log('🎤 WhatsApp Voice Message (Demo/Mock mode):');
             console.log(`To: +${formattedPhone}`);
             console.log(`Audio URL: ${audioUrl}`);
             return true;
